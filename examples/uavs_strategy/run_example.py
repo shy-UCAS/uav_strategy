@@ -1,6 +1,9 @@
 import sys
 import os, os.path as osp
 
+from modules import basic_functions as bfunc
+
+import json
 import asyncio
 from datetime import datetime, timedelta
 
@@ -34,9 +37,24 @@ fleet2 = [
 
 
 class BlueUAVAgent(BDIAgent):
-    def __init__(self, jid, password, asl_file, position=None):
+    def __init__(self, jid, password, asl_file, position=None, facilities=None):
         super().__init__(jid, password, asl_file)
         self.position = position if position else None
+        if facilities is None:
+            self.facilities = self._default_facilities()
+        else:
+            self.facilities = facilities
+
+    def _default_facilities(self, default_json_path = None):
+        if default_json_path is None:
+            _facilities_info_json = osp.join(bfunc.WS_ROOT, 'data', 'test_facilities_locations.json')
+        else:
+            _facilities_info_json = default_json_path
+
+        with open(_facilities_info_json, 'r') as f:
+            _facilities_info = json.load(f)
+
+        return bfunc.Facilities(_facilities_info['facilities_str'], _facilities_info['defence_rings'])
 
     async def setup(self):
         _template = Template(metadata={"performative": "RedUavAlert"})
@@ -86,10 +104,10 @@ class BlueUAVAgent(BDIAgent):
 
 
 async def main(server, password):
-    uav_blue01 = BlueUAVAgent(f"blue01@{server}", password, "uav_blue_01.asl",position=fleet1)
+    uav_blue01 = BlueUAVAgent(f"blue01@{server}", password, "uav_blue_01.asl", position=fleet1)
     uav_blue01.bdi.set_belief("my_friend", f"blue02@{server}")
 
-    uav_blue02 = BlueUAVAgent(f"blue02@{server}", password, "uav_blue_02.asl",position=fleet2)
+    uav_blue02 = BlueUAVAgent(f"blue02@{server}", password, "uav_blue_02.asl", position=fleet2)
     uav_blue02.bdi.set_belief("my_friend", f"blue01@{server}")
 
     await uav_blue01.start()
