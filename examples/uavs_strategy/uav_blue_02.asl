@@ -27,8 +27,8 @@
   !t2;
   !tb3.
 
-+!tb1 <- .act_breakthrough(radar1); .print("tb1 executed").
-+!t2 <- .act_escape(ring1); .print("t2 executed").
-+!tb3 <- .act_attack(hq1); .print("tb3 executed").
++!tb1 <- .act_breakthrough(antiair); .print("tb1 executed").
++!t2 <- .act_escape(antiair_facilities); .print("t2 executed").
++!tb3 <- .act_attack(headquarter); .print("tb3 executed").
 
 // +!ta1_done(a) <- .print("ta1_done received: ", a).

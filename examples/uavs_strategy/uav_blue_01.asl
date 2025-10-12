@@ -12,8 +12,6 @@
 //   .send(Friend, achieve, subtask_coord).
 
 +!start <-
-  .act_get_position(X);
-
   !ta1;
   ?my_friend(Friend);
   .print("Uav A Got friend: ", Friend);
@@ -29,8 +27,12 @@
   !t2;
   !ta3.
 
-+!ta1 <- .act_detour(ring2); .print("ta1 executed").
-+!t2 <- .act_attack(hq2); .print("t2 executed").
-+!ta3 <- .act_escape(ring1); .print("ta3 executed").
+//+!ta1 <- .act_detour(ring2); .print("ta1 executed").
+//+!t2 <- .act_attack(hq2); .print("t2 executed").
+//+!ta3 <- .act_escape(ring1); .print("ta3 executed").
+
++!ta1 <- .act_detour(probe_facilities); .print("ta1 executed").
++!t2 <- .act_attack(headquarter); .print("t2 executed").
++!ta3 <- .act_breakthrough(antiair); .print("ta3 executed").
 
 // +tb1_done(b) <- .print("tb1_done received: ", b).
