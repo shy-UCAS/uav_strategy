@@ -1,10 +1,12 @@
 import sys
 import os, os.path as osp
+import random
 
 from sqlalchemy import false
 
 from modules import basic_functions as bfunc
 from modules import quick_path_planners as qpp
+from modules import math_curves_generators as curve_gen
 
 import numpy as np
 import json
@@ -39,18 +41,37 @@ fleet2 = [
     37.56342057758475
 ]
 
+height_value_set = {
+    'breakthrough': [200, 0],
+    'escape': [0, 200],
+    'detour': [0, 200]
+}
+
+height_range_value_set = {
+    'breakthrough': [[250, 400], [0, 100]],
+    'escape': [[0, 100], [250, 400]],
+    'detour': [[0, 100], [200, 400]]
+}
+direction_range_set = {
+    'breakthrough': [-20, 20],
+    'escape': [-20, 20],
+    'detour': [0, 360]
+}
+
 
 class BlueUAVAgent(BDIAgent):
-    def __init__(self, jid, password, asl_file, position=None, facilities=None):
+    def __init__(self, jid, password, asl_file, position=None, facilities=None, height_range_set=None,
+                 direction_range_set=None):
         super().__init__(jid, password, asl_file)
         self.position = position if position else None
-        if facilities is None:
-            self.facilities = self._default_facilities()
-        else:
-            self.facilities = facilities
-        self.traj = [self.position]
+        self.facilities = self._default_facilities() if facilities is None else facilities
+        self.height_range_set = height_range_set if height_range_set else height_range_value_set
+        self.direction_range_set = direction_range_set if direction_range_set else direction_range_set
+        self._lnglat2utm_convertor = bfunc.LngLat2UTM()
 
-    def _default_facilities(self, default_json_path = None):
+        self.traj = self._lnglat2utm_convertor.lng_lat_to_utm_array(np.array([self.position])).tolist()
+
+    def _default_facilities(self, default_json_path=None):
         if default_json_path is None:
             _facilities_info_json = osp.join(bfunc.WS_ROOT, 'data', 'test_facilities_locations.json')
         else:
@@ -71,41 +92,66 @@ class BlueUAVAgent(BDIAgent):
             print(f"{self.agent.name} checking alter from red uavs ...")
 
     def add_custom_actions(self, actions):
-        @actions.add(".act_breakthrough", 1)
+        @actions.add(".act_breakthrough", 3)
         def _action_breakthrough(agent, term, intention):
-            _arg = str(agentspeak.grounded(term.args[0], intention.scope))
-            if  _arg in bfunc.GlobalBasicConfigs.PLANNING_BREAKTHROUGH_FACILITY_TYPES:
-                _traj =  self._plan_breakthrough_targettype(self.traj[-1], _arg)
-            elif _arg in self.facilities.get_facilities_names():
-                _traj = self._plan_breakthrough_target(self.traj[-1], _arg)
+            # 获取三个参数：第一个是目标类型，第二个是起点高度，第三个是终点高度
+            _arg_target = str(agentspeak.grounded(term.args[0], intention.scope))
+            _arg_start_height = int(agentspeak.grounded(term.args[1], intention.scope))
+            _arg_end_height = int(agentspeak.grounded(term.args[2], intention.scope))
+
+            # 计算轨迹
+            if _arg_target in bfunc.GlobalBasicConfigs.PLANNING_BREAKTHROUGH_FACILITY_TYPES:
+                _traj = self._plan_breakthrough_targettype(self.traj[-1], _arg_target)
+            elif _arg_target in self.facilities.get_facilities_names():
+                _traj = self._plan_breakthrough_target(self.traj[-1], _arg_target)
+
+            # 执行三维坐标转换并且插值高度
+            _traj = self._insert_height_val('breakthrough', _traj, _arg_start_height, _arg_end_height)
             self.traj.extend(_traj[1:])
-            print(f"{agent.name} is breaking through {str(_arg)},breakthrough trajectory is: {_traj}",end=' ')
-            print(f"full trajectory: {self.traj}")
+
+            print(f"{agent.name} is breaking through {str(_arg_target)},breakthrough trajectory is: \n {_traj}")
+            print(f"cur full trajectory: {self.traj}")
             yield
 
-        @actions.add(".act_escape", 1)
+        @actions.add(".act_escape", 3)
         def _action_escape(agent, term, intention):
-            _arg = str(agentspeak.grounded(term.args[0], intention.scope))
-            _traj = self._plan_escape(self.traj[-1], _arg)
+            _arg_target = str(agentspeak.grounded(term.args[0], intention.scope))
+            _arg_start_height = int(agentspeak.grounded(term.args[1], intention.scope))
+            _arg_end_height = int(agentspeak.grounded(term.args[2], intention.scope))
+
+            _traj = self._insert_height_val(
+                'escape',
+                self._plan_escape(self.traj[-1], _arg_target),
+                _arg_start_height,
+                _arg_end_height
+            )
+
             self.traj.extend(_traj[1:])
-            print(f"{agent.name} is escaping {_arg},escape trajectory is: {_traj}",end=' ')
-            print(f"full trajectory: {self.traj}")
+            print(f"{agent.name} is escaping {_arg_target},escape trajectory is: \n {_traj}")
+            print(f"cur full trajectory: {self.traj}")
             yield
 
         @actions.add(".act_attack", 1)
         def _action_attack(agent, term, intention):
             _arg = agentspeak.grounded(term.args[0], intention.scope)
-            print(f"{agent.name} is attacking {_arg} ...",end=' ')
+            print(f"{agent.name} is attacking {_arg} ...", end=' ')
 
             yield
 
-        @actions.add(".act_detour", 1)
+        @actions.add(".act_detour", 3)
         def _action_detour(agent, term, intention):
-            _arg = str(agentspeak.grounded(term.args[0], intention.scope))
-            _traj = self._plan_detour(self.traj[-1], _arg)
+            _arg_target = str(agentspeak.grounded(term.args[0], intention.scope))
+            _arg_start_height = int(agentspeak.grounded(term.args[1], intention.scope))
+            _arg_end_height = int(agentspeak.grounded(term.args[2], intention.scope))
+            _traj = self._insert_height_val(
+                'detour',
+                self._plan_detour(self.traj[-1], _arg_target),
+                _arg_start_height,
+                _arg_end_height
+            )
             self.traj.extend(_traj[1:])
-            print(f"{agent.name} is detouring {_arg},detour trajectory is: {_traj}",end=' ')
-            print(f"full trajectory: {self.traj}")
+            print(f"{agent.name} is detouring {_arg_target},detour trajectory is: \n{_traj}")
+            print(f"cur full trajectory: {self.traj}")
             yield
 
         @actions.add(".act_get_position", 1)
@@ -117,31 +163,79 @@ class BlueUAVAgent(BDIAgent):
             # 将位置绑定到 X 变量
             _arg = agentspeak.grounded(term.args[0], intention.scope)
             _arg.set_value(position)  # 将当前位置赋给 X 变量
-
             yield
 
-    def _plan_breakthrough_targettype(self, start_location, facility_type, utm = False):
+        @actions.add(".act_visualize", 0)
+        def _act_visualize(agent, term, intention):
+            self.facilities.visualize(show_mode = "2D")
+            print(f"{agent.name} is visualizing the environment ...")
+            yield
+
+    def _insert_height_val(self, order_type, traj, start_height, end_height):
+        # 传入的是只有二维坐标的轨迹点，先给起点和终点添加高度，然后插值得到中间点的高度，返回一个新的三维轨迹点列表
+        _default_height_range = self.height_range_set[order_type]
+
+        # 生成随机的起点和终点高度
+        _altitude_start_random = random.randint(
+            _default_height_range[0][0],
+            _default_height_range[0][1]
+        )
+        _altitude_end_random = random.randint(
+            _default_height_range[1][0],
+            _default_height_range[1][1]
+        )
+
+        # 修改起点高度
+        if len(traj[0]) == 2:
+            # 传入的值是二维坐标，则给起点添加高度，且值是-1的时候随机生成高度
+            traj[0].append(start_height if start_height != -1 else _altitude_start_random)
+        elif len(traj[0]) == 3:
+            pass
+
+        # 修改终点高度
+        if len(traj[-1]) == 2:
+            traj[-1].append(end_height if end_height != -1 else _altitude_end_random)
+        elif len(traj[-1]) == 3:
+            pass
+
+        # 此时轨迹点列表中只有起点和终点是三维的，需要插值得到中间点的高度
+        _3dim_traj = curve_gen.interpolate_z_coordinates(traj)
+
+        if order_type == 'detour':
+            # escape类型的数据轨迹本身就有很多个点，用样条曲线方法拟合就够了
+            return curve_gen.cubic_interpolation_3d(_3dim_traj)
+        else:
+            # 其他类型的轨迹都是只有两个轨迹点，可以套用breakthrough的方法
+            return curve_gen.generate_breakthrough_flight(_3dim_traj)
+
+    def _plan_breakthrough_targettype(self, start_location, facility_type, utm=True):
         # 寻找可以突破的目标
-        _target_location = self.facilities.pick_random_target(facility_type,utm)
-        return [start_location, _target_location['location']]
+        _target_location = self.facilities.pick_random_target(facility_type, utm)
+        return [start_location,
+                list(_target_location['location']) if isinstance(_target_location['location'], tuple) else
+                _target_location['location']]
 
-    def _plan_breakthrough_target(self, start_location, target):
-        _target_location = self.facilities.get_target_location(target)
-        return [start_location, _target_location]
+    def _plan_breakthrough_target(self, start_location, target, utm=True):
+        _target_location = self.facilities.get_target_location(target, utm)
+        return [start_location, list(_target_location) if isinstance(_target_location, tuple) else _target_location]
 
-    def _plan_detour(self, start_location, target , detour_steps=5):
+    def _plan_detour(self, start_location, target, detour_steps=5, utm=True):
         if target in self.facilities.facilities_info.keys() \
             or target in self.facilities.defend_rings.keys():
 
             if target in self.facilities.antiairs:
                 _detour_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.antiairs[target],
-                                                                               bfunc.GlobalBasicConfigs.AVOID_ANTIAIR_DISTANCE, ll2utm=False)
+                                                                                   bfunc.GlobalBasicConfigs.AVOID_ANTIAIR_DISTANCE,
+                                                                                   ll2utm=utm)
             elif target in self.facilities.headquartors:
                 _detour_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.headquartors[target],
-                                                                               bfunc.GlobalBasicConfigs.AVOID_HQ_DISTANCE, ll2utm=False)
+                                                                                   bfunc.GlobalBasicConfigs.AVOID_HQ_DISTANCE,
+                                                                                   ll2utm=utm)
             elif target in self.facilities.probers:
                 _detour_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.probers[target],
-                                                                               bfunc.GlobalBasicConfigs.AVOID_RADAR_DISTANCE, ll2utm=False)
+                                                                                   bfunc.GlobalBasicConfigs.AVOID_RADAR_DISTANCE,
+                                                                                   ll2utm=utm)
+
             elif target in self.facilities.defend_rings.keys():
                 _detour_polygon_xys = self.facilities.get_defence_rings_polyborder()
 
@@ -155,25 +249,28 @@ class BlueUAVAgent(BDIAgent):
             _detour_polygon_xys = self.facilities.get_defence_facilities_polyborder()
 
         _border = qpp.SimpleBorders(_detour_polygon_xys[0])
-        _traj_locations = _border.move_along_border(start_location, steps=detour_steps,
+        _traj_locations = _border.move_along_border(start_location if len(start_location) == 2 else start_location[:2],
+                                                    steps=detour_steps,
                                                     direction=np.random.choice(['clockwise', 'anticlockwise']))
 
-        return _traj_locations
+        return [list(item) if isinstance(item, tuple) else item for item in _traj_locations]
 
-
-    def _plan_escape(self, start_location, target = 'defence_rings'):
+    def _plan_escape(self, start_location, target='defence_rings', utm=True):
         if target in self.facilities.facilities_info.keys() \
             or target in self.facilities.defend_rings.keys():
 
             if target in self.facilities.antiairs:
                 _escape_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.antiairs[target],
-                                                                                   bfunc.GlobalBasicConfigs.AVOID_ANTIAIR_DISTANCE, ll2utm=False)
+                                                                                   bfunc.GlobalBasicConfigs.AVOID_ANTIAIR_DISTANCE,
+                                                                                   ll2utm=utm)
             elif target in self.facilities.headquartors:
                 _escape_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.headquartors[target],
-                                                                                   bfunc.GlobalBasicConfigs.AVOID_HQ_DISTANCE, ll2utm=False)
+                                                                                   bfunc.GlobalBasicConfigs.AVOID_HQ_DISTANCE,
+                                                                                   ll2utm=utm)
             elif target in self.facilities.probers:
                 _escape_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.probers[target],
-                                                                                   bfunc.GlobalBasicConfigs.AVOID_RADAR_DISTANCE, ll2utm=False)
+                                                                                   bfunc.GlobalBasicConfigs.AVOID_RADAR_DISTANCE,
+                                                                                   ll2utm=utm)
             elif target in self.facilities.defend_rings.keys():
                 _escape_polygon_xys = self.facilities.get_defence_rings_polyborder()
 
@@ -193,8 +290,8 @@ class BlueUAVAgent(BDIAgent):
         else:
             # 否则，则计算当前坐标到逃逸范围的最近边界点，并返回
             # _nearest_point = _border.get_nearest_border_point(init_location)
-            _nearest_point = _border.get_nearest_border_vertex(start_location)
-            return [start_location, _nearest_point.coords[0]]
+            _nearest_point = _border.get_nearest_border_vertex(start_location if len(start_location) == 2 else start_location[:2])
+            return [start_location, list(_nearest_point) if isinstance(_nearest_point, tuple) else _nearest_point]
 
 
 async def main(server, password):

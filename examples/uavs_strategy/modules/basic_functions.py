@@ -27,6 +27,7 @@ if not WS_ROOT in sys.path:
 
 BASIC_CONFIGS_FILE = osp.join(WS_ROOT, 'configs.ini')
 
+
 class BasicConfigs:
     def __init__(self, ini_file=BASIC_CONFIGS_FILE):
         self.cfg_file = ini_file
@@ -67,7 +68,7 @@ class BasicConfigs:
 
         except Exception as e:
             print(e)
-        
+
     def retrieve_avoid_radius(self):
         return {'AVOIDE_ANTIAIR_DISTANCE': self.AVOID_ANTIAIR_DISTANCE,
                 'AVOIDE_RADAR_DISTANCE': self.AVOID_RADAR_DISTANCE,
@@ -88,6 +89,7 @@ class BasicConfigs:
 
             with open(self.cfg_file, 'w', encoding='utf-8') as f:
                 _config.write(f)
+
 
 GlobalBasicConfigs = BasicConfigs()
 
@@ -229,13 +231,14 @@ class Facilities:
     def _get_union_polygons_border(self, polygons):
         _union_polygon = unary_union(polygons)
         return _union_polygon.exterior.coords.xy
-    
+
     def get_spec_facility_polyborder(self, center_location, radius, ll2utm=True):
         if ll2utm:
-            _polygon = self._make_polygon_from_circle(self.lnglat_converter.lon_lat_to_utm(center_location[0], center_location[1]), radius)
+            _polygon = self._make_polygon_from_circle(
+                self.lnglat_converter.lon_lat_to_utm(center_location[0], center_location[1]), radius)
         else:
             _polygon = self._make_polygon_from_circle(np.array(center_location), radius)
-        
+
         return _polygon.exterior.coords.xy
 
     def get_defence_facilities_polyborder(self, radius=GlobalBasicConfigs.AVOID_ANTIAIR_DISTANCE, union_polygons=False):
@@ -284,7 +287,8 @@ class Facilities:
         else:
             return [_ext_defend_rings[0].exterior.coords.xy]
 
-    def visualize(self, start_point=None, show_defend_rings=True, show_borders=False, show_ppath=None, show_mode='3D'):
+    def visualize(self, start_point=None, show_defend_rings=True, show_borders=False, show_ppath=None, show_mode='3D',
+                  block=False):
         fig = plt.figure(figsize=(10, 10))
 
         if show_mode == '3D':
@@ -302,7 +306,8 @@ class Facilities:
                     _utm_xys = np.array([_lnglats['lngs'], _lnglats['lats']]).T
 
                 if show_mode == '3D':
-                    ax.plot_trisurf(_utm_xys[:, 0], _utm_xys[:, 1], np.zeros_like(_utm_xys[:, 0]), color='red', alpha=0.3, label=_ring)
+                    ax.plot_trisurf(_utm_xys[:, 0], _utm_xys[:, 1], np.zeros_like(_utm_xys[:, 0]), color='red',
+                                    alpha=0.3, label=_ring)
                 else:
                     ax.fill(_utm_xys[:, 0], _utm_xys[:, 1], color='red', alpha=0.3, label=_ring)
 
@@ -370,7 +375,8 @@ class Facilities:
                     _cur_ys = [_loc[1] for _loc in _path['trajectory']]
                     _cur_zs = [_loc[2] for _loc in _path['trajectory']]
 
-                    ax.plot(_cur_xs, _cur_ys, _cur_zs, linestyle='--', color=plt.cm.tab10(_p_iter % 10), linewidth=1, label='Path')
+                    ax.plot(_cur_xs, _cur_ys, _cur_zs, linestyle='--', color=plt.cm.tab10(_p_iter % 10), linewidth=1,
+                            label='Path')
 
                     if len(_cur_xs) > 2:
                         _cur_mid_idx = len(_cur_xs) // 2
@@ -383,9 +389,9 @@ class Facilities:
                         z_mid = (_cur_zs[0] + _cur_zs[-1]) / 2
 
                     # 添加标签
-                    ax.text(x_mid, y_mid, z_mid, 
-                            _path['type'], 
-                            color='black', 
+                    ax.text(x_mid, y_mid, z_mid,
+                            _path['type'],
+                            color='black',
                             fontsize=5,
                             bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'))
                     ax.set_zlim(-100, 300)
@@ -394,7 +400,8 @@ class Facilities:
                 for _p_iter, _path in enumerate(show_ppath):
                     _cur_xs = [_loc[0] for _loc in _path['trajectory']]
                     _cur_ys = [_loc[1] for _loc in _path['trajectory']]
-                    ax.plot(_cur_xs, _cur_ys, linestyle='--', color=plt.cm.tab10(_p_iter % 10), linewidth=1, label='Path')
+                    ax.plot(_cur_xs, _cur_ys, linestyle='--', color=plt.cm.tab10(_p_iter % 10), linewidth=1,
+                            label='Path')
 
                     if len(_cur_xs) > 2:
                         _cur_mid_idx = len(_cur_xs) // 2
@@ -415,7 +422,6 @@ class Facilities:
                 ax.scatter(start_point[0], start_point[1], start_point[2], color='b', marker=_marker, label='start')
             else:
                 ax.scatter(start_point[0], start_point[1], color='b', marker=_marker, label='start')
-
         def on_mouse_move(event):
             if event.inaxes:
                 x = event.xdata
@@ -428,7 +434,7 @@ class Facilities:
                 print(f"Current Point: ({x}, {y})")
 
                 fig.canvas.draw_idle()
-                
+
         # 调整边距，减小空白部分
         plt.tight_layout(pad=0)  # 自动紧凑布局
 
@@ -450,7 +456,7 @@ class Facilities:
                 _utm_xys = self.lnglat_converter.lng_lat_to_utm_array(np.array([_cur_xs, _cur_ys]).T)
                 _cur_xs = _utm_xys[:, 0]
                 _cur_ys = _utm_xys[:, 1]
-            
+
             ax.plot(_cur_xs, _cur_ys, linestyle='--', color=plt.cm.tab10(_p_iter % 10), linewidth=1, label='Path')
 
             if len(_cur_xs) > 2:
@@ -543,16 +549,21 @@ class Facilities:
                 _marker = 's'
                 _border_radius = GlobalBasicConfigs.AVOID_RADAR_DISTANCE
 
-            if show_borders: # 绘制主要设施周围的躲避区域（圆形）
+            if show_borders:  # 绘制主要设施周围的躲避区域（圆形）
                 _border_xys = self.get_spec_facility_polyborder([_utm_x, _utm_y], _border_radius, ll2utm=False)
 
             if show_mode == '3D':
-                ax.scatter(xs=[_utm_x], ys=[_utm_y], zs=[0], s=30, color=_color, marker=_marker, edgecolors='black', linewidth=1, label=_fac)
-                ax.text(_utm_x + 25, _utm_y + 25, 0, _fac, color='black', fontsize=9, bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'))
-                ax.plot_trisurf(_border_xys[0], _border_xys[1], np.zeros_like(_border_xys[:, 0]), color='green', alpha=0.1)
+                ax.scatter(xs=[_utm_x], ys=[_utm_y], zs=[0], s=30, color=_color, marker=_marker, edgecolors='black',
+                           linewidth=1, label=_fac)
+                ax.text(_utm_x + 25, _utm_y + 25, 0, _fac, color='black', fontsize=9,
+                        bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'))
+                ax.plot_trisurf(_border_xys[0], _border_xys[1], np.zeros_like(_border_xys[:, 0]), color='green',
+                                alpha=0.1)
             else:
-                ax.scatter(x=[_utm_x], y=[_utm_y], s=30, color=_color, marker=_marker, edgecolors='black', linewidth=1, label=_fac)
-                ax.text(_utm_x + 25, _utm_y + 25, _fac, color='black', fontsize=9, bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'))
+                ax.scatter(x=[_utm_x], y=[_utm_y], s=30, color=_color, marker=_marker, edgecolors='black', linewidth=1,
+                           label=_fac)
+                ax.text(_utm_x + 25, _utm_y + 25, _fac, color='black', fontsize=9,
+                        bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'))
                 ax.fill(_border_xys[0], _border_xys[1], color='green', alpha=0.1)
 
         for _plan in twisted_paths:
@@ -627,7 +638,7 @@ class Facilities:
         plt.show()
 
     def animation_visualize_twisted_paths(self, twisted_paths, show_defend_rings=True, show_borders=False,
-                                show_mode='3D', show_formation=False):
+                                          show_mode='3D', show_formation=False):
         fig = plt.figure(figsize=(10, 10))
 
         if show_mode == '3D':
@@ -716,13 +727,14 @@ class Facilities:
             elif _plan['type'] == 'aggregate':
                 _agg_paths = _plan['aggregate_trajectories']
                 _agg_fleet_name = _plan['fleets']
-                for _idx,(_fleet, _path) in enumerate(_agg_paths.items()):
+                for _idx, (_fleet, _path) in enumerate(_agg_paths.items()):
                     members_full_path = []
                     if _idx == 0:
                         agg_members_num = len(_path['member_paths'])
-                        _pre_agg_num = agg_members_num//3
+                        _pre_agg_num = agg_members_num // 3
                         _atf_aff_num = agg_members_num - _pre_agg_num
-                        print(f"agg_members_num: {agg_members_num}, _pre_agg_num: {_pre_agg_num}, _atf_aff_num: {_atf_aff_num}")
+                        print(
+                            f"agg_members_num: {agg_members_num}, _pre_agg_num: {_pre_agg_num}, _atf_aff_num: {_atf_aff_num}")
                         _pre_num_time_steps = len(_path['member_paths'][0])  # 每架从机的轨迹点数量
                         _pre_num_drones = _pre_agg_num  # 从机数量
                         # 构造新的轨迹格式
@@ -735,11 +747,11 @@ class Facilities:
                         _atf_num_drones = _atf_aff_num  # 从机数量
                         for t in range(_atf_num_time_steps):
                             time_step_positions = []
-                            for d in range(_pre_num_drones,agg_members_num):
+                            for d in range(_pre_num_drones, agg_members_num):
                                 time_step_positions.append(_path['member_paths'][d][t])
                             members_full_path.append(time_step_positions)
                         aggregate_paths.append({
-                            _fleet:members_full_path
+                            _fleet: members_full_path
                         })
 
                     else:
@@ -753,7 +765,7 @@ class Facilities:
                                 time_step_positions.append(_path['member_paths'][d][t])
                             members_full_path.append(time_step_positions)
                         aggregate_paths.append({
-                            _fleet:members_full_path
+                            _fleet: members_full_path
                         })
 
                     for _traj in indenpendent_paths:
@@ -764,7 +776,7 @@ class Facilities:
 
             elif _plan['type'] == 'disperse':
                 _disp_paths = _plan['disperse_trajectories']
-                for _fleet_idx,(_fleet, _path) in enumerate(_disp_paths.items()):
+                for _fleet_idx, (_fleet, _path) in enumerate(_disp_paths.items()):
                     full_path = []
                     members_full_path = []
                     for _idx, _traj in enumerate(_path):
@@ -786,9 +798,9 @@ class Facilities:
                                 time_step_positions.append(_traj['member_paths'][d][t])
                             members_full_path.append(time_step_positions)
                     disperse_paths.append({
-                        _fleet:members_full_path
+                        _fleet: members_full_path
                     })
-                    for _idx,_traj in enumerate(indenpendent_paths):
+                    for _idx, _traj in enumerate(indenpendent_paths):
                         for fleet_name, path in _traj.items():
                             if _fleet_idx == _idx:
                                 for sublist in full_path:
@@ -810,14 +822,13 @@ class Facilities:
         line2, = ax.plot([], [], [], 'b--', lw=1, label='Fleet2 Path')
         point1, = ax.plot([], [], [], 'ro', markersize=3, label='Fleet1 Current')
         point2, = ax.plot([], [], [], 'bo', markersize=3, label='Fleet2 Current')
-        members1_points = [ax.plot([], [], [], 'o',markersize=2)[0] for _ in range(members_num)]
+        members1_points = [ax.plot([], [], [], 'o', markersize=2)[0] for _ in range(members_num)]
         members2_points = [ax.plot([], [], [], 'o', markersize=2)[0] for _ in range(members_num)]
         agg_members_line = [ax.plot([], [], [], 'o', markersize=2)[0] for _ in range(_atf_aff_num)]
         agg_members_line1 = [ax.plot([], [], [], 'o', markersize=2)[0] for _ in range(_pre_agg_num)]
         agg_members_line2 = [ax.plot([], [], [], 'o', markersize=2)[0] for _ in range(_pre_agg_num)]
         disperse_members1_line = [ax.plot([], [], [], 'o', markersize=2)[0] for _ in range(members_num)]
         disperse_members2_line = [ax.plot([], [], [], 'o', markersize=2)[0] for _ in range(members_num)]
-
 
         #
         # 初始化函数
@@ -840,7 +851,8 @@ class Facilities:
                 line.set_data_3d([], [], [])
             for line in disperse_members2_line:
                 line.set_data_3d([], [], [])
-            return line1, line2, point1, point2,members1_points,members2_points,agg_members_line,agg_members_line1,agg_members_line2,disperse_members1_line,disperse_members2_line
+            return line1, line2, point1, point2, members1_points, members2_points, agg_members_line, agg_members_line1, agg_members_line2, disperse_members1_line, disperse_members2_line
+
         #
         # 更新函数（每一帧调用）
         def update(frame):
@@ -852,40 +864,45 @@ class Facilities:
             point1.set_data_3d([fleet1_path[frame, 0]], [fleet1_path[frame, 1]], [fleet1_path[frame, 2]])
             point2.set_data_3d([fleet2_path[frame, 0]], [fleet2_path[frame, 1]], [fleet2_path[frame, 2]])
             if frame < len(members_path[0]["fleet1"]):
-                for _traj,_path in enumerate(members_path):
+                for _traj, _path in enumerate(members_path):
                     for fleet_name, path in _path.items():
-                        for _idx,_step in enumerate(path):
+                        for _idx, _step in enumerate(path):
                             if _idx == frame:
-                                for _num,_uav in enumerate(_step):
-                                    if  _traj == 0:
-                                        members1_points[_num].set_data_3d([round(_uav[0],2)], [round(_uav[1],2)], [round(_uav[2],2)])
-                                    else :
-                                        members2_points[_num].set_data_3d([round(_uav[0],2)], [round(_uav[1],2)], [round(_uav[2],2)])
+                                for _num, _uav in enumerate(_step):
+                                    if _traj == 0:
+                                        members1_points[_num].set_data_3d([round(_uav[0], 2)], [round(_uav[1], 2)],
+                                                                          [round(_uav[2], 2)])
+                                    else:
+                                        members2_points[_num].set_data_3d([round(_uav[0], 2)], [round(_uav[1], 2)],
+                                                                          [round(_uav[2], 2)])
             elif frame < len(members_path[0]["fleet1"]) + len(aggregate_paths[0]["fleet1"]):
                 for point in members1_points:
                     point.set_data_3d([], [], [])
                 for point in members2_points:
                     point.set_data_3d([], [], [])
-                for _traj,_path in enumerate(aggregate_paths):
+                for _traj, _path in enumerate(aggregate_paths):
                     for fleet_name, path in _path.items():
-                        for _idx,_step in enumerate(path[: _pre_num_time_steps]):
+                        for _idx, _step in enumerate(path[: _pre_num_time_steps]):
                             if _idx == frame - len(members_path[0]["fleet1"]):
-                                for _num,_uav in enumerate(_step):
+                                for _num, _uav in enumerate(_step):
                                     if _traj == 0:
-                                        agg_members_line1[_num].set_data_3d([round(_uav[0],2)], [round(_uav[1],2)], [round(_uav[2],2)])
+                                        agg_members_line1[_num].set_data_3d([round(_uav[0], 2)], [round(_uav[1], 2)],
+                                                                            [round(_uav[2], 2)])
                                     else:
-                                        agg_members_line2[_num].set_data_3d([round(_uav[0],2)], [round(_uav[1],2)], [round(_uav[2],2)])
-                for _traj,_path in enumerate(aggregate_paths):
+                                        agg_members_line2[_num].set_data_3d([round(_uav[0], 2)], [round(_uav[1], 2)],
+                                                                            [round(_uav[2], 2)])
+                for _traj, _path in enumerate(aggregate_paths):
                     for fleet_name, path in _path.items():
-                        for _idx,_step in enumerate(path[_pre_num_time_steps: ]):
+                        for _idx, _step in enumerate(path[_pre_num_time_steps:]):
                             if _idx == frame - len(members_path[0]["fleet1"]) - _pre_num_time_steps:
                                 for line in agg_members_line1:
                                     line.set_data_3d([], [], [])
                                 for line in agg_members_line2:
                                     line.set_data_3d([], [], [])
-                                for _num,_uav in enumerate(_step):
+                                for _num, _uav in enumerate(_step):
                                     if _traj == 0:
-                                        agg_members_line[_num].set_data_3d([round(_uav[0],2)], [round(_uav[1],2)], [round(_uav[2],2)])
+                                        agg_members_line[_num].set_data_3d([round(_uav[0], 2)], [round(_uav[1], 2)],
+                                                                           [round(_uav[2], 2)])
             else:
                 for line in agg_members_line:
                     line.set_data_3d([], [], [])
@@ -899,12 +916,13 @@ class Facilities:
                             if _idx == frame - len(members_path[0]["fleet1"]) - len(aggregate_paths[0]["fleet1"]):
                                 for _num, _uav in enumerate(_step):
                                     if _traj == 0:
-                                        disperse_members1_line[_num].set_data_3d([round(_uav[0],2)], [round(_uav[1],2)], [round(_uav[2],2)])
+                                        disperse_members1_line[_num].set_data_3d([round(_uav[0], 2)],
+                                                                                 [round(_uav[1], 2)],
+                                                                                 [round(_uav[2], 2)])
                                     else:
-                                        disperse_members2_line[_num].set_data_3d([round(_uav[0],2)], [round(_uav[1],2)], [round(_uav[2],2)])
-
-
-
+                                        disperse_members2_line[_num].set_data_3d([round(_uav[0], 2)],
+                                                                                 [round(_uav[1], 2)],
+                                                                                 [round(_uav[2], 2)])
 
             # 添加步数标注（显示在3D坐标系中）
             ax.text2D(0.02, 0.95, f'Step: {frame}', transform=ax.transAxes, fontsize=12,
@@ -913,7 +931,7 @@ class Facilities:
             # # 动态调整视角（可选，模拟飞行视角）
             # ax.view_init(elev=30, azim=frame * 2)  # 每帧旋转2度
 
-            return line1, line2, point1, point2,members1_points,members2_points,agg_members_line,agg_members_line1,agg_members_line2
+            return line1, line2, point1, point2, members1_points, members2_points, agg_members_line, agg_members_line1, agg_members_line2
 
         # 创建动画
         ani = FuncAnimation(
@@ -964,18 +982,18 @@ class Facilities:
             fps=10,  # 帧率（每秒帧数，需与interval对应）
             dpi=100  # 分辨率
         )
-    
+
     @staticmethod
     def convert_api_facilities_str(facs_str_in):
         if facs_str_in is None:
             return None
-        
+
         if isinstance(facs_str_in, str):
             facs_info = json.loads(facs_str_in)
         else:
             facs_info = facs_str_in
 
-        _convert_info = {'facilities_str': {}, 
+        _convert_info = {'facilities_str': {},
                          'defence_rings': {}}
 
         for _fac in facs_info:
@@ -984,8 +1002,9 @@ class Facilities:
                                                         'lats': facs_info[_fac][1::2]}
             else:
                 _convert_info['facilities_str'][_fac] = facs_info[_fac]
-        
+
         return _convert_info
+
 
 class PlanGraphAnalyzer:
     ''' 用于分析轨迹路径的图结构，包括路径长度、路径覆盖率、路径连通性等
