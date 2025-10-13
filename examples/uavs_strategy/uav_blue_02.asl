@@ -26,9 +26,10 @@
   .print("ta1_taskdone received, ready to execute t2");
   !t2;
   !tb3.
+  !visual.
 
 +!tb1 <- .act_breakthrough(antiair,-1,-1); .print("tb1 executed").
 +!t2 <- .act_escape(antiair_facilities,-1,-1); .print("t2 executed").
 +!tb3 <- .act_detour(defence_rings,-1,-1); .print("tb3 executed").
-
++!visual <-  .print("blue 02 visual executed").
 // +!ta1_done(a) <- .print("ta1_done received: ", a).

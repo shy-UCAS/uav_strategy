@@ -134,7 +134,7 @@ class BlueUAVAgent(BDIAgent):
         @actions.add(".act_attack", 1)
         def _action_attack(agent, term, intention):
             _arg = agentspeak.grounded(term.args[0], intention.scope)
-            print(f"{agent.name} is attacking {_arg} ...", end=' ')
+            print(f"{agent.name} is attacking {_arg} ...")
 
             yield
 
@@ -168,7 +168,6 @@ class BlueUAVAgent(BDIAgent):
         @actions.add(".act_visualize", 0)
         def _act_visualize(agent, term, intention):
             self.facilities.visualize(show_mode = "2D")
-            print(f"{agent.name} is visualizing the environment ...")
             yield
 
     def _insert_height_val(self, order_type, traj, start_height, end_height):

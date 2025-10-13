@@ -447,6 +447,8 @@ class Facilities:
 
         plt.show()
 
+        return "finished plot"
+
     def _plot_plan_path_2d(self, plans_paths, fleet_name, ax):
         for _p_iter, _path in enumerate(plans_paths):
             _cur_xs = [_loc[0] for _loc in _path['trajectory']]
