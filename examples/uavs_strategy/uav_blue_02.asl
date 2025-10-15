@@ -1,16 +1,5 @@
 !start.
 
-// +!start <-
-//   .print("Blue 02 started");
-//   ?friend(Friend);
-//   .send(Friend, tell, subtask_done("blue02_01_taskdone"));
-//   .send(Friend, achieve, subtask_coord).
-
-// +!subtask_coord <-
-//   ?subtask_done(SubTaskName);
-//   .print("Blue 02 received subtask state:", SubTaskName);
-//   .print("start subtask 02").
-
 +!start <-
   !tb1;
   ?my_friend(Friend);
@@ -32,4 +21,4 @@
 +!t2 <- .act_escape(antiair_facilities,-1,-1); .print("t2 executed").
 +!tb3 <- .act_detour(defence_rings,-1,-1); .print("tb3 executed").
 +!visual <-  .print("blue 02 visual executed").
-// +!ta1_done(a) <- .print("ta1_done received: ", a).
+

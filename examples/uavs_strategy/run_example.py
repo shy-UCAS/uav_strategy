@@ -2,6 +2,7 @@ import sys
 import os, os.path as osp
 import random
 
+from pyrect import Point
 from sqlalchemy import false
 
 from modules import basic_functions as bfunc
@@ -88,6 +89,7 @@ class BlueUAVAgent(BDIAgent):
 
     class RedUavAlert(PeriodicBehaviour):
         # 这里进行红方uav是否在威胁范围内的周期性检查
+        # 周期性获取红方uav的坐标，蓝方规划好预选的轨迹后，根据轨迹和红方uav的坐标，判断是否有必要进行轨迹调整
         async def run(self):
             print(f"{self.agent.name} checking alter from red uavs ...")
 
@@ -285,12 +287,16 @@ class BlueUAVAgent(BDIAgent):
         _border = qpp.SimpleBorders(_escape_polygon_xys[0])
         if not _border.is_inside_border(start_location):
             # 如果当前坐标本来就在逃逸范围之外，那么则直接返回当前坐标
-            return [start_location, start_location]
+            _border_traj = [start_location, start_location]
+            print(f"_outside_border_traj:{_border_traj}")
+            return _border_traj
         else:
             # 否则，则计算当前坐标到逃逸范围的最近边界点，并返回
             # _nearest_point = _border.get_nearest_border_point(init_location)
-            _nearest_point = _border.get_nearest_border_vertex(start_location if len(start_location) == 2 else start_location[:2])
-            return [start_location, list(_nearest_point) if isinstance(_nearest_point, tuple) else _nearest_point]
+            _nearest_point = _border.get_nearest_border_vertex(start_location if len(start_location) == 2 else start_location[:2]).coords[0]
+            _border_traj = [start_location, list(_nearest_point) if isinstance(_nearest_point, tuple) else _nearest_point]
+            print(f"_inside_border_traj:{_border_traj}")
+            return _border_traj
 
 
 async def main(server, password):
