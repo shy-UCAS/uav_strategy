@@ -1,27 +1,27 @@
 !start.
 
-// +!start <-
-//   !ta1;
-//   ?my_friend(Friend);
-//   .print("Uav A Got friend: ", Friend);
-//   .wait(400);
-//   .send(Friend, tell, ta1_done("from_uav01"));
-//   .send(Friend, achieve, ta1_taskdone);
-//   .print("Uav A start-process done.").
-
 +!start <-
-  !task_section01.
+  !ta1;
+  ?my_friend(Friend);
+  .print("Uav A Got friend: ", Friend);
+  .wait(400);
+  .send(Friend, tell, ta1_done("from_uav01"));
+  .send(Friend, achieve, ta1_taskdone);
+  .print("Uav A start-process done.").
 
-+!task_section01 <-
-  .act_breakthrough(antiair,-1,-1);
-  .act_rolling(timeout);
-  .check_join_status([blue02, blue03], section02_start).
+// +!start <-
+//   !task_section01.
 
-+section02_start <-
-  !task_section02.
+// +!task_section01 <-
+//   .act_breakthrough(antiair,-1,-1);
+//   .act_rolling(timeout);
+//   .check_join_status([blue02, blue03], section02_start).
 
-+!task_section02: condition <-
-  .act_xxx.
+// +section02_start <-
+//   !task_section02.
+
+// +!task_section02: condition <-
+//   .act_xxx.
 
 +tb1_done(Msg) <- .print("tb1_done received: ", Msg).
 
