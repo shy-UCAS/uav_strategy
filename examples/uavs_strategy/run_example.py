@@ -2,7 +2,7 @@ import sys
 import os, os.path as osp
 import random
 
-from pyrect import Point
+
 from sqlalchemy import false
 
 from modules import basic_functions as bfunc
@@ -13,6 +13,9 @@ import numpy as np
 import json
 import asyncio
 from datetime import datetime, timedelta
+
+import redis # 共享一个全局的蓝方分布地图，直接提取其中他机位置信息 （方法1）
+# key(blueuav_xxx), value (json - 坐标或状态信息)
 
 SPADE_PKGS_ROOT = osp.abspath(osp.join(osp.abspath(__file__), "../../../.."))
 # import pdb; pdb.set_trace()
@@ -87,11 +90,19 @@ class BlueUAVAgent(BDIAgent):
         _template = Template(metadata={"performative": "RedUavAlert"})
         self.add_behaviour(self.RedUavAlert(period=5, start_at=datetime.now()), _template)
 
-    class RedUavAlert(PeriodicBehaviour):
+    class RedUavAlert(PeriodicBehaviour): # 检查红方位置
         # 这里进行红方uav是否在威胁范围内的周期性检查
         # 周期性获取红方uav的坐标，蓝方规划好预选的轨迹后，根据轨迹和红方uav的坐标，判断是否有必要进行轨迹调整
         async def run(self):
             print(f"{self.agent.name} checking alter from red uavs ...")
+            if len(self.agent.bdi_intention_buffer) > 0:
+                self.agent.belief_update(self.agent.bdi_intention_buffer.popleft()) # 在置信空间里面添加发现红方的fact
+                self.agent.beliefs.insert("red_alert")
+
+    class BlueUavsCheck(PeriodicBehaviour): # 检查其他蓝方的位置和状态信息
+        async def run(self):
+            print(f"{self.agent.name} checking blue uavs ...")
+            self.agent.beliefs.insert("blue_collide")
 
     def add_custom_actions(self, actions):
         @actions.add(".act_breakthrough", 3)
@@ -113,6 +124,9 @@ class BlueUAVAgent(BDIAgent):
 
             print(f"{agent.name} is breaking through {str(_arg_target)},breakthrough trajectory is: \n {_traj}")
             print(f"cur full trajectory: {self.traj}")
+
+            # blueavoid 
+            
             yield
 
         @actions.add(".act_escape", 3)
@@ -171,6 +185,11 @@ class BlueUAVAgent(BDIAgent):
         def _act_visualize(agent, term, intention):
             self.facilities.visualize(show_mode = "2D")
             yield
+        
+        @actions.add(".check_join_status", 1)
+        def _act_check_joint_status(agent, term, intention):
+            _arg = str(agentspeak.grounded(term.args[0], intention.scope))
+
 
     def _insert_height_val(self, order_type, traj, start_height, end_height):
         # 传入的是只有二维坐标的轨迹点，先给起点和终点添加高度，然后插值得到中间点的高度，返回一个新的三维轨迹点列表
