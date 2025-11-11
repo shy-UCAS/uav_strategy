@@ -97,20 +97,20 @@ class BlueUAVAgent(BDIAgent):
         # 周期性获取红方uav的坐标，蓝方规划好预选的轨迹后，根据轨迹和红方uav的坐标，判断是否有必要进行轨迹调整
         async def run(self):
             print(f"{self.agent.name} checking alter from red uavs ...")
-            if len(self.agent.bdi_intention_buffer) > 0:
-                self.agent.belief_update(self.agent.bdi_intention_buffer.popleft()) # 在置信空间里面添加发现红方的fact
-                self.agent.beliefs.insert("red_alert")
+    #         if len(self.agent.bdi_intention_buffer) > 0:
+    #             self.agent.belief_update(self.agent.bdi_intention_buffer.popleft()) # 在置信空间里面添加发现红方的fact
+    #             self.agent.beliefs.insert("red_alert")
             
-            if red_detected:
-                self.agent.beliefs.insert("!avoid_red_enemy")
+    #         if red_detected:
+    #             self.agent.beliefs.insert("!avoid_red_enemy")
 
-    class BlueUavsCheck(PeriodicBehaviour): # 检查其他蓝方的位置和状态信息
-        async def run(self):
-            print(f"{self.agent.name} checking blue uavs ...")
-            self.agent.beliefs.insert("blue_collide")
+    # class BlueUavsCheck(PeriodicBehaviour): # 检查其他蓝方的位置和状态信息
+    #     async def run(self):
+    #         print(f"{self.agent.name} checking blue uavs ...")
+    #         self.agent.beliefs.insert("blue_collide")
 
-            if blue_in_range:
-                self.agent.beliefs.insert("!avoid_blue_friend")
+    #         if blue_in_range:
+    #             self.agent.beliefs.insert("!avoid_blue_friend")
     
     class ExecutStep(PeriodicBehaviour): # 执行规划好的轨迹
         async def run(self):

@@ -8,6 +8,7 @@ from spade.behaviour import PeriodicBehaviour, TimeoutBehaviour
 from spade.template import Template
 
 from spade_bdi.bdi import BDIAgent
+import os.path as osp
 
 
 class CounterAgent(BDIAgent):
@@ -52,7 +53,7 @@ class CounterAgent(BDIAgent):
 
 
 async def main(server, password):
-    a = CounterAgent("counter@" + server, password, "E:/CASIA/Drone_Swarm_SituationSensingAlgos/BDI_Agent/spade_bdi-master/examples/counter/counter.asl")
+    a = CounterAgent("counter@" + server, password, osp.join(osp.dirname(__file__), "counter.asl"))
     await a.start()
 
     await asyncio.sleep(5)
