@@ -88,6 +88,8 @@ class BlueUAVAgent(BDIAgent):
 
     async def setup(self):
         _template = Template(metadata={"performative": "RedUavAlert"})
+        # 读取task_sequence里面的任务列表
+
         self.add_behaviour(self.RedUavAlert(period=5, start_at=datetime.now()), _template)
 
     class RedUavAlert(PeriodicBehaviour): # 检查红方位置
@@ -98,11 +100,25 @@ class BlueUAVAgent(BDIAgent):
             if len(self.agent.bdi_intention_buffer) > 0:
                 self.agent.belief_update(self.agent.bdi_intention_buffer.popleft()) # 在置信空间里面添加发现红方的fact
                 self.agent.beliefs.insert("red_alert")
+            
+            if red_detected:
+                self.agent.beliefs.insert("!avoid_red_enemy")
 
     class BlueUavsCheck(PeriodicBehaviour): # 检查其他蓝方的位置和状态信息
         async def run(self):
             print(f"{self.agent.name} checking blue uavs ...")
             self.agent.beliefs.insert("blue_collide")
+
+            if blue_in_range:
+                self.agent.beliefs.insert("!avoid_blue_friend")
+    
+    class ExecutStep(PeriodicBehaviour): # 执行规划好的轨迹
+        async def run(self):
+            print(f"{self.agent.name} executing plan trajectory ...")
+    
+    class StateCheck(PeriodicBehaviour): # 检查当前状态
+        async def run(self):
+            print(f"{self.agent.name} checking current state ...")
 
     def add_custom_actions(self, actions):
         @actions.add(".act_breakthrough", 3)
