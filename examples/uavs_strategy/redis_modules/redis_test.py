@@ -14,10 +14,10 @@ try:
 except Exception as e:
     print(f"连接 Redis 时发生错误: {e}")
 
-# import redis
+# import redis_modules
 #
 # # 连接到 Redis（假设 Redis 在 WSL 中运行并监听 127.0.0.1:6379）
-# r = redis.Redis(host='127.0.0.1', port=6379, db=0)
+# r = redis_modules.Redis(host='127.0.0.1', port=6379, db=0)
 #
 # # 获取名为 'name' 的键值
 # name_value = r.get('name')

@@ -104,7 +104,7 @@ def search_nearby(r: redis.Redis,
         radius=int(radius_m), unit="m",
         withdist=True, count=int(count), sort="ASC"
     )
-    # redis-py 返回 [(member, dist), ...]
+    # redis_modules-py 返回 [(member, dist), ...]
     return [(member, float(dist)) for member, dist in res]
 
 

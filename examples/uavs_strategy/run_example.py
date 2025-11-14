@@ -100,7 +100,7 @@ class BlueUAVAgent(BDIAgent):
     #         if len(self.agent.bdi_intention_buffer) > 0:
     #             self.agent.belief_update(self.agent.bdi_intention_buffer.popleft()) # 在置信空间里面添加发现红方的fact
     #             self.agent.beliefs.insert("red_alert")
-            
+
     #         if red_detected:
     #             self.agent.beliefs.insert("!avoid_red_enemy")
 
@@ -111,14 +111,14 @@ class BlueUAVAgent(BDIAgent):
 
     #         if blue_in_range:
     #             self.agent.beliefs.insert("!avoid_blue_friend")
-    
-    class ExecutStep(PeriodicBehaviour): # 执行规划好的轨迹
-        async def run(self):
-            print(f"{self.agent.name} executing plan trajectory ...")
-    
-    class StateCheck(PeriodicBehaviour): # 检查当前状态
-        async def run(self):
-            print(f"{self.agent.name} checking current state ...")
+
+    # class ExecutStep(PeriodicBehaviour): # 执行规划好的轨迹
+    #     async def run(self):
+    #         print(f"{self.agent.name} executing plan trajectory ...")
+    #
+    # class StateCheck(PeriodicBehaviour): # 检查当前状态
+    #     async def run(self):
+    #         print(f"{self.agent.name} checking current state ...")
 
     def add_custom_actions(self, actions):
         @actions.add(".act_breakthrough", 3)
@@ -141,8 +141,8 @@ class BlueUAVAgent(BDIAgent):
             print(f"{agent.name} is breaking through {str(_arg_target)},breakthrough trajectory is: \n {_traj}")
             print(f"cur full trajectory: {self.traj}")
 
-            # blueavoid 
-            
+            # blueavoid
+
             yield
 
         @actions.add(".act_escape", 3)
@@ -201,7 +201,7 @@ class BlueUAVAgent(BDIAgent):
         def _act_visualize(agent, term, intention):
             self.facilities.visualize(show_mode = "2D")
             yield
-        
+
         @actions.add(".check_join_status", 1)
         def _act_check_joint_status(agent, term, intention):
             _arg = str(agentspeak.grounded(term.args[0], intention.scope))
@@ -343,6 +343,8 @@ async def main(server, password):
 
     await uav_blue01.start()
     await uav_blue02.start()
+
+    print("server started")
 
     await asyncio.sleep(4)
 

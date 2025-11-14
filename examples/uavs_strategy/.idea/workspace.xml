@@ -1,7 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
   <component name="ChangeListManager">
-    <list default="true" id="5f4d56e3-bc38-4072-b864-093659f1665f" name="更改" comment="" />
+    <list default="true" id="5f4d56e3-bc38-4072-b864-093659f1665f" name="更改" comment="">
+      <change afterPath="$PROJECT_DIR$/modules/uav_planning_actions.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/redis_modules/uav_redis_io.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../.idea/spade_bdi-master.iml" beforeDir="false" afterPath="$PROJECT_DIR$/../../.idea/spade_bdi-master.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/uavs_strategy.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/uavs_strategy.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/redis/Load_Map.py" beforeDir="false" afterPath="$PROJECT_DIR$/redis_modules/Load_Map.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/redis/map_reader.py" beforeDir="false" afterPath="$PROJECT_DIR$/redis_modules/map_reader.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/redis/map_writer.py" beforeDir="false" afterPath="$PROJECT_DIR$/redis_modules/map_writer.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/redis/redis_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/redis_modules/redis_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/redis/uav_data_reader.py" beforeDir="false" afterPath="$PROJECT_DIR$/redis_modules/uav_data_reader.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/redis/uav_data_writer.py" beforeDir="false" afterPath="$PROJECT_DIR$/redis_modules/uav_data_writer.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/run_example.py" beforeDir="false" afterPath="$PROJECT_DIR$/run_example.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_example.py" beforeDir="false" afterPath="$PROJECT_DIR$/test_example.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -10,9 +28,9 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../.." />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 3
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 3
+}</component>
   <component name="ProjectId" id="342wD9ryeDgsJuR8idgqCWTg6ve" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -20,10 +38,41 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "Python.run_example.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "main"
+    "git-widget-placeholder": "main",
+    "ignore.virus.scanning.warn.message": "true"
   }
 }]]></component>
+  <component name="RunManager">
+    <configuration name="run_example" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="uavs_strategy" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/run_example.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.run_example" />
+      </list>
+    </recent_temporary>
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
