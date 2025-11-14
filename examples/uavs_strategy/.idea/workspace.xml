@@ -5,20 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5f4d56e3-bc38-4072-b864-093659f1665f" name="更改" comment="">
-      <change afterPath="$PROJECT_DIR$/modules/uav_planning_actions.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/redis_modules/uav_redis_io.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../.idea/spade_bdi-master.iml" beforeDir="false" afterPath="$PROJECT_DIR$/../../.idea/spade_bdi-master.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/uavs_strategy.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/uavs_strategy.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../.vscode/settings.json" beforeDir="false" afterPath="$PROJECT_DIR$/../../.vscode/settings.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/redis/Load_Map.py" beforeDir="false" afterPath="$PROJECT_DIR$/redis_modules/Load_Map.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/redis/map_reader.py" beforeDir="false" afterPath="$PROJECT_DIR$/redis_modules/map_reader.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/redis/map_writer.py" beforeDir="false" afterPath="$PROJECT_DIR$/redis_modules/map_writer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/redis/redis_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/redis_modules/redis_test.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/redis/uav_data_reader.py" beforeDir="false" afterPath="$PROJECT_DIR$/redis_modules/uav_data_reader.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/redis/uav_data_writer.py" beforeDir="false" afterPath="$PROJECT_DIR$/redis_modules/uav_data_writer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/run_example.py" beforeDir="false" afterPath="$PROJECT_DIR$/run_example.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/test_example.py" beforeDir="false" afterPath="$PROJECT_DIR$/test_example.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/uav_redis_io.asl" beforeDir="false" afterPath="$PROJECT_DIR$/uav_redis_io.asl" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -36,14 +26,14 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python.run_example.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "main",
-    "ignore.virus.scanning.warn.message": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.run_example.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RunManager">
     <configuration name="run_example" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="uavs_strategy" />
@@ -76,7 +66,7 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-python-sdk-d7ad00fb9fc3-c546a90a8094-com.jetbrains.pycharm.community.sharedIndexes.bundled-PC-242.23726.102" />
+        <option value="bundled-python-sdk-337b0a7a993a-31b6be0877a2-com.jetbrains.pycharm.community.sharedIndexes.bundled-PC-241.19416.19" />
       </set>
     </attachedChunks>
   </component>

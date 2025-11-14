@@ -4,7 +4,7 @@ uav_planning_actions.py
 
 把 BlueUAVAgent 中的轨迹规划与 BDI 动作抽出来，做成可复用模块。
 使用方式：
-    from modules.uav_planning_actions import register_planning_actions
+    from planning_modules.uav_planning_actions import register_planning_actions
 
     class BlueUAVAgent(BDIAgent):
         ...
@@ -19,9 +19,9 @@ from typing import Any, Dict, List
 import numpy as np
 import agentspeak
 
-from modules import basic_functions as bfunc
-from modules import quick_path_planners as qpp
-from modules import math_curves_generators as curve_gen
+import examples.uavs_strategy.planning_modules.basic_functions as bfunc
+import examples.uavs_strategy.planning_modules.quick_path_planners as qpp
+import examples.uavs_strategy.planning_modules.math_curves_generators as curve_gen
 
 
 # ------------------------ 小工具 ------------------------ #
@@ -230,7 +230,7 @@ def register_planning_actions(self, actions):
     """
     在 BlueUAVAgent.add_custom_actions(self, actions) 中调用：
 
-        from modules.uav_planning_actions import register_planning_actions
+        from planning_modules.uav_planning_actions import register_planning_actions
 
         def add_custom_actions(self, actions):
             # 先注册 redis IO 动作 ...
@@ -266,7 +266,7 @@ def register_planning_actions(self, actions):
         self.traj.extend(traj_3d[1:])
 
         print(f"{self.name} is breaking through {arg_target}, trajectory:\n{traj_3d}")
-        print(f"cur full trajectory: {self.traj}")
+        # print(f"cur full trajectory: {self.traj}")
 
         # 如需写入 redis，可以在这里使用 self.io（如果有）
         # if hasattr(self, "io"):
@@ -287,7 +287,7 @@ def register_planning_actions(self, actions):
         self.traj.extend(traj_3d[1:])
 
         print(f"{self.name} is escaping {arg_target}, trajectory:\n{traj_3d}")
-        print(f"cur full trajectory: {self.traj}")
+        # print(f"cur full trajectory: {self.traj}")
         yield
 
     # ---------- 迂回 ---------- #
@@ -300,10 +300,11 @@ def register_planning_actions(self, actions):
         traj_2d = lib.plan_detour(self.traj[-1], arg_target)
         traj_3d = lib.insert_height_val("detour", traj_2d, arg_start_h, arg_end_h)
 
+        self.cur_reference_traj = traj_3d
         self.traj.extend(traj_3d[1:])
 
-        print(f"{self.name} is detouring {arg_target}, trajectory:\n{traj_3d}")
-        print(f"cur full trajectory: {self.traj}")
+        print(f"{self.name} is detouring {arg_target}, trajectory:\n{self.cur_reference_traj}")
+        # print(f"cur full trajectory: {self.traj}")
         yield
 
     # ---------- 攻击（占位） ---------- #

@@ -5,9 +5,9 @@ import random
 
 from sqlalchemy import false
 
-from modules import basic_functions as bfunc
-from modules import quick_path_planners as qpp
-from modules import math_curves_generators as curve_gen
+from planning_modules import basic_functions as bfunc
+from planning_modules import quick_path_planners as qpp
+from planning_modules import math_curves_generators as curve_gen
 
 import numpy as np
 import json

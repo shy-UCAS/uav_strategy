@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
 
-from modules import basic_functions as bfunc
+from examples.uavs_strategy.planning_modules import basic_functions as bfunc
 import copy
 from collections import defaultdict
 
@@ -58,7 +58,7 @@ class SimpleBorders:
             _oriented_border = orient(self.border_poly, sign=-1)
         else:
             _oriented_border = orient(self.border_poly, sign=1)
-        
+
         _intercept_point, _vertex_index = self.get_nearest_border_vertex(point, _oriented_border.exterior.xy, return_index=True)
 
         _oriented_border_coords = list(_oriented_border.exterior.coords)
@@ -208,7 +208,7 @@ class SimpleOrdersPlanner:
                     _plan = self._plan_breakthrough_target(_cur_location, _order['target'])
                 elif isinstance(_order['target'], tuple) or isinstance(_order['target'], list):
                     _plan = self._plan_breakthrough_location(_cur_location, _order['target'])
-            
+
             elif _order['type'] == 'escape':
                 _plan = self._plan_escape(_cur_location, _order['target'])
 
@@ -274,7 +274,7 @@ class SimpleOrdersPlanner:
             # _nearest_point = _border.get_nearest_border_point(init_location)
             _nearest_point = _border.get_nearest_border_vertex(init_location)
             return {'type': 'escape', 'target': target, 'trajectory': [init_location, _nearest_point.coords[0]]}
-    
+
     def _plan_detour(self, init_location, target='defence_rings', detour_steps=5):
         if target in self.facilities.facilities_info.keys() \
             or target in self.facilities.defend_rings.keys():
@@ -311,7 +311,7 @@ class SimpleOrdersTwistor(SimpleOrdersPlanner):
     '''
     def __init__(self, init_location, orders, facilities=None):
         super().__init__(init_location, orders, facilities)
-    
+
     def twist_trajectory_plans(self, init_location=None, orders=None, vis_check=False, convert_to_llt=False):
         if init_location is not None:
             _cur_location = init_location
@@ -334,10 +334,10 @@ class SimpleOrdersTwistor(SimpleOrdersPlanner):
                     _cur_sub_orders = _plan['orders']
 
                     _cur_sub_plans = self.generate_trajectory_plans(_cur_init_location, _cur_sub_orders, vis_check=vis_check)
-                    _cur_indep_plan['trajectories'].append({'fleet': _cur_fleet_name, 'trajectory': _cur_sub_plans})      
+                    _cur_indep_plan['trajectories'].append({'fleet': _cur_fleet_name, 'trajectory': _cur_sub_plans})
 
                     _cur_location[_cur_fleet_name] = _cur_sub_plans[-1]['trajectory'][-1]
-                
+
                 _plans.append(_cur_indep_plan)
 
             elif _order['type'] == 'aggregate':
@@ -347,30 +347,30 @@ class SimpleOrdersTwistor(SimpleOrdersPlanner):
                                  'fleets': _cur_init_fleets,
                                  'fleet': _cur_aggregate_fleet,
                                  'aggregate_trajectories': {}}
-                
+
                 _cur_init_locations = {_fleet:self.init_location[_fleet] for _fleet in _cur_init_fleets}
 
                 _aggr_section, _tgtr_section = \
                     self._plan_aggregate_trajectories(_cur_init_locations, _order['order'], aggr_ratio=_order['aggregate_ratio'], vis_check=vis_check)
-                
-                _cur_aggr_trajs = {_fleet: {'type': _order['order']['type'], 
+
+                _cur_aggr_trajs = {_fleet: {'type': _order['order']['type'],
                                             'target': _order['order']['target'],
                                             "formation": _order['order']["formation"] if "formation" in _order['order'].keys() else [],
                                             'trajectory': _aggr_section[_fleet]} for _fleet in _aggr_section}
-                
+
                 for _fleet in _cur_aggr_trajs.keys():
                     _cur_aggr_trajs[_fleet]['trajectory'].extend(_tgtr_section[1:])
                 _cur_agg_plan['aggregate_trajectories'] = _cur_aggr_trajs
-                
+
                 _cur_location[_cur_aggregate_fleet] = _tgtr_section[-1]
 
                 _plans.append(_cur_agg_plan)
 
             elif _order['type'] == 'disperse':
                 _cur_aggregate_fleet = _order['fleet']
-                _cur_dispr_plan = {'type': 'disperse', 
-                                   'fleet': _cur_aggregate_fleet, 
-                                   'fleets': _order['fleets'], 
+                _cur_dispr_plan = {'type': 'disperse',
+                                   'fleet': _cur_aggregate_fleet,
+                                   'fleets': _order['fleets'],
                                    'disperse_trajectories': {}}
 
                 for _plan in _order['plans']:
@@ -382,13 +382,13 @@ class SimpleOrdersTwistor(SimpleOrdersPlanner):
                     _cur_dispr_plan['disperse_trajectories'][_cur_fleet_name] = _cur_sub_plans
 
                     _cur_location[_cur_fleet_name] = _cur_sub_plans[-1]['trajectory'][-1]
-                
+
                 _plans.append(_cur_dispr_plan)
 
         self.plans = _plans
 
         return _plans
-    
+
     def _plan_aggregate_trajectories(self, init_locations, order, aggr_ratio=0.5, vis_check=False):
         # 首先生成从多机集合中心出发的航路规划点
         _geometry_center_location = np.mean(np.array([_coords for _coords in init_locations.values()]), axis=0)
@@ -416,7 +416,7 @@ class GraphOrdersPlanner(SimpleOrdersTwistor):
         if mode == 'sum':
             _lhs_keypath_locs = lhs_node['key_path_locs']
             _rhs_keypath_locs = rhs_node['key_path_locs']
-            
+
             if np.sum(_lhs_keypath_locs) > np.sum(_rhs_keypath_locs):
                 return 1
             elif np.sum(_lhs_keypath_locs) < np.sum(_rhs_keypath_locs):
@@ -433,7 +433,7 @@ class GraphOrdersPlanner(SimpleOrdersTwistor):
                 return -1
             else:
                 return 0
-    
+
     def _assort_task_joints(self, plan_graph):
         # 提取当前plan graph中的所有的“协同执行节点”，排列他们的先后顺序
         _graph_in_degs = dict(plan_graph.in_degree())
@@ -448,24 +448,24 @@ class GraphOrdersPlanner(SimpleOrdersTwistor):
                     _node_item['key_path_locs'][_p_iter] = _path.index(_node_item['node'])
                     _cur_path_ratio = _node_item['key_path_locs'][_p_iter] / len(_path)
                     _node_item['key_path_ratios'][_p_iter] = np.round(_cur_path_ratio, 3)
-        
+
         # 根据所有“多入”节点在各个关键节点上面位置进行排序，得到各“多入节点”的处理顺序
         _sorted_mult_in_nodes = sorted(_mult_in_nodes, key=cmp_to_key(self._joint_nodes_compare))
 
         return _sorted_mult_in_nodes
-    
+
     def _estimate_trajectory_timesteps(self, trajectory):
         pass
-    
+
     def _connect_to_nearest_trajectory(self, cur_location, trajectories):
         # 找到和当前位置最近的一组轨迹中的轨迹点，并连接生成新的轨迹
         _cur_loc2trajs_mindists = [0 for _iter in range(len(trajectories))]
         _cur_loc2trajs_minelidxs = [0 for _iter in range(len(trajectories))]
-        
+
         for _traj_i, _traj in enumerate(trajectories):
             _cur_ptr2traj_dists = np.linalg.norm(np.array(_traj).reshape(-1, 2) - np.array(cur_location).flatten(), axis=1)
             _cur_ptr2traj_minidx = np.argmin(_cur_ptr2traj_dists)
-            
+
             _cur_loc2trajs_minelidxs[_traj_i] = _cur_ptr2traj_minidx
             _cur_loc2trajs_mindists[_traj_i] = _cur_ptr2traj_dists[_cur_ptr2traj_minidx]
 
@@ -532,7 +532,7 @@ class GraphOrdersPlanner(SimpleOrdersTwistor):
                             _cur_location = new_traj[-1]
 
         return _marked_plan_graph
- 
+
     def generate_trajectories(self, vis_check=False,info_check=False):
         # 为每个关键路径生成具体的目的地和大致时间
         _plans_descs = []
@@ -542,7 +542,7 @@ class GraphOrdersPlanner(SimpleOrdersTwistor):
 
         # 然后根据获取的“联合执行序列”，反推所有节点上面的联合执行时间点
         for _item in _ordered_joint_nodes: print(_item)
-        
+
         _trajs_graph = self._pathwise_plan_generate(self.orders, self.key_paths, self.init_location)
 
         graph_data = {
@@ -568,10 +568,10 @@ class GraphOrdersPlanner(SimpleOrdersTwistor):
 
         if info_check:
             print(json.dumps(graph_data["edges"], indent=4))
-        
+
         if vis_check:
             self.show_trajectories_graph(_trajs_graph)
-        
+
         return _trajs_graph
 
     def show_trajectories_graph(self, trajs_graph):
