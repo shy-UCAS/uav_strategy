@@ -73,17 +73,17 @@ class UavRedisIO:
         return out
 
     # ---------- 蓝方：轨迹读写 ----------
-    def set_traj(self, uid: str, points: List[Dict[str, float]]) -> None:
+    def set_traj(self, uid: str, points: List[List[float]]) -> None:
         """覆盖写入轨迹：points = [{x,y,z}, ...]"""
         key = f"uav:{uid}:traj"
         self.r.set(key, json.dumps(points))
 
-    def append_traj_points(self, uid: str, points: List[Dict[str, float]]) -> None:
+    def append_traj_points(self, uid: str, points: List[float]) -> None:
         """追加轨迹点"""
         key = f"uav:{uid}:traj"
         cur = self.r.get(key)
         cur_list = json.loads(cur) if cur else []
-        cur_list.extend(points)
+        cur_list.append(points)
         self.r.set(key, json.dumps(cur_list))
 
     def get_traj(self, uid: str) -> List[Dict[str, float]]:
@@ -94,13 +94,42 @@ class UavRedisIO:
     def clear_traj(self, uid: str) -> None:
         self.r.delete(f"uav:{uid}:traj")
 
+    # ---------- 蓝方：参考轨迹读写 ----------
+    def set_ref_traj(self, uid: str, points: List[List[float]]) -> None:
+        """覆盖写入参考轨迹：points = [{x,y,z}, ...]"""
+        key = f"uav:{uid}:ref_traj"
+        self.r.set(key, json.dumps(points))
+
+    def get_ref_traj(self, uid: str) -> List[List[float]]:
+        """获取参考轨迹"""
+        key = f"uav:{uid}:ref_traj"
+        raw = self.r.get(key)
+        if not raw:
+            return []
+        return json.loads(raw.decode("utf-8"))
+
     # ---------- 蓝方：预瞄点 ----------
     def set_lookahead(self, uid: str, idx: int) -> None:
-        self.r.set(f"uav:{uid}:lookahead", int(idx))
+        """
+        当前在预设轨迹上走到第几个点（索引）
+        """
+        key = f"uav:{uid}:lookahead"
+        self.r.set(key, str(int(idx)))
 
-    def get_lookahead(self, uid: str) -> int:
-        v = self.r.get(f"uav:{uid}:lookahead")
-        return int(v) if v is not None else 0
+    def get_lookahead(self, uid: str) -> Optional[int]:
+        key = f"uav:{uid}:lookahead"
+        raw = self.r.get(key)
+        if raw is None:
+            return None
+
+        # 兼容 decode_responses=True/False 两种情况
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+
+        try:
+            return int(raw)
+        except ValueError:
+            return None
 
     # ---------- 工具：过滤过期 ----------
     @staticmethod

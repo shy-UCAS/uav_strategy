@@ -113,6 +113,7 @@ class BlueUAVAgent(BDIAgent):
         # redis初始化数据
         self.io.add_uav_id(self.self_uid, blue=True)
         self.io.set_pos(self.self_uid, self.traj[0][0], self.traj[0][1], self.position[2])
+        self.io.set_traj(self.self_uid, [[self.traj[0][0], self.traj[0][1], self.position[2]]])
         self.io.set_lookahead(self.self_uid, 0)  # 初始化 lookahead 为 0（指向参考轨迹的第一个目标点）
 
     def _default_facilities(self, default_json_path=None):
@@ -181,6 +182,11 @@ class BlueUAVAgent(BDIAgent):
             traj = agent.cur_reference_traj
             if not traj:
                 return  # 如果没有参考轨迹，跳过
+            if agent.bdi.get_belief("if_set_ref_traj"):
+                # 如果当前轨迹没有写入redis，则写入
+                io.set_ref_traj(agent.self_uid,traj)
+                agent.bdi.set_belief("if_set_ref_traj", "False")
+                print(f"ref_traj add to redis")
 
             # 获取当前预瞄点的位置（从参考轨迹中）
             lookahead = io.get_lookahead(agent.self_uid)
@@ -225,6 +231,8 @@ class BlueUAVAgent(BDIAgent):
 
             # ---- 回写新的无人机位置到 Redis ----
             io.set_pos(agent.self_uid, nxt[0], nxt[1], nxt[2])
+            io.append_traj_points(agent.self_uid, [nxt[0], nxt[1], nxt[2]])
+
             print(f"New position for {agent.self_uid}: {nxt}")
 
     # =============================
@@ -258,6 +266,7 @@ async def main(server: str, password: str):
         position=fleet1,
     )
     ag.bdi.set_belief("start_height", fleet1[2])
+    ag.bdi.set_belief("if_set_ref_traj", "False")
 
     # 启动代理
     await ag.start()

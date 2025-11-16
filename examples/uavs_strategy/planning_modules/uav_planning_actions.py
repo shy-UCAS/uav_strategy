@@ -261,7 +261,7 @@ def register_planning_actions(self, actions):
             traj_2d = [self.traj[-1], self.traj[-1]]
 
         traj_3d = lib.insert_height_val("breakthrough", traj_2d, arg_start_h, arg_end_h)
-
+        self.cur_reference_traj = traj_3d
         # 追加到当前完整轨迹
         self.traj.extend(traj_3d[1:])
 

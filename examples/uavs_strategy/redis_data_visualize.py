@@ -66,14 +66,55 @@ class MapVisualizer:
         traj_data = {}
         for uid in ids:
             pos = self.r.get(f"uav:{uid}:pos")
-            traj = self.r.lrange(f"uav:{uid}:traj", 0, -1)  # 获取历史轨迹数据
-
+            traj_raw = self.r.get(f"uav:{uid}:traj")
+            print(f"get uav:{uid}:pos: {pos}, get uav:{uid}:traj: {traj_raw}")
             if pos:
                 positions[uid] = json.loads(pos.decode('utf-8'))  # 解码并存储位置信息
-            if traj:
-                traj_data[uid] = [json.loads(point.decode('utf-8')) for point in traj]  # 解码并存储轨迹数据
+            if traj_raw:
+                # String -> JSON list，例如 [[x,y,z], [x,y,z], ...]
+                traj_list = json.loads(traj_raw.decode('utf-8'))
+                traj_data[uid] = traj_list
         print(f"UAV {'Blue' if blue else 'Red'} Positions: {positions}")
         return positions, traj_data
+
+    def get_drone_states(self, blue=True):
+        """
+        读取 UAV 当前状态：
+        - 当前位置 pos
+        - 实际轨迹 traj
+        - 预设轨迹 ref_traj
+        - 预设轨迹当前索引 lookahead
+        """
+        ids = self.r.smembers("uav:ids" if blue else "red:ids")
+        ids = [uid.decode('utf-8') for uid in ids]
+
+        positions = {}
+        traj_data = {}
+        ref_traj_data = {}
+        lookahead_data = {}
+
+        for uid in ids:
+            pos = self.r.get(f"uav:{uid}:pos")
+            traj_raw = self.r.get(f"uav:{uid}:traj")  # 你现在用 String(JSON) 存轨迹
+            ref_raw = self.r.get(f"uav:{uid}:ref_traj")
+            lookahead_raw = self.r.get(f"uav:{uid}:lookahead")
+
+            if pos:
+                positions[uid] = json.loads(pos.decode('utf-8'))
+
+            if traj_raw:
+                traj_data[uid] = json.loads(traj_raw.decode('utf-8'))  # [[x,y,z], ...]
+
+            if ref_raw:
+                ref_traj_data[uid] = json.loads(ref_raw.decode('utf-8'))  # [[x,y,z], ...]
+
+            if lookahead_raw:
+                try:
+                    lookahead_data[uid] = int(lookahead_raw.decode('utf-8'))
+                except ValueError:
+                    pass
+
+        return positions, traj_data, ref_traj_data, lookahead_data
 
     def visualize(self, blue=True):
         """
@@ -127,45 +168,108 @@ class MapVisualizer:
                 ax.plot(_utm_xy[0], _utm_xy[1], 'go', label=f'{_fac} Prober')
 
             # 绘制防御环（如果需要）
-            for ring in self.facilities.defend_rings.values():
-                # 防御圈应只包含两个值，确保它们是单一的坐标对
-                if isinstance(ring, tuple) and len(ring) == 2:
-                    # 绘制每个防御圈
-                    circle = plt.Circle((ring[0], ring[1]), 1000, color='r', fill=False)  # radius假设为1000
-                    ax.add_artist(circle)
+            for _fac, _utm_xy in self.facilities.defend_rings.items():
+                ax.fill(_utm_xy[: ,0], _utm_xy[: ,1], alpha=0.2, label=f'{_fac} Defence Ring')
 
     def update_plot(self, frame, ax, blue=True):
-        """
-        每次更新时重新绘制地图。
+        ax.cla()  # 建议用 cla，不要 clear，避免坐标轴属性全被重置
 
-        :param frame: 动画帧数。
-        :param ax: Matplotlib的轴对象，用于更新绘图。
-        :param blue: 是否绘制蓝方数据，默认为True。
-        :return: 更新后的轴对象。
-        """
-        ax.clear()  # 清除当前的图像
-        positions, traj_data = self.get_drone_positions_and_traj(blue)
+        positions, traj_data, ref_traj_data, lookahead_data = self.get_drone_states(blue)
 
-        # 绘制设施信息
+        # 画设施
         self.plot_facilities(ax)
 
-        # 绘制UAV的位置和轨迹
         for uid, pos in positions.items():
-            # 绘制当前位置信息
+            # 1. 当前无人机位置
             ax.plot(pos['x'], pos['y'], 'go', label=f'{uid} Position')
 
-            # 绘制历史轨迹
+            # 2. 实际飞行轨迹（历史）
             traj = traj_data.get(uid, [])
             if traj:
-                traj = np.array(traj)
-                ax.plot(traj[:, 0], traj[:, 1], label=f'{uid} Trajectory')
+                traj_arr = np.array(traj)  # [[x,y,z],...]
+                ax.plot(traj_arr[:, 0], traj_arr[:, 1],
+                        '-', linewidth=1.5, label=f'{uid} Actual Traj')
 
-        ax.set_title(f"{'Blue' if blue else 'Red'} UAVs - Positions and Trajectories")
+            # 3. 预设轨迹（已完成 + 未完成）
+            ref_traj = ref_traj_data.get(uid, [])
+            if ref_traj:
+                ref_arr = np.array(ref_traj)  # [[x,y,z],...]
+
+                # 当前索引
+                idx = lookahead_data.get(uid, None)
+                if idx is None:
+                    # 如果读取不到索引，就默认整条都画成“未完成”
+                    ax.plot(ref_arr[:, 0], ref_arr[:, 1],
+                            '--', linewidth=1, label=f'{uid} Ref Traj (all)')
+                else:
+                    # 安全裁剪一下索引范围
+                    idx = max(0, min(idx, len(ref_arr) - 1))
+
+                    # 已完成部分（包括当前点）
+                    done = ref_arr[:idx + 1]
+                    # 未完成部分
+                    remain = ref_arr[idx:]
+
+                    if len(done) >= 2:
+                        ax.plot(done[:, 0], done[:, 1],
+                                '-', linewidth=2, label=f'{uid} Ref Done')
+
+                    if len(remain) >= 2:
+                        ax.plot(remain[:, 0], remain[:, 1],
+                                '--', linewidth=1, label=f'{uid} Ref Remain')
+
+                    # （可选）也可以在当前“参考位置”上再画一个小点对比
+                    # cur_ref = ref_arr[idx]
+                    # ax.plot(cur_ref[0], cur_ref[1], 'rx', label=f'{uid} Ref Cur')
+
+        # 坐标轴信息
+        ax.set_title(f"{'Blue' if blue else 'Red'} UAVs - Realtime Map")
         ax.set_xlabel('X Coordinate')
         ax.set_ylabel('Y Coordinate')
-        ax.legend()
+        ax.legend(loc='best')
+
+        # 如果你有 compute_static_range，可以继续用
+        # xmin, xmax, ymin, ymax = self.compute_static_range(positions)
+        # ax.set_xlim(xmin, xmax)
+        # ax.set_ylim(ymin, ymax)
 
         return ax
+
+    def compute_static_range(self, positions = None , buffer = 3000):
+        """
+        自动根据设施与无人机位置计算坐标轴范围。
+        positions: UAV 的实时位置 dict
+        """
+        xs = []
+        ys = []
+
+        # ① 加入设施坐标
+        for d in [
+            self.facilities.antiairs,
+            self.facilities.headquartors,
+            self.facilities.probers,
+        ]:
+            for _name, utm_xy in d.items():
+                xs.append(utm_xy[0])
+                ys.append(utm_xy[1])
+
+        # ② 加入防御圈（polygon）
+        for _name, poly in self.facilities.defend_rings.items():
+            xs.extend(poly[:, 0])
+            ys.extend(poly[:, 1])
+
+        # # ③ 加入 UAV 位置
+        # for uid, pos in positions.items():
+        #     xs.append(pos["x"])
+        #     ys.append(pos["y"])
+
+        # ④ 计算范围 + buffer
+        xmin, xmax = min(xs), max(xs)
+        ymin, ymax = min(ys), max(ys)
+
+          # 自定义 buffer，避免贴边
+
+        return xmin - buffer, xmax + buffer, ymin - buffer, ymax + buffer
 
 
 # 运行可视化，并实现动态更新
