@@ -1,4 +1,4 @@
-import redis
+﻿import redis
 import matplotlib.pyplot as plt
 import json
 import numpy as np
@@ -235,6 +235,16 @@ class MapVisualizer:
 
         return ax
 
+    def handle_click(self, event):
+        """
+        Print the xy coordinate at the mouse click location with decimal precision.
+        """
+        # Ignore clicks that don't land inside the map axes
+        if event.inaxes is None or event.xdata is None or event.ydata is None:
+            return
+
+        print(f"Clicked coordinates: ({event.xdata:.13f}, {event.ydata:.13f})")
+
     def compute_static_range(self, positions = None , buffer = 3000):
         """
         自动根据设施与无人机位置计算坐标轴范围。
@@ -278,7 +288,13 @@ if __name__ == "__main__":
 
     # 创建绘图和轴
     fig, ax = plt.subplots()
+    fig.canvas.mpl_connect('button_press_event', visualizer.handle_click)
 
     # 使用FuncAnimation动态更新图像，每秒更新一次
     ani = FuncAnimation(fig, visualizer.update_plot, fargs=(ax, True), interval=1000)  # 每秒更新一次
     plt.show()
+
+
+
+
+
