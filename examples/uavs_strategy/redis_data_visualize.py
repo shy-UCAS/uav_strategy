@@ -172,7 +172,7 @@ class MapVisualizer:
                 ax.fill(_utm_xy[: ,0], _utm_xy[: ,1], alpha=0.2, label=f'{_fac} Defence Ring')
 
     def update_plot(self, frame, ax, blue=True):
-        ax.cla()  # 建议用 cla，不要 clear，避免坐标轴属性全被重置
+        ax.clear()  # 建议用 cla，不要 clear，避免坐标轴属性全被重置
 
         positions, traj_data, ref_traj_data, lookahead_data = self.get_drone_states(blue)
 
@@ -190,37 +190,14 @@ class MapVisualizer:
                 ax.plot(traj_arr[:, 0], traj_arr[:, 1],
                         '-', linewidth=1.5, label=f'{uid} Actual Traj')
 
-            # 3. 预设轨迹（已完成 + 未完成）
+            # 3. 预设轨迹
             ref_traj = ref_traj_data.get(uid, [])
             if ref_traj:
                 ref_arr = np.array(ref_traj)  # [[x,y,z],...]
 
-                # 当前索引
-                idx = lookahead_data.get(uid, None)
-                if idx is None:
-                    # 如果读取不到索引，就默认整条都画成“未完成”
-                    ax.plot(ref_arr[:, 0], ref_arr[:, 1],
-                            '--', linewidth=1, label=f'{uid} Ref Traj (all)')
-                else:
-                    # 安全裁剪一下索引范围
-                    idx = max(0, min(idx, len(ref_arr) - 1))
+                ax.plot(ref_arr[:, 0], ref_arr[:, 1],
+                        '--', linewidth=1, label=f'{uid} Ref Traj (all)')
 
-                    # 已完成部分（包括当前点）
-                    done = ref_arr[:idx + 1]
-                    # 未完成部分
-                    remain = ref_arr[idx:]
-
-                    if len(done) >= 2:
-                        ax.plot(done[:, 0], done[:, 1],
-                                '-', linewidth=2, label=f'{uid} Ref Done')
-
-                    if len(remain) >= 2:
-                        ax.plot(remain[:, 0], remain[:, 1],
-                                '--', linewidth=1, label=f'{uid} Ref Remain')
-
-                    # （可选）也可以在当前“参考位置”上再画一个小点对比
-                    # cur_ref = ref_arr[idx]
-                    # ax.plot(cur_ref[0], cur_ref[1], 'rx', label=f'{uid} Ref Cur')
 
         # 坐标轴信息
         ax.set_title(f"{'Blue' if blue else 'Red'} UAVs - Realtime Map")
@@ -236,10 +213,9 @@ class MapVisualizer:
         return ax
 
     def handle_click(self, event):
+        """在鼠标点击点位置打印xy坐标，并保留小数位精度。
         """
-        Print the xy coordinate at the mouse click location with decimal precision.
-        """
-        # Ignore clicks that don't land inside the map axes
+
         if event.inaxes is None or event.xdata is None or event.ydata is None:
             return
 

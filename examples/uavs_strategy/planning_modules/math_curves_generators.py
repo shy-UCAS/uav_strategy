@@ -68,7 +68,7 @@ def interpolate_z_coordinates(trajectory):
     return completed
 
 
-def generate_breakthrough_flight(traj, direction_range=None, num_points=5):
+def generate_breakthrough_flight(traj, direction_range=None, num_points=15):
     """
     参数：
         traj: 三维点的列表，格式为 [[x1, y1, z1], [x2, y2, z2], ...]
@@ -179,7 +179,7 @@ def generate_zline_random_segment(traj, num_points=3):
     return random.choice([z_straight_values, z_dive_values, z_climb_values])
 
 
-def cubic_interpolation_3d(traj, bc_type='not-a-knot', num_points=5):
+def cubic_interpolation_3d(traj, bc_type='not-a-knot', num_points=15):
     """
     使用三次样条插值拟合三维曲线数据
 

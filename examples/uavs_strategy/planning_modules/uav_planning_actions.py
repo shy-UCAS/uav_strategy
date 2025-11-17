@@ -228,18 +228,7 @@ class PlanningLib:
 
 def register_planning_actions(self, actions):
     """
-    在 BlueUAVAgent.add_custom_actions(self, actions) 中调用：
-
-        from planning_modules.uav_planning_actions import register_planning_actions
-
-        def add_custom_actions(self, actions):
-            # 先注册 redis IO 动作 ...
-            register_planning_actions(self, actions)
-
-    注意：
-    - 这里的 self 是 BlueUAVAgent 实例
-    - 所有动作内部都用 self.xxx（包括 self.io / self.traj / self.facilities）
-    - 回调参数 agent_ 只是为了接口一致，不参与属性访问
+    调用之前设计的轨迹规划方法，注册 BDI 动作。
     """
     lib = PlanningLib(self)
 

@@ -145,6 +145,93 @@ class LngLat2UTM(object):
         return euavs_trajs_utm
 
 
+class DroneTrajectory:
+    def __init__(self, uav_id, lnglats=[], alts=[], utm_xys=[], ts=[], time_step=1):
+        self.uav_id = uav_id
+
+        self.lnglats = lnglats
+        self.alts = alts
+        self.utm_xys = utm_xys
+        self.ts = ts
+        self.time_step = time_step
+
+        self.llt2utm_cnvrtr = LngLat2UTM()
+
+    def set_longlats(self, lngs, lats):
+        self.lnglats = np.array([lngs, lats]).T
+
+    def set_alts(self, alts):
+        self.alts = alts
+
+    def set_utm_xys(self, utm_xys):
+        self.utm_xys = utm_xys
+
+    def set_ts(self, ts):
+        self.ts = ts
+
+    def __len__(self):
+        return len(self.alts)
+
+    def append_utmxy_alt(self, utm_xy, alt):
+        if len(self.utm_xys) == 0:
+            self.utm_xys = np.array([utm_xy])
+        else:
+            self.utm_xys = np.append(self.utm_xys, [utm_xy], axis=0)
+
+        if len(self.lnglats) == 0:
+            self.lnglats = np.array([self.llt2utm_cnvrtr.utm_to_lng_lat(utm_xy[0], utm_xy[1])])
+        else:
+            self.lnglats = np.append(self.lnglats, [self.llt2utm_cnvrtr.utm_to_lng_lat(utm_xy[0], utm_xy[1])], axis=0)
+
+        if len(self.alts) == 0:
+            self.alts = np.array([alt])
+        else:
+            self.alts = np.append(self.alts, [alt])
+
+        if len(self.ts) == 0:
+            self.ts = np.array([0])
+        else:
+            self.ts = np.append(self.ts, [self.ts[-1] + self.time_step])
+
+    def append_lnglat_alt(self, lnglat, alt):
+        if len(self.lnglats) == 0:
+            self.lnglats = np.array([lnglat])
+        else:
+            self.lnglats = np.append(self.lnglats, [lnglat], axis=0)
+
+        if len(self.utm_xys) == 0:
+            self.utm_xys = np.array([self.llt2utm_cnvrtr.lng_lat_to_utm(lnglat[0], lnglat[1])])
+        else:
+            self.utm_xys = np.append(self.utm_xys, [self.llt2utm_cnvrtr.lng_lat_to_utm(lnglat[0], lnglat[1])], axis=0)
+
+        if len(self.alts) == 0:
+            self.alts = np.array([alt])
+        else:
+            self.alts = np.append(self.alts, [alt])
+
+        if len(self.ts) == 0:
+            self.ts = np.array([0])
+        else:
+            self.ts = np.append(self.ts, [self.ts[-1] + self.time_step])
+
+    def location_at_step(self, step):
+        _cur_utm_xy = self.utm_xys[step]
+        _cur_lnglat = self.lnglats[step]
+        _cur_alt = self.alts[step]
+
+        return _cur_utm_xy, _cur_lnglat, _cur_alt
+
+    def time_at_step(self, step):
+        return self.ts[step]
+
+    def show(self):
+        print(f"Drone {self.uav_id} Trajectory:")
+        print("<long>, <lat>, <alt>, <x>, <y>")
+        for _i in range(len(self.lnglats)):
+            print(
+                f"{self.lnglats[_i][0]:.3f}, {self.lnglats[_i][1]:.3f}, {self.alts[_i]:.3f}, {self.utm_xys[_i][0]:.3f}, {self.utm_xys[_i][1]:.3f}")
+
+
 class Facilities:
     def __init__(self, facilities_info, defend_rings_info, convert_to_utm=True):
         self.facilities_info = facilities_info
@@ -422,6 +509,7 @@ class Facilities:
                 ax.scatter(start_point[0], start_point[1], start_point[2], color='b', marker=_marker, label='start')
             else:
                 ax.scatter(start_point[0], start_point[1], color='b', marker=_marker, label='start')
+
         def on_mouse_move(event):
             if event.inaxes:
                 x = event.xdata

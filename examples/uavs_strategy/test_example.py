@@ -16,9 +16,10 @@ from spade_bdi.bdi import BDIAgent
 from spade.behaviour import PeriodicBehaviour
 
 # === 项目内部模块（统一写成 from planning_modules.xxx 导入） ===
-from .redis_modules.uav_redis_io import UavRedisIO
-from .planning_modules.uav_planning_actions import register_planning_actions
-from .planning_modules import basic_functions as bfunc
+from redis_modules.uav_redis_io import UavRedisIO
+from planning_modules.uav_planning_actions import register_planning_actions
+from planning_modules import basic_functions as bfunc
+
 
 fleet1 = [
     122.09686551225596,
@@ -28,7 +29,8 @@ fleet1 = [
 
 fleet2 = [
     122.10258217246229,
-    37.56342057758475
+    37.56342057758475,
+    220
 ]
 
 height_range_value_set = {
@@ -45,7 +47,7 @@ direction_range_set = {
 # ==== 势场与步进参数（可改为 configs.ini 里读取）====
 DT = 1.0  # 与 PeriodicBehaviour 的 period 对齐（秒）
 STEP = 8.0  # 每步“最大位移”/速度上限（米/步）
-K_ATT = 0.5  # 引力系数
+K_ATT = 0.75  # 引力系数
 K_REP = 2.5  # 斥力系数
 R_INF = 150.0  # 斥力影响半径（米）
 CLOSE_TH = 10000.0  # 预瞄点“到点”判定阈值（米）
@@ -173,7 +175,7 @@ class BlueUAVAgent(BDIAgent):
             io = agent.io
             current_time = time()  # 获取当前时间
 
-            # 获取蓝方（当前 Agent）的 ID 和位姿
+            # 获取本机数据
             me = io.get_pos(agent.self_uid, blue=True)
             if not me:
                 return  # 如果没有当前无人机位置，跳过
@@ -182,10 +184,12 @@ class BlueUAVAgent(BDIAgent):
             traj = agent.cur_reference_traj
             if not traj:
                 return  # 如果没有参考轨迹，跳过
-            if agent.bdi.get_belief("if_set_ref_traj"):
+            if_set_ref_traj_belief = agent.bdi.get_belief("if_set_ref_traj")[len("if_set_ref_traj("):-1]
+
+            if if_set_ref_traj_belief == "true":
                 # 如果当前轨迹没有写入redis，则写入
                 io.set_ref_traj(agent.self_uid,traj)
-                agent.bdi.set_belief("if_set_ref_traj", "False")
+                agent.bdi.set_belief("if_set_ref_traj", "false")
                 print(f"ref_traj add to redis")
 
             # 获取当前预瞄点的位置（从参考轨迹中）
@@ -195,6 +199,15 @@ class BlueUAVAgent(BDIAgent):
             print(f"Current goal: {goal}")
             # 获取当前无人机的位置
             p_me = [me["x"], me["y"], me["z"]]
+
+            # 计算当前速度
+            _real_traj = io.get_traj(agent.self_uid)
+            if len(_real_traj) > 1:
+                _prev_pos = _real_traj[-2]
+                _prev_vel = v_sub(p_me, _prev_pos)
+            else:
+                _prev_vel = [0, 0, 0]
+            print(f"Current velocity: {_prev_vel}")
 
             # ---- 引力：朝向目标（预瞄点） ----
             F_att = v_scale(v_sub(goal, p_me), K_ATT)
@@ -255,49 +268,67 @@ async def main(server: str, password: str):
     python -m examples.uavs_strategy.test_example --server 127.0.0.1 --password 202127
     """
 
-    jid = f"blue01@{server}"
-    asl_path = os.path.join(os.path.dirname(__file__), "uav_redis_io.asl")
-    # === 构造 UAV Agent ===
-    ag = BlueUAVAgent(
-        jid,
+    # blue01 agent
+    jid_01 = f"blue01@{server}"
+    asl_path_01 = os.path.join(os.path.dirname(__file__), "uav_blue_redis_01.asl")  # blue01的ASL文件路径
+    # 构造 blue01 UAV Agent
+    ag_01 = BlueUAVAgent(
+        jid_01,
         password,
-        asl_path,
+        asl_path_01,
         redis_cfg={"host": "127.0.0.1", "port": 6379},
         position=fleet1,
     )
-    ag.bdi.set_belief("start_height", fleet1[2])
-    ag.bdi.set_belief("if_set_ref_traj", "False")
+    ag_01.bdi.set_belief("start_height", fleet1[2])
+    ag_01.bdi.set_belief("if_set_ref_traj", "False")
+
+    # blue02 agent
+    jid_02 = f"blue02@{server}"
+    asl_path_02 = os.path.join(os.path.dirname(__file__), "uav_blue_redis_02.asl")  # blue02的ASL文件路径
+    # 构造 blue02 UAV Agent
+    ag_02 = BlueUAVAgent(
+        jid_02,
+        password,
+        asl_path_02,
+        redis_cfg={"host": "127.0.0.1", "port": 6379},
+        position=fleet2,
+    )
+    ag_02.bdi.set_belief("start_height", fleet2[2])
+    ag_02.bdi.set_belief("if_set_ref_traj", "False")
 
     # 启动代理
-    await ag.start()
-    print(f"Agent {jid} started.")
+    await ag_01.start()
+    await ag_02.start()
+    print(f"Agent {jid_01} started.")
+    print(f"Agent {jid_02} started.")
 
     # 关闭前保持运行
     await asyncio.sleep(99999)
+
 
 
 # =============================
 # 6. 命令行处理
 # =============================
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--server", help="XMPP Server (host)", required=False)
-    parser.add_argument("--password", help="Password", required=False)
-    args = parser.parse_args()
-
-    # server
-    if args.server is None:
-        server = input("XMPP Server> ")
-    else:
-        server = args.server
-
-    # password
-    if args.password is None:
-        passwd = getpass.getpass("Password> ")
-    else:
-        passwd = args.password
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--server", help="XMPP Server (host)", required=False)
+    # parser.add_argument("--password", help="Password", required=False)
+    # args = parser.parse_args()
+    #
+    # # server
+    # if args.server is None:
+    #     server = input("XMPP Server> ")
+    # else:
+    #     server = args.server
+    #
+    # # password
+    # if args.password is None:
+    #     passwd = getpass.getpass("Password> ")
+    # else:
+    #     passwd = args.password
 
     # 启动
     import spade
 
-    spade.run(main(server, passwd))
+    spade.run(main("127.0.0.1", "202127"))

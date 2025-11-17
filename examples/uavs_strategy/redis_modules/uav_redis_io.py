@@ -86,7 +86,7 @@ class UavRedisIO:
         cur_list.append(points)
         self.r.set(key, json.dumps(cur_list))
 
-    def get_traj(self, uid: str) -> List[Dict[str, float]]:
+    def get_traj(self, uid: str) -> List[List[float]]:
         key = f"uav:{uid}:traj"
         js = self.r.get(key)
         return json.loads(js) if js else []
