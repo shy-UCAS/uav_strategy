@@ -12,6 +12,7 @@ fleet2 = [
     122.10258217246229,
     37.56342057758475
 ]
+fleet1_utm = [425274.66488500574, 4151544.508846587]
 rings = {
     "defence_rings": {
         "ring1": {
@@ -60,6 +61,4 @@ for ring in facilities.defend_rings.values():
 
 lnglat2utm_convertor = bfunc.LngLat2UTM()
 print(f"{lnglat2utm_convertor.lon_lat_to_utm(fleet1[0], fleet1[1])}")
-print(f"{lnglat2utm_convertor.utm_to_lng_lat(fleet2[0], fleet2[1])}")
-
-
+print(f"{lnglat2utm_convertor.utm_to_lng_lat(426245.5405112152, 4153226.1147590093)}")

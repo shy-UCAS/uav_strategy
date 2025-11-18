@@ -1,4 +1,4 @@
-# examples/uavs_strategy/test_example.py
+# examples/uavs_strategy/uav_task_test.py
 # -*- coding: utf-8 -*-
 
 import asyncio
@@ -25,14 +25,14 @@ from planning_modules import avoidance_agents as a_agents
 
 
 fleet1 = [
-    122.09686551225596,
-    37.56536338371065,
+    122.15451569813476,
+    37.50781897194055,
     165
 ]
 
 fleet2 = [
-    122.10258217246229,
-    37.56342057758475,
+    122.16533086650654,
+    37.52305286868604,
     220
 ]
 
@@ -50,7 +50,7 @@ direction_range_set = {
 # ==== 势场与步进参数（可改为 configs.ini 里读取）====
 DT = 1.0  # 与 PeriodicBehaviour 的 period 对齐（秒）
 STEP = 8.0  # 每步“最大位移”/速度上限（米/步）
-K_ATT = 0.75  # 引力系数
+K_ATT = 0.95  # 引力系数
 K_REP = 2.5  # 斥力系数
 R_INF = 150.0  # 斥力影响半径（米）
 CLOSE_TH = 10000.0  # 预瞄点“到点”判定阈值（米）
@@ -174,7 +174,7 @@ class BlueUAVAgent(BDIAgent):
             agent = self.agent
             io = agent.io
             current_time = time()  # 获取当前时间
-            print(f"uav:{agent.name} at {current_time}\n")
+            print(f"\nuav:{agent.name} at {current_time}")
             # 获取本机数据
             me = io.get_pos(agent.self_uid, blue=True)
             if not me:
@@ -204,6 +204,17 @@ class BlueUAVAgent(BDIAgent):
             self_pos = [me["x"], me["y"], me["z"]]
             self_vel = all_blue_speed.get(agent.self_uid, [0.0, 0.0, 0.0])
 
+            #结束当前task的标志位
+            dist_to_end = io.get_dist_2d(agent.self_uid)
+            print(f"current_dist_to_end: {dist_to_end}")
+            if dist_to_end <= 50:
+                # 重置当任务状态
+                io.set_lookahead(agent.self_uid, 0)
+                agent.bdi.set_belief("can_task_start", True)
+                print(f"near end")
+                return
+
+
             obstacle_positions = []
             obstacle_vels = []
 
@@ -218,6 +229,7 @@ class BlueUAVAgent(BDIAgent):
                 vel = all_blue_speed.get(uid, [0.0, 0.0, 0.0])
                 obstacle_vels.append(vel)
 
+            # # ---- 斥力：来自其他无人机的位置 ----
             # 如果当前只有一架机，障碍数组为空，就没必要算
             if not obstacle_positions:
                 F_rep = np.zeros(3)
@@ -234,23 +246,7 @@ class BlueUAVAgent(BDIAgent):
             # ---- 引力：朝向目标（预瞄点） ----
             F_att = v_scale(v_sub(goal, self_pos), K_ATT)
             print(f"F_att: {F_att}")
-            # # ---- 斥力：来自其他无人机的位置 ----
-            # F_rep = [0.0, 0.0, 0.0]
-            #
-            # def acc_rep(others: dict):
-            #     nonlocal F_rep
-            #     for k, p in (others or {}).items():
-            #         if not p: continue
-            #         if k == agent.self_uid: continue  # 排除自己
-            #         d = v_sub(self_pos, [float(p["x"]), float(p["y"]), float(p["z"])])
-            #         dist = v_norm(d)
-            #         if 0.0 < dist < R_INF:
-            #             mag = K_REP * (1.0 / dist - 1.0 / R_INF) * (1.0 / (dist * dist))
-            #             F_rep = v_add(F_rep, v_scale(v_unit(d), mag))
 
-            # # 计算蓝方和红方的斥力（使用已经存储的位姿数据）
-            # acc_rep(agent.world.get("blue_pos", {}))
-            # acc_rep(agent.world.get("red_pos", {}))
 
             # ---- 合力：引力和斥力合成 ----
             F = v_add(F_att, F_rep)

@@ -148,7 +148,9 @@ class UavRedisIO:
         raw = self.r.get(key)
         if not raw:
             return []
-        return json.loads(raw.decode("utf-8"))
+        else:
+            return json.loads(raw)
+
 
     # ---------- 蓝方：预瞄点 ----------
     def set_lookahead(self, uid: str, idx: int) -> None:
@@ -172,6 +174,26 @@ class UavRedisIO:
             return int(raw)
         except ValueError:
             return None
+
+    def get_dist_2d(self, uid: str, blue: bool = True):
+        """获取当前位置，距离当前参考轨迹终点的距离"""
+        pos = self.get_pos(uid, blue=blue)
+        ref_traj = self.get_ref_traj(uid)
+
+        if not pos or not ref_traj:
+            print("Warning: no valid pos or ref_traj for uav", pos, ref_traj)
+            return None
+
+        # 当前位置 (x, y)
+        x1, y1 = pos["x"], pos["y"]
+
+        # 参考轨迹终点 (x, y)
+        x2, y2 = ref_traj[-1][0], ref_traj[-1][1]
+
+        # 平面距离 √((x1-x2)^2 + (y1-y2)^2)
+        dist = np.hypot(x1 - x2, y1 - y2)
+
+        return dist
 
     # ---------- 工具：过滤过期 ----------
     @staticmethod

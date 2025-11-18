@@ -272,7 +272,7 @@ def register_planning_actions(self, actions):
 
         traj_2d = lib.plan_escape(self.traj[-1], arg_target)
         traj_3d = lib.insert_height_val("escape", traj_2d, arg_start_h, arg_end_h)
-
+        self.cur_reference_traj = traj_3d
         self.traj.extend(traj_3d[1:])
 
         print(f"{self.name} is escaping {arg_target}, trajectory:\n{traj_3d}")
