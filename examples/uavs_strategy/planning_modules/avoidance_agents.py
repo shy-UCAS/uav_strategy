@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.cluster import DBSCAN
 import matplotlib.pyplot as plt
 
-import basic_functions as bfun
+import examples.uavs_strategy.planning_modules.basic_functions as bfun
 from matplotlib import animation
 from mpl_toolkits.mplot3d import Axes3D
 from itertools import cycle
@@ -13,12 +13,18 @@ config = configparser.ConfigParser()
 config.read('cfg.ini')
 # blue_agent_id = config.getint('DEFAULT', 'blue_agent_id')
 blue_agent_id = 7
-range_radius = config.getfloat('DEFAULT', 'range_radius')
-red_range_radius = config.getfloat('DEFAULT', 'red_range_radius')
-target_range_radius = config.getfloat('DEFAULT', 'target_range_radius')
-dymic_red_krep_xy = config.getfloat('DEFAULT', 'dymic_red_krep_xy')
-dymic_red_krep_z = config.getfloat('DEFAULT', 'dymic_red_krep_z')
-kattr = config.getfloat('DEFAULT', 'kattr')
+# range_radius = config.getfloat('DEFAULT', 'range_radius')
+# red_range_radius = config.getfloat('DEFAULT', 'red_range_radius')
+# target_range_radius = config.getfloat('DEFAULT', 'target_range_radius')
+# dymic_red_krep_xy = config.getfloat('DEFAULT', 'dymic_red_krep_xy')
+# dymic_red_krep_z = config.getfloat('DEFAULT', 'dymic_red_krep_z')
+# kattr = config.getfloat('DEFAULT', 'kattr')
+range_radius = 4.5
+red_range_radius = 1500
+target_range_radius = 200.5
+dymic_red_krep_xy = 220000
+dymic_red_krep_z = 200
+kattr = 0.28
 
 
 class AvoidanceAgent:
@@ -42,32 +48,6 @@ class AvoidanceAgent:
         self.cur_avoid_frame = 0  # 用于基于当前无人机实际traverse的avoidance trajectory的次序
         self.avoidance_trajectory = bfun.DroneTrajectory(self.uav_id)  # 实际飞行过程中产生的轨迹（预设+secondary轨迹形成）
         self.secondary_trajectory = None  # 临机避障时使用的轨迹，如果临机避障的状态满足，则使用该轨迹，否则使用self.avoidance_trajectory
-
-    def infer_preset_speeds_accs(self, step_time=1, vis=False):
-        _cur_utm_xys = self.preset_trajectory.utm_xys
-        _cur_alts = self.preset_trajectory.alts
-
-        # infer speeds and accs from the trajectory
-        _utm_xys_diffs = np.diff(_cur_utm_xys, axis=0)
-        _alts_diffs = np.diff(_cur_alts, axis=0)
-
-        _speeds = np.sqrt(_utm_xys_diffs[:, 0] ** 2 + _utm_xys_diffs[:, 1] ** 2 + _alts_diffs ** 2) / step_time
-        _accs = np.diff(_speeds, axis=0) / step_time
-
-        if vis:
-            _fig, _axs = plt.subplots(1, 2, figsize=(10, 5))
-            _axs[0].plot(_speeds);
-            _axs[0].set_title('speeds')
-            _axs[1].plot(_accs);
-            _axs[1].set_title('accs')
-            plt.tight_layout()
-            plt.show()
-
-    def get_current_location(self):
-        _cur_utm_xy = self.avoidance_trajectory.utm_xys[-1]
-        _cur_alt = self.avoidance_trajectory.alts[-1]
-
-        return np.concatenate((_cur_utm_xy, np.array([_cur_alt])))
 
     def infer_last_speed(self, frame=None, scalar=True, step_time=1):
         if frame is None and len(self.avoidance_trajectory) > 1:
@@ -144,41 +124,6 @@ class AvoidanceAgent:
     def append_to_avoidance_trajectory(self, _cur_utm_xy, _cur_alt):
         self.avoidance_trajectory.append_utmxy_alt(_cur_utm_xy, _cur_alt)
 
-    # def repulsive_from_redagents(self, self_location, reds_locations):
-    #     ''' 来自红方agent的斥力，应该是距离越近、斥力越大
-    #     '''
-    #
-    #     _loc_delta = np.linalg.norm(self_location - reds_locations)
-    #
-    #     _equiv_dist = _loc_delta / (self.repulsive_range * 2) * 10
-    #     _repulsive_acc = min(self.max_acc / (_equiv_dist ** 2 + 1), self.max_acc)
-    #
-    #     _repulse_force = _repulsive_acc * (self_location - reds_locations) / max(_loc_delta, 1e-5)
-    #
-    #     return _repulse_force
-    #
-    # def respulsive_from_other_blueagents(self, self_location, other_blues_locations):
-    #     ''' 来自其他蓝方agent的斥力，应该是距离越近、斥力越大
-    #     '''
-    #     _loc_delta = np.linalg.norm(self_location - other_blues_locations)
-    #     _equiv_dist = _loc_delta / self.repulsive_range * 10
-    #     _repulsive_acc = min(self.max_acc / (_equiv_dist ** 2 + 1), self.max_acc)
-    #
-    #     _repulse_force = _repulsive_acc * (self_location - other_blues_locations) / max(_loc_delta, 1e-5)
-    #
-    #     return _repulse_force
-    #
-    # def attractive_to_target(self, self_location, target_location):
-    #     ''' 来自目标点的吸引力，应该是距离越远、吸引力越大
-    #     '''
-    #
-    #     _loc_delta = np.linalg.norm(target_location - self_location)
-    #     # _attractive_acc = min(2 * np.power(_loc_delta, 1.5) / (self.preset_trajectory.time_step ** 2), self.max_acc * 4.5)
-    #     _attractive_acc = min(2 * np.power(_loc_delta, 1.5) / (self.preset_trajectory.time_step ** 2), 100)
-    #
-    #     _attract_force = _attractive_acc * (target_location - self_location) / max(_loc_delta, 1e-5)
-    #
-    #     return _attract_force
 
     def repulsive_from_dymanic_redagents(self, self_location, self_vel_vec,
                                          reds_locations, reds_vels, target_location,
@@ -187,7 +132,6 @@ class AvoidanceAgent:
         """
         3D 动态障碍斥力（相对速度投影）：逐红机计算再求和
         F_r = (1/ρ - 1/ρ0) * (1/ρ^3) * (1 + ζ|dot_rho|) * (X - X_r)
-        （可选）你也可以把 (||X-Xg||^2) 当作额外权重乘进去
         """
         self_location = np.asarray(self_location, float).reshape(3)
         self_vel_vec = np.asarray(self_vel_vec[0], float).reshape(3)
@@ -212,9 +156,6 @@ class AvoidanceAgent:
 
             # 力（只取障碍梯度项的工程实现）
             _repulse_force = (_loc_delta - 1.0 / rep_dist) * (_loc_delta ** 3) * dyn_w * _red_vec
-
-            # （可选）若想更贴近配图里“乘以目标距”：
-            # _repulse_force *= (_dist_to_target**2)
 
             # 各向异性缩放
             _repulse_force[0] *= krep_xy
@@ -669,5 +610,96 @@ class AvoidanceCluster:
 
         return _reds_prev_vels
 
+
+
+import numpy as np
+
+def compute_dynamic_repulsive_force(agent_pos,
+                                    agent_vel,
+                                    obstacle_positions,
+                                    obstacle_vels,
+                                    target_pos=None,
+                                    k_xy=0.0,
+                                    k_z=1.0,
+                                    influence_dist=1500.0,
+                                    zeta=1.0,
+                                    eps=1e-6,
+                                    sum_limit=None):
+    """
+    计算 3D 动态障碍物的合成斥力（适用于任何无人机 / 障碍物，不分红蓝阵营）
+
+    物理模型：
+        F = (1/ρ - 1/ρ0) * (1/ρ^3) * (1 + ζ|dot_rho|) * (X - X_obs)
+        其中：
+            ρ        = agent 与障碍的距离
+            ρ0       = influence_dist 作用距离
+            dot_rho  = 相对速度在连线方向上的投影
+
+    参数:
+        agent_pos          : shape (3,)         自身位置
+        agent_vel          : shape (3,)         自身速度
+        obstacle_positions : shape (N,3)        障碍物位置
+        obstacle_vels      : shape (N,3)        障碍物速度
+        target_pos         : shape (3,) 或 None  可选，用于增强权重
+        k_xy, k_z          : 斥力缩放（XY 向更灵敏，Z 向更平滑）
+        influence_dist     : 斥力生效距离
+        zeta               : 相对速度权重
+        eps                : 小量（防除零）
+        sum_limit          : 可选，合力限幅
+
+    返回:
+        F_total: shape (3,)  作用在 agent 上的总斥力向量
+    """
+
+    agent_pos = np.asarray(agent_pos, float).reshape(3)
+    agent_vel = np.asarray(agent_vel, float).reshape(3)
+    obstacle_positions = np.asarray(obstacle_positions, float).reshape(-1, 3)
+    obstacle_vels = np.asarray(obstacle_vels, float).reshape(-1, 3)
+
+    if target_pos is not None:
+        target_pos = np.asarray(target_pos, float).reshape(3)
+
+    F_total = np.zeros(3, float)
+
+    for obs_pos, obs_vel in zip(obstacle_positions, obstacle_vels):
+
+        diff_vec = agent_pos - obs_pos
+
+        dist = max(np.linalg.norm(diff_vec), eps)
+
+        # 超出影响范围，忽略
+        if dist > influence_dist:
+            continue
+
+        inv_r = 1.0 / dist
+
+        # 相对速度
+        v_rel = agent_vel - obs_vel
+
+
+        # 连线方向的速度投影
+        dot_rho = np.dot(v_rel, diff_vec) / dist
+
+        # 动态因子
+        dyn_factor = 1.0 + zeta * abs(dot_rho)
+
+        # 基础斥力
+        rep_force = (inv_r - 1.0 / influence_dist) * (inv_r ** 3) * dyn_factor * diff_vec
+
+        # 各向异性缩放（XY 更强，Z 更小）
+        rep_force[0] *= k_xy
+        rep_force[1] *= k_xy
+        rep_force[2] *= k_z
+        print(f"rep_force: {rep_force}")
+        # 累加
+        F_total += rep_force
+
+    # 合力限幅
+    if sum_limit is not None:
+        norm = np.linalg.norm(F_total)
+        if norm > sum_limit:
+            F_total = F_total / norm * sum_limit
+
+    return F_total
 
 

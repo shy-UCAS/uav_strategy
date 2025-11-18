@@ -9,8 +9,10 @@ import sys
 import redis
 import json
 import numpy as np
+from typing import Dict, List, Optional, Iterable, Tuple, Any
 
-from datetime import datetime, time
+from time import time
+from datetime import datetime
 
 from spade_bdi.bdi import BDIAgent
 from spade.behaviour import PeriodicBehaviour
@@ -19,6 +21,7 @@ from spade.behaviour import PeriodicBehaviour
 from redis_modules.uav_redis_io import UavRedisIO
 from planning_modules.uav_planning_actions import register_planning_actions
 from planning_modules import basic_functions as bfunc
+from planning_modules import avoidance_agents as a_agents
 
 
 fleet1 = [
@@ -111,6 +114,8 @@ class BlueUAVAgent(BDIAgent):
         self.world = {"blue_pos": {}, "red_pos": {}}
         # 当前参考轨迹
         self.cur_reference_traj = []
+        self.blue_ids = []
+        self.red_ids = []
 
         # redis初始化数据
         self.io.add_uav_id(self.self_uid, blue=True)
@@ -149,32 +154,27 @@ class BlueUAVAgent(BDIAgent):
             agent = self.agent  # BlueUAVAgent 实例
             io = agent.io
 
-            # 查询蓝方 ID
-            blue_ids = io.get_ids(blue=True)
-            if not blue_ids:
-                blue_ids = io.scan_ids_by_key("uav")
-
-            # 查询红方 ID
-            red_ids = io.get_ids(blue=False)
-            if not red_ids:
-                red_ids = io.scan_ids_by_key("red")
+            # 查询蓝红方 ID
+            agent.blue_ids = io.get_ids(blue=True) or io.scan_ids_by_key("uav")
+            agent.red_ids = io.get_ids(blue=False) or io.scan_ids_by_key("red")
 
             # 批量读取蓝方和红方的位置信息
-            blue_all = io.mget_pos(blue_ids, blue=True)
-            red_all = io.mget_pos(red_ids, blue=False)
+            blue_all = io.mget_pos(agent.blue_ids, blue=True)
+            red_all = io.mget_pos(agent.red_ids, blue=False)
 
             # 写入到 agent.world 中
             agent.world["blue_pos"] = {k: v for k, v in blue_all.items() if v}
             agent.world["red_pos"] = {k: v for k, v in red_all.items() if v}
-            print(f"[FetchWorldState] blue={list(agent.world['blue_pos'].keys())}, "
-                  f"red={list(agent.world['red_pos'].keys())}")
+            # print(f"[FetchWorldState] blue={list(agent.world['blue_pos'].keys())}, "
+            #       f"red={list(agent.world['red_pos'].keys())}")
 
     class APFStep(PeriodicBehaviour):
         async def run(self):
+
             agent = self.agent
             io = agent.io
             current_time = time()  # 获取当前时间
-
+            print(f"uav:{agent.name} at {current_time}\n")
             # 获取本机数据
             me = io.get_pos(agent.self_uid, blue=True)
             if not me:
@@ -196,47 +196,69 @@ class BlueUAVAgent(BDIAgent):
             lookahead = io.get_lookahead(agent.self_uid)
             lookahead = max(1, min(lookahead, len(traj) - 1))
             goal = traj[lookahead]  # 当前目标点（预瞄点）
-            print(f"Current goal: {goal}")
-            # 获取当前无人机的位置
-            p_me = [me["x"], me["y"], me["z"]]
 
-            # 计算当前速度
-            _real_traj = io.get_traj(agent.self_uid)
-            if len(_real_traj) > 1:
-                _prev_pos = _real_traj[-2]
-                _prev_vel = v_sub(p_me, _prev_pos)
+            # 获取无人机的位置及速度
+            all_blue_speed = io.mget_speed_from_traj(agent.blue_ids, blue=True, dt=DT)
+            all_blue_pos = io.mget_pos(agent.blue_ids, blue=True)
+
+            self_pos = [me["x"], me["y"], me["z"]]
+            self_vel = all_blue_speed.get(agent.self_uid, [0.0, 0.0, 0.0])
+
+            obstacle_positions = []
+            obstacle_vels = []
+
+            for uid, pos in all_blue_pos.items():
+                if uid == agent.self_uid:
+                    continue  # 排除自己
+
+                # 位置：[x, y, z]
+                obstacle_positions.append([pos["x"], pos["y"], pos["z"]])
+
+                # 速度：从 all_blue_speed 里取，如果还没算出就给个 0
+                vel = all_blue_speed.get(uid, [0.0, 0.0, 0.0])
+                obstacle_vels.append(vel)
+
+            # 如果当前只有一架机，障碍数组为空，就没必要算
+            if not obstacle_positions:
+                F_rep = np.zeros(3)
             else:
-                _prev_vel = [0, 0, 0]
-            print(f"Current velocity: {_prev_vel}")
+                F_rep = a_agents.compute_dynamic_repulsive_force(
+                    agent_pos=self_pos,
+                    agent_vel=self_vel,
+                    obstacle_positions=obstacle_positions,
+                    obstacle_vels=obstacle_vels,
+                )
+            print(f"obs_pos: {obstacle_positions}, obs_vel: {obstacle_vels}, F_rep: {F_rep}")
+
 
             # ---- 引力：朝向目标（预瞄点） ----
-            F_att = v_scale(v_sub(goal, p_me), K_ATT)
+            F_att = v_scale(v_sub(goal, self_pos), K_ATT)
+            print(f"F_att: {F_att}")
+            # # ---- 斥力：来自其他无人机的位置 ----
+            # F_rep = [0.0, 0.0, 0.0]
+            #
+            # def acc_rep(others: dict):
+            #     nonlocal F_rep
+            #     for k, p in (others or {}).items():
+            #         if not p: continue
+            #         if k == agent.self_uid: continue  # 排除自己
+            #         d = v_sub(self_pos, [float(p["x"]), float(p["y"]), float(p["z"])])
+            #         dist = v_norm(d)
+            #         if 0.0 < dist < R_INF:
+            #             mag = K_REP * (1.0 / dist - 1.0 / R_INF) * (1.0 / (dist * dist))
+            #             F_rep = v_add(F_rep, v_scale(v_unit(d), mag))
 
-            # ---- 斥力：来自其他无人机的位置 ----
-            F_rep = [0.0, 0.0, 0.0]
-
-            def acc_rep(others: dict):
-                nonlocal F_rep
-                for k, p in (others or {}).items():
-                    if not p: continue
-                    if k == agent.self_uid: continue  # 排除自己
-                    d = v_sub(p_me, [float(p["x"]), float(p["y"]), float(p["z"])])
-                    dist = v_norm(d)
-                    if 0.0 < dist < R_INF:
-                        mag = K_REP * (1.0 / dist - 1.0 / R_INF) * (1.0 / (dist * dist))
-                        F_rep = v_add(F_rep, v_scale(v_unit(d), mag))
-
-            # 计算蓝方和红方的斥力（使用已经存储的位姿数据）
-            acc_rep(agent.world.get("blue_pos", {}))
-            acc_rep(agent.world.get("red_pos", {}))
+            # # 计算蓝方和红方的斥力（使用已经存储的位姿数据）
+            # acc_rep(agent.world.get("blue_pos", {}))
+            # acc_rep(agent.world.get("red_pos", {}))
 
             # ---- 合力：引力和斥力合成 ----
             F = v_add(F_att, F_rep)
 
-            # 步进：每 period 向目标迈进 STEP 米
-            step_vec = v_scale(v_unit(F), STEP)  # 每步最大位移
-            # nxt = [p_me[0] + step_vec[0], p_me[1] + step_vec[1], p_me[2] + step_vec[2]]
-            nxt = [p_me[0] + F_att[0], p_me[1] + F_att[1], p_me[2] + F_att[2]]
+            # # 步进：每 period 向目标迈进 STEP 米
+            # step_vec = v_scale(v_unit(F), STEP)  # 每步最大位移
+            nxt = [self_pos[0] + F[0], self_pos[1] + F[1], self_pos[2] + F[2]]
+            # nxt = [self_pos[0] + F_att[0], self_pos[1] + F_att[1], self_pos[2] + F_att[2]]
 
             # ---- 如果到达预瞄点，推进到下一个点 ----
             if v_norm(v_sub(goal, nxt)) <= CLOSE_TH and lookahead < len(traj) - 1:
@@ -257,6 +279,7 @@ class BlueUAVAgent(BDIAgent):
         # 每 1 秒读取一次 Redis
         self.add_behaviour(self.FetchWorldState(period=1.0))
         self.add_behaviour(self.APFStep(period=DT))
+
 
 
 # =============================

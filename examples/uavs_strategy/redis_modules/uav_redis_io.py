@@ -3,7 +3,7 @@
 import time
 import json
 from typing import Dict, List, Optional, Iterable, Tuple, Any
-
+import numpy as np
 import redis
 
 
@@ -72,6 +72,32 @@ class UavRedisIO:
             out[uid] = json.loads(js) if js else None
         return out
 
+    def mget_speed_from_traj(self, ids, blue=True, dt: float = 1.0):
+        """
+        使用“滞后一帧”的方式计算速度：本轮用的是上一轮的速度，避免半步更新不对称。
+        """
+        trajs = self.mget_traj(ids, blue=blue)
+        speeds = {}
+
+        for uid, traj in trajs.items():
+            n = len(traj)
+            if n >= 3:
+                # 用 t-2 → t-1 之间的位移作为本轮速度
+                p1 = np.asarray(traj[-2], dtype=float)
+                p0 = np.asarray(traj[-3], dtype=float)
+                v = (p1 - p0) / float(dt)
+                speeds[uid] = v.tolist()
+            elif n == 2:
+                # 只有两个点，只好用这两个算一次
+                p1 = np.asarray(traj[-1], dtype=float)
+                p0 = np.asarray(traj[-2], dtype=float)
+                v = (p1 - p0) / float(dt)
+                speeds[uid] = v.tolist()
+            else:
+                speeds[uid] = [0.0, 0.0, 0.0]
+
+        return speeds
+
     # ---------- 蓝方：轨迹读写 ----------
     def set_traj(self, uid: str, points: List[List[float]]) -> None:
         """覆盖写入轨迹：points = [{x,y,z}, ...]"""
@@ -90,6 +116,22 @@ class UavRedisIO:
         key = f"uav:{uid}:traj"
         js = self.r.get(key)
         return json.loads(js) if js else []
+
+    def mget_traj(self, ids: Iterable[str],blue: bool = True) -> Dict[str, List[List[float]]]:
+        """批量获取轨迹（pipeline）"""
+        p = self.r.pipeline()
+        keys = [f"{'uav' if blue else 'red'}:{uid}:traj" for uid in ids]
+        # 批量读取
+        for k in keys:
+            p.get(k)
+
+        vals = p.execute()
+
+        out = {}
+        for uid, js in zip(ids, vals):
+            out[uid] = json.loads(js) if js else []
+
+        return out
 
     def clear_traj(self, uid: str) -> None:
         self.r.delete(f"uav:{uid}:traj")
