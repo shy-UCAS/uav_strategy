@@ -18,11 +18,12 @@ from spade_bdi.bdi import BDIAgent
 from spade.behaviour import PeriodicBehaviour
 
 # === 项目内部模块（统一写成 from planning_modules.xxx 导入） ===
-from redis_modules.uav_redis_io import UavRedisIO
-from planning_modules.uav_planning_actions import register_planning_actions
-from planning_modules import basic_functions as bfunc
-from planning_modules import avoidance_agents as a_agents
-
+from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
+from examples.uavs_strategy.planning_modules.uav_planning_actions import register_planning_actions
+from examples.uavs_strategy.planning_modules import basic_functions as bfunc
+from examples.uavs_strategy.planning_modules import avoidance_agents as a_agents
+# 周期性执行的行为
+from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FormationAPFStep, APFStep,DT
 
 fleet1 = [
     122.15451569813476,
@@ -94,6 +95,9 @@ class BlueUAVAgent(BDIAgent):
         # 默认设施：如果外部没传，就从 json 加载
         self.facilities = self._default_facilities() if facilities is None else facilities
 
+        self.APFStep = APFStep
+        self.FormationAPFStep = FormationAPFStep
+
         self.height_range_set = height_range_set if height_range_set else height_range_value_set
         self.direction_range_set = direction_range_set if direction_range_set else direction_range_set
 
@@ -122,6 +126,13 @@ class BlueUAVAgent(BDIAgent):
         self.io.set_pos(self.self_uid, self.traj[0][0], self.traj[0][1], self.position[2])
         self.io.set_traj(self.self_uid, [[self.traj[0][0], self.traj[0][1], self.position[2]]])
         self.io.set_lookahead(self.self_uid, 0)  # 初始化 lookahead 为 0（指向参考轨迹的第一个目标点）
+
+        # 初始化编队状态：
+        self.formation_state = {
+                    "role": "independent",  # 可选: independent, follower, leader
+                    "leader_id": None,      # 仅 follower 需要
+                    "offset": np.array([0.0, 0.0, 0.0]) # 相对 Leader 的 XYZ 偏移
+                }
 
     def _default_facilities(self, default_json_path=None):
         if default_json_path is None:
@@ -165,106 +176,7 @@ class BlueUAVAgent(BDIAgent):
             # 写入到 agent.world 中
             agent.world["blue_pos"] = {k: v for k, v in blue_all.items() if v}
             agent.world["red_pos"] = {k: v for k, v in red_all.items() if v}
-            # print(f"[FetchWorldState] blue={list(agent.world['blue_pos'].keys())}, "
-            #       f"red={list(agent.world['red_pos'].keys())}")
 
-    class APFStep(PeriodicBehaviour):
-        async def run(self):
-
-            agent = self.agent
-            io = agent.io
-            current_time = time()  # 获取当前时间
-            print(f"\nuav:{agent.name} at {current_time}")
-            # 获取本机数据
-            me = io.get_pos(agent.self_uid, blue=True)
-            if not me:
-                return  # 如果没有当前无人机位置，跳过
-
-            # 获取当前的参考轨迹 (_cur_reference_traj)
-            traj = agent.cur_reference_traj
-            if not traj:
-                return  # 如果没有参考轨迹，跳过
-            if_set_ref_traj_belief = agent.bdi.get_belief("if_set_ref_traj")[len("if_set_ref_traj("):-1]
-
-            if if_set_ref_traj_belief == "true":
-                # 如果当前轨迹没有写入redis，则写入
-                io.set_ref_traj(agent.self_uid,traj)
-                agent.bdi.set_belief("if_set_ref_traj", "false")
-                print(f"ref_traj add to redis")
-
-            # 获取当前预瞄点的位置（从参考轨迹中）
-            lookahead = io.get_lookahead(agent.self_uid)
-            lookahead = max(1, min(lookahead, len(traj) - 1))
-            goal = traj[lookahead]  # 当前目标点（预瞄点）
-
-            # 获取无人机的位置及速度
-            all_blue_speed = io.mget_speed_from_traj(agent.blue_ids, blue=True, dt=DT)
-            all_blue_pos = io.mget_pos(agent.blue_ids, blue=True)
-
-            self_pos = [me["x"], me["y"], me["z"]]
-            self_vel = all_blue_speed.get(agent.self_uid, [0.0, 0.0, 0.0])
-
-            #结束当前task的标志位
-            dist_to_end = io.get_dist_2d(agent.self_uid)
-            print(f"current_dist_to_end: {dist_to_end}")
-            if dist_to_end <= 50:
-                # 重置当任务状态
-                io.set_lookahead(agent.self_uid, 0)
-                agent.bdi.set_belief("can_task_start", True)
-                print(f"near end")
-                return
-
-
-            obstacle_positions = []
-            obstacle_vels = []
-
-            for uid, pos in all_blue_pos.items():
-                if uid == agent.self_uid:
-                    continue  # 排除自己
-
-                # 位置：[x, y, z]
-                obstacle_positions.append([pos["x"], pos["y"], pos["z"]])
-
-                # 速度：从 all_blue_speed 里取，如果还没算出就给个 0
-                vel = all_blue_speed.get(uid, [0.0, 0.0, 0.0])
-                obstacle_vels.append(vel)
-
-            # # ---- 斥力：来自其他无人机的位置 ----
-            # 如果当前只有一架机，障碍数组为空，就没必要算
-            if not obstacle_positions:
-                F_rep = np.zeros(3)
-            else:
-                F_rep = a_agents.compute_dynamic_repulsive_force(
-                    agent_pos=self_pos,
-                    agent_vel=self_vel,
-                    obstacle_positions=obstacle_positions,
-                    obstacle_vels=obstacle_vels,
-                )
-            print(f"obs_pos: {obstacle_positions}, obs_vel: {obstacle_vels}, F_rep: {F_rep}")
-
-
-            # ---- 引力：朝向目标（预瞄点） ----
-            F_att = v_scale(v_sub(goal, self_pos), K_ATT)
-            print(f"F_att: {F_att}")
-
-
-            # ---- 合力：引力和斥力合成 ----
-            F = v_add(F_att, F_rep)
-
-            # # 步进：每 period 向目标迈进 STEP 米
-            # step_vec = v_scale(v_unit(F), STEP)  # 每步最大位移
-            nxt = [self_pos[0] + F[0], self_pos[1] + F[1], self_pos[2] + F[2]]
-            # nxt = [self_pos[0] + F_att[0], self_pos[1] + F_att[1], self_pos[2] + F_att[2]]
-
-            # ---- 如果到达预瞄点，推进到下一个点 ----
-            if v_norm(v_sub(goal, nxt)) <= CLOSE_TH and lookahead < len(traj) - 1:
-                io.set_lookahead(agent.self_uid, lookahead + 1)
-
-            # ---- 回写新的无人机位置到 Redis ----
-            io.set_pos(agent.self_uid, nxt[0], nxt[1], nxt[2])
-            io.append_traj_points(agent.self_uid, [nxt[0], nxt[1], nxt[2]])
-
-            print(f"New position for {agent.self_uid}: {nxt}")
 
     # =============================
     # 4. BDI Agent 初始化
