@@ -24,8 +24,6 @@ import examples.uavs_strategy.planning_modules.quick_path_planners as qpp
 import examples.uavs_strategy.planning_modules.math_curves_generators as curve_gen
 
 
-# ------------------------ 小工具 ------------------------ #
-
 def _ground(term, intention):
     """简化 agentspeak.grounded 的调用。"""
     return agentspeak.grounded(term, intention.scope)
@@ -357,4 +355,38 @@ def register_planning_actions(self, actions):
         arg = _ground(term.args[0], intention)
         print(f"{self.name} checking join status: {arg}")
 
+        yield
+
+    # ---------- 加入编队 (Join Formation) ---------- #
+    @actions.add(".act_join_formation", 4)
+    def _act_join_formation(agent_, term, intention):
+        leader_id = str(_ground(term.args[0], intention))
+        off_x = float(_ground(term.args[1], intention))
+        off_y = float(_ground(term.args[2], intention))
+        off_z = float(_ground(term.args[3], intention))
+
+        # 切换状态为跟随者
+        self.formation_state["role"] = "follower"
+        self.formation_state["leader_id"] = leader_id
+        self.formation_state["offset"] = np.array([off_x, off_y, off_z])
+        
+        print(f"[{self.name}] Joining Formation -> Leader: {leader_id}, Offset: {self.formation_state['offset']}")
+        yield
+        
+    # ---------- 离开编队 (Leave Formation) ---------- #
+    # ASL调用格式: .act_leave_formation
+    @actions.add(".act_leave_formation", 0)
+    def _act_leave_formation(agent_, term, intention):
+        # 切换回独立模式
+        self.formation_state["role"] = "independent"
+        self.formation_state["leader_id"] = None
+        
+        # 获取当前位置，重置为新轨迹的起点，防止瞬移
+        curr_pos = self.io.get_pos(self.self_uid, blue=True)
+        if curr_pos:
+             # 可以在这里清空旧的参考轨迹，强制 BDI 重新规划
+             self.traj = [[curr_pos['x'], curr_pos['y'], curr_pos['z']]]
+             self.io.set_lookahead(self.self_uid, 0)
+
+        print(f"[{self.name}] ⚡ LEAVING FORMATION -> Independent Mode.")
         yield

@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run uav_task_test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/uav_strategy/examples/uavs_strategy/uav_task_test.py",
+
+            "console": "integratedTerminal",
+
+            "cwd": "${workspaceFolder}/uav_strategy",
+
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/uav_strategy"
+            }
+        }
+    ]
+}
