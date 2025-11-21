@@ -102,7 +102,7 @@ class BlueUAVAgent(BDIAgent):
         self.formation_state = {
                     "role": "independent",  # 可选: independent, follower, leader
                     "leader_id": None,      # 仅 follower 需要
-                    ""
+                    "formation_type": "v_shape", # 队形可选的有：'circular', 'vertical', 'horizontal', 'vshape','arc'
                     "offset": np.array([0.0, 0.0, 0.0]) # 相对 Leader 的 XYZ 偏移
 
                 }
