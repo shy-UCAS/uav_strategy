@@ -21,7 +21,6 @@ from spade.behaviour import PeriodicBehaviour
 from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
 from examples.uavs_strategy.planning_modules.uav_planning_actions import register_planning_actions
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
-from examples.uavs_strategy.planning_modules import avoidance_agents as a_agents
 from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FormationAPFStep, APFStep, FetchWorldState ,DT
 
 fleet1 = [
