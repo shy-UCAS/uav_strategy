@@ -2,6 +2,8 @@
 
 ## 运行配置要求
 
+- 代码位置：`/examples/uavs_strategy/BlueSingleAgent `
+
 - 代码运行之前首先需要为Spade BDI框架配置Openfire服务器和MySQL数据库
   
   - 启动数据库：` mysql -u root -p  `之后再启动Openfire服务器
@@ -145,9 +147,8 @@
         * **更新世界状态**：将获取到的位置信息更新到代理的 `world["blue_pos"]` 和 `world["red_pos"]` 中。
       
       * **适用场景**：适用于定期获取并更新环境中所有无人机的位置信息，确保每个代理都能保持对环境的实时感知。
-
-
-
+        
+        
 - `uav_planning_actions.py` 这个库定义了一些与轨迹规划和BDI动作相关的功能，主要用于无人机在不同飞行任务中的行为控制。
   
   - **轨迹规划工具类 `PlanningLib`**
@@ -181,5 +182,3 @@
         * **加入编队 (`.act_join_formation`)**：设置无人机为编队成员并指定偏移量。
         
         * **离开编队 (`.act_leave_formation`)**：将无人机从编队中移除，恢复独立飞行状态。
-
-
