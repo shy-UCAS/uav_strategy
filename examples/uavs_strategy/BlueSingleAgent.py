@@ -100,11 +100,10 @@ class BlueUAVAgent(BDIAgent):
 
         # 初始化编队信息
         self.formation_state = {
-                    "role": "independent",  # 可选: independent, follower, leader
-                    "leader_id": None,      # 仅 follower 需要
+                    "role": "independent",  # 可选: independent, aggregate
+                    "follower_num": None,      # 设定从机数量
                     "formation_type": "v_shape", # 队形可选的有：'circular', 'vertical', 'horizontal', 'vshape','arc'
-                    "offset": np.array([0.0, 0.0, 0.0]) # 相对 Leader 的 XYZ 偏移
-
+                    "cluster_id": None,    # 只有当role不是independent时才有用，用于标识自己属于哪个集群，比如说蓝方blue01和blue02汇合后，cluster_id为blue01_02
                 }
 
     def _default_facilities(self, default_json_path=None):
