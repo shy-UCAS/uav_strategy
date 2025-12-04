@@ -100,8 +100,8 @@ class BlueUAVAgent(BDIAgent):
         # 初始化编队信息
         self.formation_state = {
                     "role": "independent",  # 可选: independent, aggregate
-                    "follower_num": None,      # 设定从机数量
-                    "formation_type": "v_shape", # 队形可选的有：'circular', 'vertical', 'horizontal', 'vshape','arc'
+                    "follower_num": None,      # 设定从机数量 
+                    "formation_type": "v_shape", # 队形可选的有：'circular', 'vertical', 'horizontal', 'vshape','arc' 
                     "cluster_id": None,    # 只有当role不是independent时才有用，用于标识自己属于哪个集群，比如说蓝方blue01和blue02汇合后，cluster_id为blue01_02
                 }
 
