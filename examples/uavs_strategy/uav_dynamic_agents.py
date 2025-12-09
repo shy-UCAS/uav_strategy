@@ -1,81 +1,85 @@
-# 动态创建 / 删除 BlueUAVAgent
+# 动态创建 / 删除 BlueUAVAgent 
+# 结合key_paths处理提取出的数据,数据导入redis服务器
+# 使用一个固定通用的asl文件处理uav_key_path.asl
 import asyncio
 import argparse
-from spade.agent import Agent
-from spade.behaviour import CyclicBehaviour
+import getpass
+import os, os.path as osp
+import sys
+import redis
+import json
+import numpy as np
+import spade
+import agentspeak
+import time
 
+from typing import Dict, List, Optional, Iterable, Tuple, Any
 
-class DemoAgent(Agent):
-    """
-    一个最简单的智能体：
-    周期性打印自己的 jid，方便观察谁还活着。
-    """
-    class HeartbeatBehaviour(CyclicBehaviour):
-        async def run(self):
-            print(f"[HB] {self.agent.jid} is alive.")
-            await asyncio.sleep(1)
+# from time import time
+from datetime import datetime
 
-    async def setup(self):
-        print(f"[SETUP] Agent {self.jid} started.")
-        hb = self.HeartbeatBehaviour()
-        self.add_behaviour(hb)
+from spade_bdi.bdi import BDIAgent
+from spade.behaviour import PeriodicBehaviour
 
+complex_key_paths = [
+    [1,2,3,4,5,6],
+    [7,8,9,10,11,12],
 
-async def spawn_agent(name: str, server: str, password: str):
-    """
-    运行过程中动态创建并启动一个智能体。
-    """
-    jid = f"{name}@{server}"
-    ag = DemoAgent(jid, password)
-    # 如需自动在 XMPP 服务器上注册账号，可以加 auto_register=True（前提是服务器允许）
-    await ag.start()  # await ag.start(auto_register=True)
-    print(f"[SPAWN] Agent {jid} created and started.")
-    return ag
+    # [20, 21, 5, 27], 
+    # [28, 3, 21, 5, 27], 
+    # [1, 2, 10, 26], 
+    # [30, 2, 10, 26], 
+    # [29, 22, 2, 10, 26], 
+    # [20, 21, 5, 7, 25], 
+    # [1, 2, 10, 12, 4, 8], 
+    # [1, 2, 10, 12, 11, 24, 16]
 
+]
 
-async def main(server: str, password: str):
+# =============================
+# 1. Blue UAV Agent
+# =============================
+class BlueUAVAgent(BDIAgent):
+    def __init__(self, jid, password, asl_file,key_path ,**kwargs):
+        super().__init__(jid, password, asl_file)
+        self.key_path = key_path
+
+    def add_custom_actions(self, actions):
+        @actions.add(".act_digraph_path_planning", 2)
+        def act_digraph_path_planning(agent, term, intention):
+            cur_start_node = agentspeak.grounded(term.args[0], intention.scope)
+            cur_end_node = agentspeak.grounded(term.args[1], intention.scope)
+            print(f"act_digraph_path_planning from {cur_start_node} to {cur_end_node}")
+            # 休眠1s暂时代替规划过程
+            time.sleep(2)
+            # self.bdi.set_belief("can_task_start", True)
+            yield
+
+async def main(server, password):
+    current_dir = os.path.dirname(__file__)
+    asl_file = os.path.join(current_dir, "uav_key_path.asl")
+    print(f"key paths num:{len(complex_key_paths)}")
     agents = []
+    for blue_idx, key_path in enumerate(complex_key_paths):
+        jid = f"blue_{blue_idx}_uav@{server}"
+        print(f"Blue UAV {blue_idx} jid: {jid}")
+        agent = BlueUAVAgent(jid, password, asl_file,key_path)
+        
+        if len(key_path) >= 2:
+            # 设置初始阶段 belief: cur_nodes(Start, End)
+            agent.bdi.set_belief("cur_nodes", key_path[0], key_path[1])
+            
+            # 设置后续阶段 belief: next_node(Current, Next)
+            # for i in range(1, len(key_path) - 1):
+            #     agent.bdi.set_belief("next_node", key_path[i], key_path[i+1])
+            #     print(f"Blue UAV {blue_idx} set_belief: next_node({key_path[i]}, {key_path[i+1]})")
+        agents.append(agent)
+    
+    # 并发启动所有 agent
+    await asyncio.gather(*(agent.start() for agent in agents))
 
-    # 1. 启动时先创建一个初始 agent
-    a1 = await spawn_agent("agent01", server, password)
-    agents.append(a1)
-
-    # 2. 用一个简单循环模拟“程序运行过程”
-    #    每隔几秒钟：创建新 agent / 停掉旧 agent
-    for step in range(6):
-        print(f"\n========== STEP {step} ==========")
-
-        # 在 step == 2 时，动态再创建一个智能体
-        if step == 2:
-            a2 = await spawn_agent("agent02", server, password)
-            agents.append(a2)
-
-        # 在 step == 4 时，销毁最早的那个智能体
-        if step == 4 and agents:
-            old = agents.pop(0)
-            print(f"[STOP] Stopping oldest agent: {old.jid}")
-            await old.stop()
-
-        await asyncio.sleep(2)
-
-    # 3. 结束前把剩下的智能体都停掉
-    print("\n[SHUTDOWN] Stopping remaining agents...")
-    for ag in agents:
-        print(f"[STOP] {ag.jid}")
-        await ag.stop()
-
-    # SPADE 内部有些清理是异步的，留一点时间完成关闭
-    await asyncio.sleep(1)
-    print("[DONE] All agents stopped. Bye.")
-
-
+    await asyncio.sleep(99999)
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument("--server", type=str, default="127.0.0.1",
-    #                     help="XMPP server domain, e.g., 127.0.0.1 or localhost")
-    # parser.add_argument("--password", type=str, required=True,
-    #                     help="Password for all test agents")
-    # args = parser.parse_args()
-
-    # 启动 asyncio 主循环
-    asyncio.run(main("127.0.0.1", "202127"))
+    server = "127.0.0.1"
+    passwd = "202127"
+    spade.run(main(server, passwd))

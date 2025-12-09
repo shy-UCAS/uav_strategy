@@ -2,16 +2,19 @@ import argparse
 import asyncio
 import getpass
 import spade
-
+import os
 from spade_bdi.bdi import BDIAgent
 
 
 async def main(server, password):
-    b = BDIAgent("receiver@{}".format(server), password, "receiver.asl")
+    current_dir = os.path.dirname(__file__)
+    asl_file = os.path.join(current_dir, "receiver.asl")
+    b = BDIAgent("receiver@{}".format(server), password, asl_file)
     b.bdi.set_belief("sender", "sender@{}".format(server))
     await b.start()
 
-    a = BDIAgent("sender@{}".format(server), password, "sender.asl")
+    asl_file = os.path.join(current_dir, "sender.asl")
+    a = BDIAgent("sender@{}".format(server), password, asl_file)
     a.bdi.set_belief("receiver", "receiver@{}".format(server))
     await a.start()
 
