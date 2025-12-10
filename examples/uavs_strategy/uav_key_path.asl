@@ -10,7 +10,8 @@ can_task_start(true).
 +!task_digraph(CurrentStart, CurrentEnd) 
     <- 
     while(true) {
-        !act_digraph_path_planning(CurrentStart, CurrentEnd);
+        ?cur_nodes(Start, End); 
+        !act_digraph_path_planning(Start, End);
     }.
 
 +!act_digraph_path_planning(CurrentStart, CurrentEnd): can_task_start(true)
@@ -24,6 +25,10 @@ can_task_start(true).
     <-
     .wait(100);
     .print("Waiting to start path planning for segment: ", CurrentStart, " -> ", CurrentEnd).
+
++!test_set_intention
+    <-
+    .print("Test set intention").
 
 
 

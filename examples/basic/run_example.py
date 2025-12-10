@@ -3,12 +3,14 @@ import asyncio
 import getpass
 
 import spade
-
+import os
 from spade_bdi.bdi import BDIAgent
 
 
 async def main(server, password):
-    a = BDIAgent(f"bdiagent@{server}", password, "E:/CASIA/Drone_Swarm_SituationSensingAlgos/BDI_Agent/spade_bdi-master/examples/basic/basic.asl")
+    current_dir = os.path.dirname(__file__)
+    asl_file = os.path.join(current_dir, "basic.asl")
+    a = BDIAgent(f"bdiagent@{server}", password, asl_file)
     await a.start()
 
     await asyncio.sleep(1)
