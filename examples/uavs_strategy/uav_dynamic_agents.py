@@ -12,6 +12,9 @@ import numpy as np
 import spade
 import agentspeak
 import time
+import collections
+import random
+import math
 
 from typing import Dict, List, Optional, Iterable, Tuple, Any
 
@@ -20,52 +23,85 @@ from datetime import datetime
 
 from spade_bdi.bdi import BDIAgent
 from spade.behaviour import PeriodicBehaviour
+from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
+from examples.uavs_strategy.planning_modules.uav_planning_actions import register_planning_actions
+from examples.uavs_strategy.planning_modules import basic_functions as bfunc
+from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FormationAPFStep, APFStep, FetchWorldState ,DT
 
 complex_key_paths = [
-    [1,2,3,4,5,6],
-    [7,8,9,10,11,12],
-
-    # [20, 21, 5, 27], 
-    # [28, 3, 21, 5, 27], 
-    # [1, 2, 10, 26], 
-    # [30, 2, 10, 26], 
-    # [29, 22, 2, 10, 26], 
-    # [20, 21, 5, 7, 25], 
-    # [1, 2, 10, 12, 4, 8], 
-    # [1, 2, 10, 12, 11, 24, 16]
-]
-complex_key_paths_stage2 = [
     [20, 21, 5, 27], 
     [28, 3, 21, 5, 27], 
+    [1, 2, 10, 26], 
+    [30, 2, 10, 26], 
+    [29, 22, 2, 10, 26], 
+    [20, 21, 5, 7, 25], 
+    [1, 2, 10, 12, 4, 8], 
+    [1, 2, 10, 12, 11, 24, 16]
 ]
+
+init_loc1 = [
+    122.15451569813476,
+    37.50781897194055,
+    165
+]
+
+init_loc2 = [
+    122.16533086650654,
+    37.52305286868604,
+    220
+]
+
+current_dir = os.path.dirname(__file__)
+digraph_attrs_reference_path = os.path.join(current_dir, "data", "digraph_with_attrs.json")
+digraph_attrs = json.load(open(digraph_attrs_reference_path, "r"))
 
 # =============================
 # 1. Blue UAV Agent
 # =============================
 class BlueUAVAgent(BDIAgent):
-    def __init__(self, jid, password, asl_file,key_path ,**kwargs):
+    def __init__(self, jid, password, asl_file,task_lists, init_pos=None, facilities=None, **kwargs):
         super().__init__(jid, password, asl_file)
-        self.key_path = key_path
-        self.is_finished = False  # 任务完成标志
+        # 读取任务列表
+        self.task = task_lists[0]
+        self.key_path = self.task['path']
 
-    def add_achievement_goal(self, name, *args):
-        """添加一个成就目标到意图缓冲区
-        """
-        new_args = ()
-        for x in args:
-            if type(x) == str:
-                new_args += (agentspeak.Literal(x),)
-            else:
-                new_args += (x,)
-        term = agentspeak.Literal(name, tuple(new_args))
-        self.bdi_intention_buffer.append((agentspeak.Trigger.addition, agentspeak.GoalType.achievement, term, agentspeak.runtime.Intention()))
+        # 任务完成标志
+        self.is_finished = False
+        self.is_final_task = False
+        self.io = UavRedisIO(**kwargs.get("redis_cfg", {}))
+        self.position = init_pos
+
+        # 周期性行为
+        self.APFStep = APFStep
+        # self.FormationAPFStep = FormationAPFStep
+        self.FetchWorldState = FetchWorldState
+
+        # 经纬度 -> UTM
+        self._lnglat2utm_convertor = bfunc.LngLat2UTM()
+
+        if self.position is not None:
+            # 如果传入了经纬度初始点，用它初始化轨迹
+            self.traj = self._lnglat2utm_convertor.lng_lat_to_utm_array(
+                np.array([self.position])
+            ).tolist()
+        else:
+            # 否则，基于init_loc1和init_loc2生成一个随机位置
+            self.traj = generate_circle_positions_from_diameter(1, init_loc1, init_loc2)  
+
+        #初始化节点信念
+        self.bdi.set_belief("cur_nodes", self.key_path[0], self.key_path[1])
+        
 
     def add_custom_actions(self, actions):
         @actions.add(".act_digraph_path_planning", 2)
         def act_digraph_path_planning(agent, term, intention):
-            cur_start_node = agentspeak.grounded(term.args[0], intention.scope)
-            cur_end_node = agentspeak.grounded(term.args[1], intention.scope)
-            print(f"act_digraph_path_planning from {cur_start_node} to {cur_end_node}")
+            cur_start_node = int(agentspeak.grounded(term.args[0], intention.scope))
+            cur_end_node = int(agentspeak.grounded(term.args[1], intention.scope))
+            print(f"{self.jid} is act_digraph_path_planning from {cur_start_node} to {cur_end_node}")
+
+            for digraph_attr in digraph_attrs:
+                if digraph_attr['from'] == cur_start_node and digraph_attr['to'] == cur_end_node:
+                    print(f"cur order_mode:{digraph_attr['attrs']['order_mode']}")
 
             # next node 获取
             # 在 key_path 中查找当前节点的位置，并更新为下一段路径
@@ -81,73 +117,207 @@ class BlueUAVAgent(BDIAgent):
                             self.bdi.set_belief("cur_nodes", next_start, next_end)
                         else:
                             print("Reached end of path.")
-                            self.is_finished = True # 标记任务完成
+                            self.is_final_task = True # 标记任务完成
                         break
                 
             except ValueError:
                 print(f"Error: Could not find nodes {cur_start_node} or {cur_end_node} in key_path {self.key_path}")
 
-            self.bdi.set_belief("can_task_start", True)
+            
             # 休眠暂时代替规划过程
-            time.sleep(0.5)
-            
-            yield
+            time.sleep(random.uniform(1, 10))
+            self.bdi.set_belief("can_task_start", True)
+            if self.is_final_task:
+                self.is_finished = True
+                print(f"{self.jid} has completed its final task.")
 
-async def main(server, password):
-    current_dir = os.path.dirname(__file__)
-    asl_file = os.path.join(current_dir, "uav_key_path.asl")
-    
-    # 定义所有阶段的任务列表
-    # 如果有更多阶段，只需添加到此列表中
-    all_stages = [complex_key_paths, complex_key_paths_stage2]
-    
-    global_agent_idx = 0
-    
-    for stage_num, stage_paths in enumerate(all_stages, 1):
-        print(f"=== Stage {stage_num} Start: {len(stage_paths)} agents ===")
-        current_stage_agents = []
+            yield        
+
+class MissionOrchestrator:
+    """结合key_path_analyzer.log数据,生成bdi agent并管理生命周期"""
+    def __init__(self, bdi_instructions: Dict[str, Any], server: str, password: str, asl_file: str, BlueBDIAgentTemplate: BDIAgent):
+        self.bdi_instructions = bdi_instructions
+        self.server = server
+        self.password = password
+        self.asl_file = asl_file
+        self.BlueBDIAgentTemplate = BlueBDIAgentTemplate
+
+        self.active_agents: Dict[str, BlueUAVAgent] = {}
         
-        for i, key_path in enumerate(stage_paths):
-            # 使用全局索引确保JID唯一，避免XMPP连接冲突
-            jid = f"blue_{global_agent_idx}_uav@{server}"
-            global_agent_idx += 1
-            
-            print(f"Stage {stage_num} - Agent {i} JID: {jid}")
-            agent = BlueUAVAgent(jid, password, asl_file, key_path)
-            
-            if len(key_path) >= 2:
-                agent.bdi.set_belief("cur_nodes", key_path[0], key_path[1])
-            
-            current_stage_agents.append(agent)
-            
-        # 并发启动当前阶段的所有 agent
-        if current_stage_agents:
-            await asyncio.gather(*(agent.start() for agent in current_stage_agents))
+        # Merge synchronization
+        # key: next_segment_hint (e.g., 'seg_1'), value: set of agent_names ready to merge
+        self.pending_merges = collections.defaultdict(set) 
+        # key: next_segment_hint, value: total number of agents expected
+        self.merge_requirements = self._calculate_merge_requirements()
+
+    def _calculate_merge_requirements(self):
+        """预计算每个汇合点需要多少个agent"""
+        reqs = collections.defaultdict(int)
+        for agent_name, tasks in self.bdi_instructions.items():
+            for task in tasks:
+                if task.get('action_at_end') == 'merge_and_terminate':
+                    target = task.get('next_segment_hint')
+                    reqs[target] += 1
+        return reqs
+
+    def _find_agent_name_by_segment_id(self, segment_id):
+        """根据segment_id找到对应的agent配置名"""
+        for name, tasks in self.bdi_instructions.items():
+            # 假设每个agent配置的第一条任务定义了它的起始段
+            if tasks and tasks[0]['segment_id'] == segment_id:
+                return name
+        return None
+
+    async def _spawn_agent(self, agent_name):
+        if agent_name not in self.bdi_instructions:
+            print(f"Error: No instructions for {agent_name}")
+            return
+
+        tasks = self.bdi_instructions[agent_name]
+        # 目前假设每个agent主要执行第一个任务段配置
+        task = tasks[0] 
+        path = task['path']
         
-        # 监控当前阶段完成情况
-        while True:
-            all_finished = True
-            for agent in current_stage_agents:
-                if not agent.is_finished:
-                    all_finished = False
-                    break
+        # 构建JID
+        jid = f"{agent_name}@{self.server}"
+        print(f"Spawning agent: {jid} with path len {len(path)}")
+        
+        agent = self.BlueBDIAgentTemplate(jid, self.password, self.asl_file, task_list=tasks)
+        
+        # 初始化信念
+        if len(path) >= 2:
+            agent.bdi.set_belief("cur_nodes", path[0], path[1])
+        
+        await agent.start()
+        self.active_agents[agent_name] = agent
+
+    async def run(self):
+        print("Mission Orchestrator Started.")
+        
+        # 1. 启动初始 Agents (名字不包含 _sub_ 或 _merged_ 的)
+        initial_agents = [name for name in self.bdi_instructions.keys() 
+                            if "_sub_" not in name and "_merged_" not in name]
+        
+        for name in initial_agents:
+            await self._spawn_agent(name)
+
+        # 2. 监控循环
+        while self.active_agents:
+            # 复制 keys 以便在循环中修改字典
+            current_agent_names = list(self.active_agents.keys())
             
-            if all_finished:
-                print(f"=== Stage {stage_num} Completed: All agents reached destination ===")
-                break
+            for name in current_agent_names:
+                agent = self.active_agents[name]
+                
+                if agent.is_finished:
+                    await self._handle_agent_completion(name, agent)
             
-            await asyncio.sleep(1)
-            
-        # 停止当前阶段 agents
-        print(f"Stopping Stage {stage_num} agents...")
-        for agent in current_stage_agents:
+            await asyncio.sleep(0.5)
+        
+        print("All missions completed.")
+
+    async def _handle_agent_completion(self, agent_name, agent):
+        # 获取该agent的任务配置
+        tasks = self.bdi_instructions[agent_name]
+        task = tasks[0]
+        action = task['action_at_end']
+        
+        if action == "finish":
+            print(f"Agent {agent_name} finished mission. Terminating.")
             await agent.stop()
+            del self.active_agents[agent_name]
             
-        # 阶段间缓冲
-        await asyncio.sleep(2)
+        elif action == "split_and_terminate":
+            print(f"Agent {agent_name} splitting.")
+            await agent.stop()
+            del self.active_agents[agent_name]
+            
+            for branch in task['branches']:
+                child_name = branch['new_agent_hint']
+                await self._spawn_agent(child_name)
+                
+        elif action == "merge_and_terminate":
+            target_seg = task['next_segment_hint']
+            
+            # 只有当该agent还没在等待列表中时才添加 (防止重复处理)
+            if agent_name not in self.pending_merges[target_seg]:
+                print(f"Agent {agent_name} ready to merge into {target_seg}. Waiting for others...")
+                self.pending_merges[target_seg].add(agent_name)
+            
+            # 检查是否满足合并条件
+            required_count = self.merge_requirements[target_seg]
+            current_count = len(self.pending_merges[target_seg])
+            
+            if current_count >= required_count:
+                print(f"Merge condition met for {target_seg} ({current_count}/{required_count}). Merging...")
+                
+                # 1. 停止所有参与合并的 agent
+                for participant in self.pending_merges[target_seg]:
+                    if participant in self.active_agents:
+                        p_agent = self.active_agents[participant]
+                        await p_agent.stop()
+                        del self.active_agents[participant]
+                
+                # 2. 清理等待列表
+                del self.pending_merges[target_seg]
+                
+                # 3. 启动合并后的新 agent
+                new_agent_name = self._find_agent_name_by_segment_id(target_seg)
+                if new_agent_name:
+                    await self._spawn_agent(new_agent_name)
+                else:
+                    print(f"Error: Could not find agent definition for segment {target_seg}")
+            else:
+                # 尚未就绪，Agent 保持运行状态 (is_finished=True)，实际上是在"原地等待"
+                pass
 
-    print("All stages finished.")
+def generate_circle_positions_from_diameter(num, p1, p2):
+    """以两个坐标点为直径的圆内生成指定数量的随机位置
+    """
+    # 1. 计算圆心 (中点)
+    center_lon = (p1[0] + p2[0]) / 2
+    center_lat = (p1[1] + p2[1]) / 2
+    center_alt = (p1[2] + p2[2]) / 2  
+
+    # 2. 计算半径 (平面欧氏距离的一半)
+    # 注意：在小范围内直接用经纬度差值计算是可行的
+    dx = p1[0] - p2[0]
+    dy = p1[1] - p2[1]
+    radius = math.sqrt(dx**2 + dy**2) / 2
+
+    positions = []
+    for _ in range(num):
+        # 3. 极坐标生成随机点 
+        # 使用 sqrt(random()) 是为了消除聚集在圆心的现象，保证在圆面积上均匀分布
+        r = radius * math.sqrt(random.random())
+        theta = random.random() * 2 * math.pi
+
+        new_lon = center_lon + r * math.cos(theta)
+        new_lat = center_lat + r * math.sin(theta)
+        
+        positions.append([new_lon, new_lat, center_alt])
+
+    return positions
+
+async def start_agent(server, password):
+    current_dir = os.path.dirname(__file__)
+    key_path_instructions_path = os.path.join(current_dir,"data" ,"key-path-analyzer.log")
+    asl_file = os.path.join(current_dir, "uav_key_path.asl")
+    digraph_attrs_reference = os.path.join(current_dir, "data", "digraph_with_attrs.json")
+    key_path_instructions = json.load(open(key_path_instructions_path, "r"))
+    bdi_instructions = key_path_instructions["bdi_instructions"]
+    
+    orchestrator = MissionOrchestrator(
+        bdi_instructions=bdi_instructions,
+        server=server,
+        password=password,
+        asl_file=asl_file,
+        BlueBDIAgentTemplate=BlueUAVAgent
+    )
+    
+    await orchestrator.run()
+
 if __name__ == "__main__":
     server = "127.0.0.1"
     passwd = "202127"
-    spade.run(main(server, passwd))
+    spade.run(start_agent(server, passwd))
