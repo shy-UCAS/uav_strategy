@@ -33,5 +33,6 @@
             "depth": 3,
             "includeAllSymbols": true
         }
-    ]
+    ],
+    "python.analysis.autoImportCompletions": true
 }

@@ -22,7 +22,7 @@ from typing import Dict, List, Optional, Iterable, Tuple, Any
 from datetime import datetime
 
 from spade_bdi.bdi import BDIAgent
-from spade.behaviour import PeriodicBehaviour
+from spade.behaviour import PeriodicBehaviour, OneShotBehaviour
 from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
 from examples.uavs_strategy.planning_modules.uav_planning_actions import register_planning_actions
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
@@ -54,6 +54,29 @@ init_loc2 = [
 current_dir = os.path.dirname(__file__)
 digraph_attrs_reference_path = os.path.join(current_dir, "data", "digraph_with_attrs.json")
 digraph_attrs = json.load(open(digraph_attrs_reference_path, "r"))
+
+class PlanningDelayBehaviour(OneShotBehaviour):
+    """后台行为：模拟规划耗时，完成后更新信念触发下一步"""
+    def __init__(self, agent_obj, next_start, next_end, delay, is_final):
+        super().__init__()
+        self.agent_obj = agent_obj
+        self.next_start = next_start
+        self.next_end = next_end
+        self.delay = delay
+        self.is_final = is_final
+
+    async def run(self):
+        # 非阻塞等待
+        await asyncio.sleep(self.delay)
+        
+        # 更新信念，这将触发 ASL 中的 +cur_nodes 事件
+        if self.next_start and self.next_end:
+            print(f"{self.agent_obj.jid} finished planning. Updating belief to {self.next_start}->{self.next_end}")
+            self.agent_obj.bdi.set_belief("cur_nodes", self.next_start, self.next_end)
+        
+        if self.is_final:
+            self.agent_obj.is_finished = True
+            print(f"{self.agent_obj.jid} has completed its final task.")
 
 # =============================
 # 1. Blue UAV Agent
@@ -91,54 +114,44 @@ class BlueUAVAgent(BDIAgent):
             self.traj = bfunc.generate_circle_positions_from_diameter(1, init_loc1, init_loc2)  
 
         #初始化节点信念
+        # 注意：这里设置信念会立即触发 ASL 中的 +cur_nodes 事件
         self.bdi.set_belief("cur_nodes", self.key_path[0], self.key_path[1])
         
     
     def add_custom_actions(self, actions):
         @actions.add(".act_digraph_path_planning", 2)
         def act_digraph_path_planning(agent, term, intention):
-            # 如果任务已完成，直接跳过
-            if self.is_finished:
-                # print(f"{self.jid} has already finished. Skipping planning.")
-                yield
-                return
-
             cur_start_node = str(agentspeak.grounded(term.args[0], intention.scope))
             cur_end_node = str(agentspeak.grounded(term.args[1], intention.scope))
             print(f"{self.jid} is act_digraph_path_planning from {cur_start_node} to {cur_end_node}")
+            
             current_idx = self.path_index
-            for digraph_attr in digraph_attrs:
-                if digraph_attr['from'] == cur_start_node and digraph_attr['to'] == cur_end_node:
-                    print(f"{self.jid} cur order_mode:{digraph_attr['attrs']['order_mode']},order_type:{digraph_attr['attrs']['order_type']}")
-
-            # 在 key_path 中查找当前节点的位置，并更新为下一段路径
+            
+            # 预计算下一段路径
+            next_start = None
+            next_end = None
+            is_final = False
+            
             try:
-                # 校验当前信念是否与路径索引匹配 (可选的安全检查)
                 if current_idx + 1 < len(self.key_path):
-                    # 逻辑：当前是 key_path[current_idx] -> key_path[current_idx+1]
-                    # 计算下一段
                     next_idx = current_idx + 1
                     if next_idx + 1 < len(self.key_path):
                         next_start = self.key_path[next_idx]
                         next_end = self.key_path[next_idx + 1]
-                        self.bdi.set_belief("cur_nodes", next_start, next_end)
-                        self.path_index = next_idx # 更新索引
+                        self.path_index = next_idx # 立即更新索引
                     else:
                         print(f"{self.jid} Reached end of path.")
-                        self.is_final_task = True
-                
+                        is_final = True
             except ValueError:
-                print(f"Error: Could not find nodes {cur_start_node} or {cur_end_node} in key_path {self.key_path}")
+                print(f"Error processing path indices.")
 
-            
-            # 休眠暂时代替规划过程
+            # 启动后台延时任务
             waiting_sec = random.uniform(1, 3)
-            print(f"{self.jid} planning... will take {waiting_sec:.2f} seconds.")
-            time.sleep(waiting_sec)
-            self.bdi.set_belief("can_task_start", True)
-            if self.is_final_task:
-                self.is_finished = True
-                print(f"{self.jid} has completed its final task.")
+            print(f"{self.jid} planning... will take {waiting_sec:.2f} seconds (non-blocking).")
+            
+            # 创建并添加行为
+            beh = PlanningDelayBehaviour(self, next_start, next_end, waiting_sec, is_final)
+            self.add_behaviour(beh)
 
             yield        
 
@@ -244,15 +257,12 @@ class MissionOrchestrator:
             
         elif action == "split_and_terminate":
             print(f"Agent {agent_name} splitting.")
-
-            await agent.stop()
-            del self.active_agents[agent_name]
-
             for branch in task['branches']:
                 child_name = branch['new_agent_hint']
                 await self._spawn_agent(child_name, _init_pos=_last_pos)
             
-
+            await agent.stop()
+            del self.active_agents[agent_name]
                 
         elif action == "merge_and_terminate":
             target_seg = task['next_segment_hint']
@@ -293,7 +303,7 @@ class MissionOrchestrator:
 async def start_agent(server, password):
     current_dir = os.path.dirname(__file__)
     key_path_instructions_path = os.path.join(current_dir,"data" ,"key-path-analyzer.log")
-    asl_file = os.path.join(current_dir, "uav_key_path.asl")
+    asl_file = os.path.join(current_dir, "uav_key_path_new.asl")
     digraph_attrs_reference = os.path.join(current_dir, "data", "digraph_with_attrs.json")
     key_path_instructions = json.load(open(key_path_instructions_path, "r"))
     bdi_instructions = key_path_instructions["bdi_instructions"]

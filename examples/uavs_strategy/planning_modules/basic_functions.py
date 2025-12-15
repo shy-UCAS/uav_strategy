@@ -10,7 +10,7 @@ import configparser
 import math
 import numpy as np
 import pyproj
-
+import random
 import networkx as nx
 from matplotlib.animation import FuncAnimation
 from matplotlib.animation import PillowWriter
@@ -26,6 +26,34 @@ if not WS_ROOT in sys.path:
     sys.path.append(WS_ROOT)
 
 BASIC_CONFIGS_FILE = osp.join(WS_ROOT, 'configs.ini')
+
+def generate_circle_positions_from_diameter(num, p1, p2):
+    """以两个坐标点为直径的圆内生成指定数量的随机位置
+    """
+    # 1. 计算圆心 (中点)
+    center_lon = (p1[0] + p2[0]) / 2
+    center_lat = (p1[1] + p2[1]) / 2
+    center_alt = (p1[2] + p2[2]) / 2  
+
+    # 2. 计算半径 (平面欧氏距离的一半)
+    # 注意：在小范围内直接用经纬度差值计算是可行的
+    dx = p1[0] - p2[0]
+    dy = p1[1] - p2[1]
+    radius = math.sqrt(dx**2 + dy**2) / 2
+
+    positions = []
+    for _ in range(num):
+        # 3. 极坐标生成随机点 
+        # 使用 sqrt(random()) 是为了消除聚集在圆心的现象，保证在圆面积上均匀分布
+        r = radius * math.sqrt(random.random())
+        theta = random.random() * 2 * math.pi
+
+        new_lon = center_lon + r * math.cos(theta)
+        new_lat = center_lat + r * math.sin(theta)
+        
+        positions.append([new_lon, new_lat, center_alt])
+
+    return positions
 
 
 class BasicConfigs:
