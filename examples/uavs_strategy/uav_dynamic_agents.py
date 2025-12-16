@@ -1,6 +1,7 @@
 # 动态创建 / 删除 BlueUAVAgent 
 # 结合key_paths处理提取出的数据,数据导入redis服务器
 # 使用一个固定通用的asl文件处理uav_key_path.asl
+
 import asyncio
 import argparse
 import getpass
@@ -92,6 +93,18 @@ class BlueUAVAgent(BDIAgent):
 
         #初始化节点信念
         self.bdi.set_belief("cur_nodes", self.key_path[0], self.key_path[1])
+    
+    def add_achievement_goal(self, name, *args):
+        """添加一个成就目标到意图缓冲区
+        """
+        new_args = ()
+        for x in args:
+            if type(x) == str:
+                new_args += (agentspeak.Literal(x),)
+            else:
+                new_args += (x,)
+        term = agentspeak.Literal(name, tuple(new_args))
+        self.bdi_intention_buffer.append((agentspeak.Trigger.addition, agentspeak.GoalType.achievement, term, agentspeak.runtime.Intention()))
         
     
     def add_custom_actions(self, actions):
@@ -102,7 +115,8 @@ class BlueUAVAgent(BDIAgent):
                 # print(f"{self.jid} has already finished. Skipping planning.")
                 yield
                 return
-
+                
+            
             cur_start_node = str(agentspeak.grounded(term.args[0], intention.scope))
             cur_end_node = str(agentspeak.grounded(term.args[1], intention.scope))
             print(f"{self.jid} is act_digraph_path_planning from {cur_start_node} to {cur_end_node}")
@@ -110,7 +124,7 @@ class BlueUAVAgent(BDIAgent):
             for digraph_attr in digraph_attrs:
                 if digraph_attr['from'] == cur_start_node and digraph_attr['to'] == cur_end_node:
                     print(f"{self.jid} cur order_mode:{digraph_attr['attrs']['order_mode']},order_type:{digraph_attr['attrs']['order_type']}")
-
+                    self.add_achievement_goal("test_set_intention")
             # 在 key_path 中查找当前节点的位置，并更新为下一段路径
             try:
                 # 校验当前信念是否与路径索引匹配 (可选的安全检查)
@@ -309,6 +323,7 @@ async def start_agent(server, password):
     await orchestrator.run()
 
 if __name__ == "__main__":
+    # 启动代码：python -m examples.uavs_strategy.uav_dynamic_agents
     server = "127.0.0.1"
     passwd = "202127"
     spade.run(start_agent(server, passwd))
