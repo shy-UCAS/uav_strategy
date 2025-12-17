@@ -5,14 +5,16 @@ can_task_start(true).
     <-
     ?cur_nodes(Start, End); 
     .print("Mission Start: ", Start, " -> ", End);
-    !task_digraph(Start, End).
+    !task_digraph.
 
-+!task_digraph(CurrentStart, CurrentEnd) 
++!task_digraph
     <- 
-    while(true) {
-        ?cur_nodes(Start, End); 
-        !act_digraph_path_planning(Start, End);
-    }.
+    // while(true) {
+    //     ?cur_nodes(Start, End); 
+    //     !act_digraph_path_planning(Start, End);
+    // }.
+    ?cur_nodes(Start, End); 
+    !act_digraph_path_planning(Start, End).
 
 +!act_digraph_path_planning(CurrentStart, CurrentEnd): can_task_start(true)
     <-

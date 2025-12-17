@@ -3,7 +3,7 @@
 uav_planning_actions.py
 
 把 BlueUAVAgent 中的轨迹规划与 BDI 动作抽出来，做成可复用模块。
-使用方式：
+第一种使用方式：
     from planning_modules.uav_planning_actions import register_planning_actions
 
     class BlueUAVAgent(BDIAgent):
@@ -11,6 +11,14 @@ uav_planning_actions.py
         def add_custom_actions(self, actions):
             # 先注册 redis 相关动作（.set_traj/.get_traj 等），然后：
             register_planning_actions(self, actions)
+
+第二种使用方式：
+    agent = MyAgent(...) 
+    # 初始化规划库
+    lib = ASLPlanningLib(agent6)
+    # 直接调用规划方法，跳过bdi的行为
+    lib.execute_breakthrough(target="hq_01", start_h=100, end_h=150)
+    lib.execute_escape(target="defence_rings", start_h=100, end_h=150)
 """
 
 import random
@@ -39,6 +47,7 @@ class PlanningLib:
         - self.facilities
         - self.height_range_set
         - 等属性。
+    通过asl的BDI 动作触发调用。
     """
 
     def __init__(self, self_agent):
@@ -106,6 +115,13 @@ class PlanningLib:
         return [
             list(start_location) if not isinstance(start_location, list) else start_location,
             list(target_loc) if isinstance(target_loc, tuple) else target_loc,
+        ]
+    def planbreakthrough_target_location(self, start_location, target_location: List[float],
+                                 utm: bool = True) -> List[List[float]]:
+        """按照给定设施的经纬坐标构成 [start, target]。"""
+        return [
+            list(start_location) if not isinstance(start_location, list) else start_location,
+            list(target_location) if isinstance(target_location, tuple) else target_location,
         ]
 
     # ---------- 迂回规划 ---------- #
@@ -220,6 +236,139 @@ class PlanningLib:
             ]
             print(f"_inside_border_traj: {border_traj}")
             return [list(p) if isinstance(p, tuple) else list(p) for p in border_traj]
+
+    # ---------- 执行动作封装 (解耦 BDI) ---------- #
+    def execute_path_planning_from_digraph(self, digraph: Dict[str, any],start_h: int, end_h: int):
+        # 根据 digraph_attr 进行路径规划
+        # 目前只考虑了 order_mode : independent\aggreagate\disperse三种
+        # 读取当前片段的轨迹规划参数
+        digraph_attr = digraph['attrs']
+        order_mode = digraph_attr['order_mode']
+        order_type = digraph_attr['order_type']
+        cur_target = digraph_attr['target']
+        formation = digraph_attr['formation']
+        fleet_no = digraph_attr['fleet_no']
+
+        if order_mode == 'independent':
+            if order_type == 'breakthrough':
+                return self.execute_breakthrough(cur_target, start_h, end_h)
+            elif order_type == 'escape':
+                return self.execute_escape(cur_target, start_h, end_h)
+            elif order_type == 'detour':
+                return self.execute_detour(cur_target, start_h, end_h)
+        
+        elif order_mode == 'aggregate':
+            if cur_target == 'aggregate_point':
+                # 多机汇合点之前仍是独立飞行
+                # 但是需要查找到汇合点的坐标才能继续处理
+                if order_type == 'breakthrough':
+                    return self.execute_breakthrough(cur_target, start_h, end_h)
+                elif order_type == 'escape':
+                    return self.execute_escape(cur_target, start_h, end_h)
+                elif order_type == 'detour':
+                    return self.execute_detour(cur_target, start_h, end_h)
+            else:
+                if order_type == 'breakthrough':
+                    return self.execute_breakthrough(cur_target, start_h, end_h)
+                elif order_type == 'escape':
+                    return self.execute_escape(cur_target, start_h, end_h)
+                elif order_type == 'detour':
+                    return self.execute_detour(cur_target, start_h, end_h)
+
+        elif order_mode == 'disperse':
+            if order_type == 'breakthrough':
+                return self.execute_breakthrough(cur_target, start_h, end_h)
+            elif order_type == 'escape':
+                return self.execute_escape(cur_target, start_h, end_h)
+            elif order_type == 'detour':
+                return self.execute_detour(cur_target, start_h, end_h)
+
+
+    def execute_breakthrough(self, target: str, start_h: int, end_h: int):
+        """
+        执行突防动作：规划路径并更新 agent 轨迹
+        新增一个针对动态汇合点的处理方法
+        """
+        # 根据 target 类型决定调用哪个 planner
+        if target in bfunc.GlobalBasicConfigs.PLANNING_BREAKTHROUGH_FACILITY_TYPES:
+            traj_2d = self.plan_breakthrough_targettype(self.agent.traj[-1], target)
+        elif target in self.agent.facilities.get_facilities_names():
+            traj_2d = self.plan_breakthrough_target(self.agent.traj[-1], target)
+        elif target == 'aggregate_point':
+            # 多机汇合点
+            rendezvous_pos = self.agent.io.get_rendezvous_point(self.agent.merge_peers)
+            traj_2d = self.planbreakthrough_target_location(self.agent.traj[-1], rendezvous_pos)
+        else:
+            # 兜底：目标既不是类型也不是设施名，就保持原地
+            traj_2d = [self.agent.traj[-1], self.agent.traj[-1]]
+
+        traj_3d = self.insert_height_val("breakthrough", traj_2d, start_h, end_h)
+        self.agent.cur_reference_traj = traj_3d
+        # 追加到当前完整轨迹
+        self.agent.traj.extend(traj_3d[1:])
+
+        print(f"{self.agent.name} is breaking through {target}, trajectory:\n{traj_3d}")
+
+
+    def execute_escape(self, target: str, start_h: int, end_h: int):
+        """
+        执行逃逸动作
+        """
+        traj_2d = self.plan_escape(self.agent.traj[-1], target)
+        traj_3d = self.insert_height_val("escape", traj_2d, start_h, end_h)
+        self.agent.cur_reference_traj = traj_3d
+        self.agent.traj.extend(traj_3d[1:])
+
+        print(f"{self.agent.name} is escaping {target}, trajectory:\n{traj_3d}")
+
+
+    def execute_detour(self, target: str, start_h: int, end_h: int):
+        """
+        执行迂回动作
+        """
+        traj_2d = self.plan_detour(self.agent.traj[-1], target)
+        traj_3d = self.insert_height_val("detour", traj_2d, start_h, end_h)
+
+        self.agent.cur_reference_traj = traj_3d
+        self.agent.traj.extend(traj_3d[1:])
+
+        print(f"{self.agent.name} is detouring {target}, trajectory:\n{self.agent.cur_reference_traj}")
+
+
+    def execute_attack(self, target: str):
+        """
+        执行攻击动作
+        """
+        print(f"{self.agent.name} is attacking {target} ...")
+
+    def execute_join_formation(self, leader_id: str, off_x: float, off_y: float, off_z: float):
+        """
+        执行加入编队
+        """
+        # 切换状态为跟随者
+        self.agent.formation_state["role"] = "follower"
+        self.agent.formation_state["leader_id"] = leader_id
+        self.agent.formation_state["offset"] = np.array([off_x, off_y, off_z])
+        
+        print(f"[{self.agent.name}] Joining Formation -> Leader: {leader_id}, Offset: {self.agent.formation_state['offset']}")
+
+    def execute_leave_formation(self):
+        """
+        执行离开编队
+        """
+        # 切换回独立模式
+        self.agent.formation_state["role"] = "independent"
+        self.agent.formation_state["leader_id"] = None
+        
+        # 获取当前位置，重置为新轨迹的起点，防止瞬移
+        if hasattr(self.agent, "io") and hasattr(self.agent, "self_uid"):
+            curr_pos = self.agent.io.get_pos(self.agent.self_uid, blue=True)
+            if curr_pos:
+                 # 可以在这里清空旧的参考轨迹，强制 BDI 重新规划
+                 self.agent.traj = [[curr_pos['x'], curr_pos['y'], curr_pos['z']]]
+                 self.agent.io.set_lookahead(self.agent.self_uid, 0)
+
+        print(f"[{self.agent.name}] ⚡ LEAVING FORMATION -> Independent Mode.")
 
 
 # ------------------------ 注册 BDI Action ------------------------ #
@@ -390,3 +539,5 @@ def register_planning_actions(self, actions):
 
         print(f"[{self.name}] ⚡ LEAVING FORMATION -> Independent Mode.")
         yield
+
+

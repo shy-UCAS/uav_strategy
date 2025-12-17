@@ -195,6 +195,26 @@ class UavRedisIO:
 
         return dist
 
+    def get_rendezvous_point(self, ids: List[str], blue: bool = True) -> Optional[List[float]]:
+        """
+        计算一组无人机的中心汇合点
+        """
+        if not ids:
+            return None
+        
+        positions_map = self.mget_pos(ids, blue=blue)
+        valid_points = []
+        for uid, pos_data in positions_map.items():
+            if pos_data:
+                valid_points.append([pos_data['x'], pos_data['y'], pos_data['z']])
+        
+        if not valid_points:
+            return None
+
+        points_np = np.array(valid_points)
+        centroid = np.mean(points_np, axis=0)
+        return centroid.tolist()
+
     # ---------- 工具：过滤过期 ----------
     @staticmethod
     def filter_stale(pos_map: Dict[str, Optional[Dict[str, Any]]], stale_ms: int) -> Dict[str, Dict[str, Any]]:

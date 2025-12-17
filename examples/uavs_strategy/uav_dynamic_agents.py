@@ -22,10 +22,12 @@ from typing import Dict, List, Optional, Iterable, Tuple, Any
 # from time import time
 from datetime import datetime
 
+from sympy import N
+
 from spade_bdi.bdi import BDIAgent
 from spade.behaviour import PeriodicBehaviour
 from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
-from examples.uavs_strategy.planning_modules.uav_planning_actions import register_planning_actions
+from examples.uavs_strategy.planning_modules.uav_planning_actions import PlanningLib
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
 from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FormationAPFStep, APFStep, FetchWorldState ,DT
 
@@ -41,16 +43,27 @@ complex_key_paths = [
 ]
 
 init_loc1 = [
-    122.15451569813476,
-    37.50781897194055,
-    165
+    122.09686551225597,
+    37.56536338371063,
+    200.0
 ]
 
 init_loc2 = [
-    122.16533086650654,
-    37.52305286868604,
-    220
+    122.10258217246229,
+    37.56342057758475,
+    200.0
 ]
+
+height_range_value_set = {
+    'breakthrough': [[250, 400], [0, 100]],
+    'escape': [[0, 100], [250, 400]],
+    'detour': [[0, 100], [200, 400]]
+}
+direction_range_set = {
+    'breakthrough': [-20, 20],
+    'escape': [-20, 20],
+    'detour': [0, 360]
+}
 
 current_dir = os.path.dirname(__file__)
 digraph_attrs_reference_path = os.path.join(current_dir, "data", "digraph_with_attrs.json")
@@ -60,39 +73,70 @@ digraph_attrs = json.load(open(digraph_attrs_reference_path, "r"))
 # 1. Blue UAV Agent
 # =============================
 class BlueUAVAgent(BDIAgent):
-    def __init__(self, jid, password, asl_file, task_lists, init_pos=None, facilities=None, **kwargs):
+    def __init__(self, jid, password, asl_file, task_lists, init_pos=None, facilities=None, merge_peers = None  ,**kwargs):
         super().__init__(jid, password, asl_file)
         # 读取任务列表
         self.task = task_lists[0]
         self.key_path = self.task['path']
-
+        # 读取汇合队友列表 (包含自己)
+        self.merge_peers = merge_peers if merge_peers else []
         # 记录当前在key_path路径中的索引
         self.path_index = 0
         # 任务完成标志
         self.is_finished = False
         self.is_final_task = False
-        self.io = UavRedisIO(**kwargs.get("redis_cfg", {}))
+
+        # 初始化设施
+        self.facilities = self._default_facilities() if facilities is None else facilities
+        # 初始化位置
         self.position = init_pos
+        # 经纬度 -> UTM
+        self._lnglat2utm_convertor = bfunc.LngLat2UTM()
+        if self.position:
+            self.traj = self._lnglat2utm_convertor.lng_lat_to_utm_array(np.array([self.position])).tolist()
+        else:
+            _rdm_init_pos = bfunc.generate_circle_positions_from_diameter(1, init_loc1, init_loc2)
+            self.traj = self._lnglat2utm_convertor.lng_lat_to_utm_array(np.array([_rdm_init_pos])).tolist()
+
+        # Redis I/O 模块
+        self.io = UavRedisIO(**kwargs.get("redis_cfg", {}))
+        # Redis 初始化数据
+        self.self_uid = jid.split("@")[0]
+        self.io.add_uav_id(self.self_uid, blue=True)
+        self.io.set_pos(self.self_uid, self.traj[0][0], self.traj[0][1], self.position[2])
+        self.io.set_traj(self.self_uid, [[self.traj[0][0], self.traj[0][1], self.position[2]]])
+        self.io.set_lookahead(self.self_uid, 0)
 
         # 周期性行为
         self.APFStep = APFStep
-        # self.FormationAPFStep = FormationAPFStep
         self.FetchWorldState = FetchWorldState
 
-        # 经纬度 -> UTM
-        self._lnglat2utm_convertor = bfunc.LngLat2UTM()
-
-        if self.position is not None:
-            # 如果传入了经纬度初始点，用它初始化轨迹
-            self.traj = self._lnglat2utm_convertor.lng_lat_to_utm_array(
-                np.array([self.position])
-            ).tolist()
-        else:
-            # 否则，基于init_loc1和init_loc2生成一个随机位置
-            self.traj = bfunc.generate_circle_positions_from_diameter(1, init_loc1, init_loc2)  
+        # 轨迹规划类函数
+        self.planning_lib = PlanningLib
+        # 轨迹相关
+        self.cur_reference_traj = []
+        self.blue_ids = []
+        self.red_ids = []
+        self.height_range_set = height_range_value_set
+        self.direction_range_set = direction_range_set
 
         #初始化节点信念
         self.bdi.set_belief("cur_nodes", self.key_path[0], self.key_path[1])
+
+    
+    def _default_facilities(self, default_json_path=None):
+        if default_json_path is None:
+            _facilities_info_json = osp.join(bfunc.WS_ROOT, 'data', 'test_facilities_locations.json')
+        else:
+            _facilities_info_json = default_json_path
+
+        with open(_facilities_info_json, 'r', encoding="utf-8") as f:
+            _facilities_info = json.load(f)
+
+        return bfunc.Facilities(
+            _facilities_info['facilities_str'],
+            _facilities_info['defence_rings']
+        )
     
     def add_achievement_goal(self, name, *args):
         """添加一个成就目标到意图缓冲区
@@ -110,33 +154,33 @@ class BlueUAVAgent(BDIAgent):
     def add_custom_actions(self, actions):
         @actions.add(".act_digraph_path_planning", 2)
         def act_digraph_path_planning(agent, term, intention):
+            """根据当前节点提取路径规划的信息用于后续的轨迹处理"""
+            
             # 如果任务已完成，直接跳过
             if self.is_finished:
                 # print(f"{self.jid} has already finished. Skipping planning.")
                 yield
                 return
-                
-            
             cur_start_node = str(agentspeak.grounded(term.args[0], intention.scope))
             cur_end_node = str(agentspeak.grounded(term.args[1], intention.scope))
             print(f"{self.jid} is act_digraph_path_planning from {cur_start_node} to {cur_end_node}")
             current_idx = self.path_index
             for digraph_attr in digraph_attrs:
-                if digraph_attr['from'] == cur_start_node and digraph_attr['to'] == cur_end_node:
+                if str(digraph_attr['from']) == cur_start_node and str(digraph_attr['to']) == cur_end_node:
+                    # 读取当前片段的轨迹规划参数，并设定参考轨迹 
                     print(f"{self.jid} cur order_mode:{digraph_attr['attrs']['order_mode']},order_type:{digraph_attr['attrs']['order_type']}")
-                    self.add_achievement_goal("test_set_intention")
+                    
             # 在 key_path 中查找当前节点的位置，并更新为下一段路径
             try:
-                # 校验当前信念是否与路径索引匹配 (可选的安全检查)
                 if current_idx + 1 < len(self.key_path):
-                    # 逻辑：当前是 key_path[current_idx] -> key_path[current_idx+1]
-                    # 计算下一段
+                    # key_path[current_idx] -> key_path[current_idx+1]
                     next_idx = current_idx + 1
                     if next_idx + 1 < len(self.key_path):
                         next_start = self.key_path[next_idx]
                         next_end = self.key_path[next_idx + 1]
+                        # 更新belief和索引
                         self.bdi.set_belief("cur_nodes", next_start, next_end)
-                        self.path_index = next_idx # 更新索引
+                        self.path_index = next_idx 
                     else:
                         print(f"{self.jid} Reached end of path.")
                         self.is_final_task = True
@@ -150,11 +194,32 @@ class BlueUAVAgent(BDIAgent):
             print(f"{self.jid} planning... will take {waiting_sec:.2f} seconds.")
             time.sleep(waiting_sec)
             self.bdi.set_belief("can_task_start", True)
+
             if self.is_final_task:
                 self.is_finished = True
                 print(f"{self.jid} has completed its final task.")
+            else:
+                # 添加新的成就目标以继续任务，替代掉原先的while循环触发asl目标的方式
+                self.add_achievement_goal("task_digraph")
 
-            yield        
+            yield 
+    def path_planning_from_digraph(self,digraph):
+        # 根据 digraph_attr 进行路径规划
+        # 目前只考虑了 order_mode : independent\aggreagate\disperse三种
+        digraph_attr = digraph['attrs']
+        order_mode = digraph_attr['order_mode']
+        order_type = digraph_attr['order_type']
+        cur_target = digraph_attr['target']
+        formation = digraph_attr['formation']
+        fleet_no = digraph_attr['fleet_no']
+        # 读取当前片段的轨迹规划参数
+        if order_mode == 'independent':
+            pass
+
+
+
+
+
 
 class MissionOrchestrator:
     """结合key_path_analyzer.log数据,生成bdi agent并管理生命周期"""
@@ -172,6 +237,22 @@ class MissionOrchestrator:
         self.pending_merges = collections.defaultdict(set) 
         # key: next_segment_hint, value: total number of agents expected
         self.merge_requirements = self._calculate_merge_requirements()
+        # key: next_segment_hint, value: list of agent_names involved
+        self.merge_groups = self._calculate_merge_groups()
+
+    def _calculate_merge_groups(self):
+        """
+        预计算每个汇合点涉及的 agent 列表
+        Returns:
+            dict: { 'seg_4': ['agent_1', 'agent_2', ...], ... }
+        """
+        groups = collections.defaultdict(list)
+        for agent_name, tasks in self.bdi_instructions.items():
+            for task in tasks:
+                if task.get('action_at_end') == 'merge_and_terminate':
+                    target = task.get('next_segment_hint')
+                    groups[target].append(agent_name)
+        return groups
 
     def _calculate_merge_requirements(self):
         """预计算每个汇合点需要多少个agent"""
@@ -200,6 +281,13 @@ class MissionOrchestrator:
         # 目前假设每个agent主要执行第一个任务段配置
         task = tasks[0] 
         path = task['path']
+
+        # 获取当前任务的汇合队友列表
+        merge_peers = []
+        if task.get('action_at_end') == 'merge_and_terminate':
+            target_seg = task.get('next_segment_hint')
+            # self.merge_groups 需要在 __init__ 中初始化: self.merge_groups = self._calculate_merge_groups()
+            merge_peers = self.merge_groups.get(target_seg, [])
         
         # 构建JID
         jid = f"{agent_name}@{self.server}"
@@ -211,7 +299,7 @@ class MissionOrchestrator:
             再返回到MissionOrchestrator中的run进行下一步处理
 
         """
-        agent = self.BlueBDIAgentTemplate(jid, self.password, self.asl_file, tasks, _init_pos)
+        agent = self.BlueBDIAgentTemplate(jid, self.password, self.asl_file, tasks, _init_pos, merge_peers=merge_peers)
         
         # 初始化信念
         if len(path) >= 2:
