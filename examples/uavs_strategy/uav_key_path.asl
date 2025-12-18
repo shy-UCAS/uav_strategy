@@ -21,7 +21,10 @@ can_task_start(true).
     -can_task_start(true);
     +can_task_start(false);
     .print("Planning segment: ", CurrentStart, " -> ", CurrentEnd);
+    -if_set_ref_traj(_);
+    +if_set_ref_traj(true);
     .act_digraph_path_planning(CurrentStart, CurrentEnd).
+
 
 +!act_digraph_path_planning(CurrentStart, CurrentEnd): can_task_start(false)
     <-

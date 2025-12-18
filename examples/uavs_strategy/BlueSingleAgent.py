@@ -83,7 +83,7 @@ class BlueUAVAgent(BDIAgent):
 
         else:
             self.traj = [[0, 0, 100]]
-
+        print(f"Agent {jid} initialized at position: {self.position}, traj: {self.traj}")
         self.self_uid = jid.split("@")[0]
         self.world = {"blue_pos": {}, "red_pos": {}}
         # 当前参考轨迹

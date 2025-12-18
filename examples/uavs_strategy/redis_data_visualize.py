@@ -1,11 +1,12 @@
 ﻿import redis
+import time
 import matplotlib.pyplot as plt
 import json
 import numpy as np
 from matplotlib.animation import FuncAnimation
 import os.path as osp
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
-
+import os
 
 class MapVisualizer:
     """
@@ -172,31 +173,58 @@ class MapVisualizer:
                 ax.fill(_utm_xy[: ,0], _utm_xy[: ,1], alpha=0.2, label=f'{_fac} Defence Ring')
 
     def update_plot(self, frame, ax, blue=True):
-        ax.clear()  # 建议用 cla，不要 clear，避免坐标轴属性全被重置
+        ax.clear()  # 清除上一帧
+        
+        # 设置标题和坐标轴
+        ax.set_title(f"{'Blue' if blue else 'Red'} UAVs - Real-time Monitor")
+        ax.set_xlabel('X (UTM)')
+        ax.set_ylabel('Y (UTM)')
 
         positions, traj_data, ref_traj_data, lookahead_data = self.get_drone_states(blue)
+        
+        # 获取当前时间戳（毫秒）
+        now_ms = int(time.time() * 1000)
 
         # 画设施
         self.plot_facilities(ax)
 
         for uid, pos in positions.items():
-            # 1. 当前无人机位置
-            ax.plot(pos['x'], pos['y'], 'go', label=f'{uid} Position')
+            # 判断该无人机是否“活跃” (2秒内有更新)
+            is_active = False
+            if 'ts' in pos:
+                if abs(now_ms - pos['ts']) < 2000:
+                    is_active = True
 
-            # 2. 实际飞行轨迹（历史）
+            # 1. 实际飞行轨迹（历史） - 始终显示
+            # 即使是停止的无人机，也保留其轨迹线
             traj = traj_data.get(uid, [])
             if traj:
                 traj_arr = np.array(traj)  # [[x,y,z],...]
+                # 活跃的用实线，非活跃的可以用虚线或透明度区别，这里统一用实线
+                style = '-' 
+                alpha = 1.0 if is_active else 0.4  # 非活跃的变淡
                 ax.plot(traj_arr[:, 0], traj_arr[:, 1],
-                        '-', linewidth=1.5, label=f'{uid} Actual Traj')
+                        style, linewidth=1.5, alpha=alpha, label=f'{uid} Path')
 
-            # 3. 预设轨迹
-            ref_traj = ref_traj_data.get(uid, [])
-            if ref_traj:
-                ref_arr = np.array(ref_traj)  # [[x,y,z],...]
+            # 2. 当前无人机位置
+            # 活跃状态正常显示，不活跃状态变浅
+            alpha_val = 1.0 if is_active else 0.4
+            text_color = 'black' if is_active else 'gray'
+            
+            ax.plot(pos['x'], pos['y'], 'go', markersize=8, alpha=alpha_val, label=f'{uid} Pos')
+            # 添加文字标签
+            ax.text(pos['x'], pos['y'], uid, fontsize=9, color=text_color, fontweight='bold', alpha=alpha_val)
 
-                ax.plot(ref_arr[:, 0], ref_arr[:, 1],
-                        '--', linewidth=1, label=f'{uid} Ref Traj (all)')
+            # 3. 预设轨迹 - 只显示活跃的
+            if is_active:
+                ref_traj = ref_traj_data.get(uid, [])
+                if ref_traj:
+                    ref_arr = np.array(ref_traj)  # [[x,y,z],...]
+                    ax.plot(ref_arr[:, 0], ref_arr[:, 1],
+                            '--', linewidth=1, color='orange', alpha=0.7)
+        
+        # 避免图例过多，可以只显示一部分或者不显示
+        # ax.legend(loc='upper right', fontsize='small')
 
 
         # 坐标轴信息
@@ -260,14 +288,18 @@ class MapVisualizer:
 
 # 运行可视化，并实现动态更新
 if __name__ == "__main__":
-    visualizer = MapVisualizer()
+    current_dir = os.path.dirname(__file__)
+    # facilities_file_name = 'facilities.json'
+    facilities_file_name = 'test_facilities_locations.json'
+    facilities_file = os.path.join(current_dir,"data" ,facilities_file_name)
+    visualizer = MapVisualizer(facilities_file=facilities_file)
 
     # 创建绘图和轴
     fig, ax = plt.subplots()
     fig.canvas.mpl_connect('button_press_event', visualizer.handle_click)
 
     # 使用FuncAnimation动态更新图像，每秒更新一次
-    ani = FuncAnimation(fig, visualizer.update_plot, fargs=(ax, True), interval=1000)  # 每秒更新一次
+    ani = FuncAnimation(fig, visualizer.update_plot, fargs=(ax, True), interval=1000, cache_frame_data=False)  # 每秒更新一次
     plt.show()
 
 

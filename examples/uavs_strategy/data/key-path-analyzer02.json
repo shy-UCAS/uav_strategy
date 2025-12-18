@@ -1,0 +1,67 @@
+{
+  "bdi_instructions": {
+    "agent_1": [
+      {
+        "segment_id": "seg_0",
+        "path": [
+          0,
+          1,
+          4
+        ],
+        "action_at_end": "merge_and_terminate",
+        "next_segment_hint": "seg_2",
+        "role_in_merge": "initiator"
+      }
+    ],
+    "agent_2": [
+      {
+        "segment_id": "seg_1",
+        "path": [
+          3,
+          4
+        ],
+        "action_at_end": "merge_and_terminate",
+        "next_segment_hint": "seg_2",
+        "role_in_merge": "participant"
+      }
+    ],
+    "agent_3": [
+      {
+        "segment_id": "seg_3",
+        "path": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          14
+        ],
+        "action_at_end": "finish"
+      }
+    ],
+    "agent_4": [
+      {
+        "segment_id": "seg_4",
+        "path": [
+          11,
+          12,
+          13,
+          14
+        ],
+        "action_at_end": "finish"
+      }
+    ],
+    "agent_merged_at_4": [
+      {
+        "segment_id": "seg_2",
+        "path": [
+          4,
+          5,
+          2,
+          14
+        ],
+        "action_at_end": "finish"
+      }
+    ]
+  }
+}

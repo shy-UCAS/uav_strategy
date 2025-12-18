@@ -31,17 +31,6 @@ from examples.uavs_strategy.planning_modules.uav_planning_actions import Plannin
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
 from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FormationAPFStep, APFStep, FetchWorldState ,DT
 
-complex_key_paths = [
-    [20, 21, 5, 27], 
-    [28, 3, 21, 5, 27], 
-    [1, 2, 10, 26], 
-    [30, 2, 10, 26], 
-    [29, 22, 2, 10, 26], 
-    [20, 21, 5, 7, 25], 
-    [1, 2, 10, 12, 4, 8], 
-    [1, 2, 10, 12, 11, 24, 16]
-]
-
 init_loc1 = [
     122.09686551225597,
     37.56536338371063,
@@ -52,6 +41,22 @@ init_loc2 = [
     122.10258217246229,
     37.56342057758475,
     200.0
+]
+init_locs = [
+    [122.06711375, 37.57744204,200],
+    [122.11945753, 37.57340029,180],
+    [122.12628947, 37.52707223,190],
+    [122.07039604, 37.52213903,220]
+    # [
+    #     122.10258217246229,
+    #     37.56342057758475,
+    #     200.0
+    # ],
+    # [
+    #     122.09686551225597,
+    #     37.56536338371063,
+    #     200.0
+    # ]
 ]
 
 height_range_value_set = {
@@ -67,8 +72,14 @@ direction_range_set = {
 
 current_dir = os.path.dirname(__file__)
 digraph_attrs_reference_path = os.path.join(current_dir, "data", "digraph_with_attrs.json")
-digraph_attrs = json.load(open(digraph_attrs_reference_path, "r"))
+key_path_instructions_path = os.path.join(current_dir,"data" ,"key-path-analyzer.log")
+asl_file = os.path.join(current_dir, "uav_key_path.asl")
 
+digraph_attrs = json.load(open(digraph_attrs_reference_path, "r"))
+key_path_instructions = json.load(open(key_path_instructions_path, "r"))
+bdi_instructions = key_path_instructions["bdi_instructions"]
+# facilities_file = os.path.join(current_dir,"data" ,"facilities.json")
+facilities_file = os.path.join(current_dir,"data" ,"test_facilities_locations.json")
 # =============================
 # 1. Blue UAV Agent
 # =============================
@@ -87,17 +98,21 @@ class BlueUAVAgent(BDIAgent):
         self.is_final_task = False
 
         # 初始化设施
-        self.facilities = self._default_facilities() if facilities is None else facilities
+        self.facilities = self._default_facilities(facilities)
         # 初始化位置
         self.position = init_pos
         # 经纬度 -> UTM
         self._lnglat2utm_convertor = bfunc.LngLat2UTM()
         if self.position:
             self.traj = self._lnglat2utm_convertor.lng_lat_to_utm_array(np.array([self.position])).tolist()
+            self.traj[0].append(self.position[2])  # 添加高度信息
         else:
+            print("No initial position provided, generating random position.")
             _rdm_init_pos = bfunc.generate_circle_positions_from_diameter(1, init_loc1, init_loc2)
-            self.traj = self._lnglat2utm_convertor.lng_lat_to_utm_array(np.array([_rdm_init_pos])).tolist()
-
+            self.position = _rdm_init_pos[0] # 更新 self.position
+            self.traj = self._lnglat2utm_convertor.lng_lat_to_utm_array(np.array(_rdm_init_pos)).tolist()
+            self.traj[0].append(self.position[2])  # 添加高度信息
+        print(f"{self.jid} initialized at position: {self.position}, traj: {self.traj}")
         # Redis I/O 模块
         self.io = UavRedisIO(**kwargs.get("redis_cfg", {}))
         # Redis 初始化数据
@@ -112,7 +127,7 @@ class BlueUAVAgent(BDIAgent):
         self.FetchWorldState = FetchWorldState
 
         # 轨迹规划类函数
-        self.planning_lib = PlanningLib
+        self.planning_lib = PlanningLib(self)
         # 轨迹相关
         self.cur_reference_traj = []
         self.blue_ids = []
@@ -122,6 +137,8 @@ class BlueUAVAgent(BDIAgent):
 
         #初始化节点信念
         self.bdi.set_belief("cur_nodes", self.key_path[0], self.key_path[1])
+        self.bdi.set_belief("if_set_ref_traj", "False")
+        self.bdi.set_belief('my_id', self.self_uid)
 
     
     def _default_facilities(self, default_json_path=None):
@@ -149,7 +166,10 @@ class BlueUAVAgent(BDIAgent):
                 new_args += (x,)
         term = agentspeak.Literal(name, tuple(new_args))
         self.bdi_intention_buffer.append((agentspeak.Trigger.addition, agentspeak.GoalType.achievement, term, agentspeak.runtime.Intention()))
-        
+    
+    async def setup(self):
+        # 注册周期任务
+        self.add_behaviour(self.APFStep(period=DT))
     
     def add_custom_actions(self, actions):
         @actions.add(".act_digraph_path_planning", 2)
@@ -158,18 +178,21 @@ class BlueUAVAgent(BDIAgent):
             
             # 如果任务已完成，直接跳过
             if self.is_finished:
-                # print(f"{self.jid} has already finished. Skipping planning.")
                 yield
                 return
             cur_start_node = str(agentspeak.grounded(term.args[0], intention.scope))
             cur_end_node = str(agentspeak.grounded(term.args[1], intention.scope))
-            print(f"{self.jid} is act_digraph_path_planning from {cur_start_node} to {cur_end_node}")
+            print(f"[{self.jid}] is act_digraph_path_planning from {cur_start_node} to {cur_end_node}")
+
             current_idx = self.path_index
             for digraph_attr in digraph_attrs:
                 if str(digraph_attr['from']) == cur_start_node and str(digraph_attr['to']) == cur_end_node:
                     # 读取当前片段的轨迹规划参数，并设定参考轨迹 
-                    print(f"{self.jid} cur order_mode:{digraph_attr['attrs']['order_mode']},order_type:{digraph_attr['attrs']['order_type']}")
-                    
+                    print(f"[{self.jid}] cur order_mode:{digraph_attr['attrs']['order_mode']},order_type:{digraph_attr['attrs']['order_type']}")
+                    self.planning_lib.execute_path_planning_from_digraph(digraph_attr, -1, -1)
+                    # 规划完成后，设置标志位通知 APFStep 将新轨迹写入 Redis
+                    # self.bdi.set_belief("if_set_ref_traj", "true")
+                    print(f"[{self.jid}] cur if_set_ref_traj flag is:{self.bdi.get_belief_value('if_set_ref_traj')[0]}")
             # 在 key_path 中查找当前节点的位置，并更新为下一段路径
             try:
                 if current_idx + 1 < len(self.key_path):
@@ -190,36 +213,20 @@ class BlueUAVAgent(BDIAgent):
 
             
             # 休眠暂时代替规划过程
-            waiting_sec = random.uniform(1, 3)
-            print(f"{self.jid} planning... will take {waiting_sec:.2f} seconds.")
-            time.sleep(waiting_sec)
-            self.bdi.set_belief("can_task_start", True)
+            # waiting_sec = random.uniform(1, 3)
+            # print(f"{self.jid} planning... will take {waiting_sec:.2f} seconds.")
+            # time.sleep(waiting_sec)
+            # self.bdi.set_belief("can_task_start", True)
 
-            if self.is_final_task:
-                self.is_finished = True
-                print(f"{self.jid} has completed its final task.")
-            else:
-                # 添加新的成就目标以继续任务，替代掉原先的while循环触发asl目标的方式
-                self.add_achievement_goal("task_digraph")
+            # can_task_start_belief = self.bdi.get_belief_value("can_task_start")[0]
+            # if self.is_final_task:
+            #     self.is_finished = True
+            #     print(f"{self.jid} agent has completed its final task.")
+            # else:
+            #     # 添加新的成就目标以继续任务，替代掉原先的while循环触发asl目标的方式
+            #     self.add_achievement_goal("task_digraph")
 
             yield 
-    def path_planning_from_digraph(self,digraph):
-        # 根据 digraph_attr 进行路径规划
-        # 目前只考虑了 order_mode : independent\aggreagate\disperse三种
-        digraph_attr = digraph['attrs']
-        order_mode = digraph_attr['order_mode']
-        order_type = digraph_attr['order_type']
-        cur_target = digraph_attr['target']
-        formation = digraph_attr['formation']
-        fleet_no = digraph_attr['fleet_no']
-        # 读取当前片段的轨迹规划参数
-        if order_mode == 'independent':
-            pass
-
-
-
-
-
 
 class MissionOrchestrator:
     """结合key_path_analyzer.log数据,生成bdi agent并管理生命周期"""
@@ -231,6 +238,8 @@ class MissionOrchestrator:
         self.BlueBDIAgentTemplate = BlueBDIAgentTemplate
 
         self.active_agents: Dict[str, BlueUAVAgent] = {}
+        # 经纬度 -> UTM 转换器
+        self._lnglat2utm_convertor = bfunc.LngLat2UTM()
         
         # Merge synchronization
         # key: next_segment_hint (e.g., 'seg_1'), value: set of agent_names ready to merge
@@ -299,7 +308,7 @@ class MissionOrchestrator:
             再返回到MissionOrchestrator中的run进行下一步处理
 
         """
-        agent = self.BlueBDIAgentTemplate(jid, self.password, self.asl_file, tasks, _init_pos, merge_peers=merge_peers)
+        agent = self.BlueBDIAgentTemplate(jid, self.password, self.asl_file, tasks, _init_pos, facilities=facilities_file, merge_peers=merge_peers)
         
         # 初始化信念
         if len(path) >= 2:
@@ -315,8 +324,11 @@ class MissionOrchestrator:
         initial_agents = [name for name in self.bdi_instructions.keys() 
                             if "_sub_" not in name and "_merged_" not in name]
         
-        for name in initial_agents:
-            await self._spawn_agent(name)
+        for _idx, name in enumerate(initial_agents):
+            if _idx < len(init_locs):
+                await self._spawn_agent(name,init_locs[_idx])
+            else:
+                await self._spawn_agent(name)
 
         # 2. 监控循环
         while self.active_agents:
@@ -324,6 +336,8 @@ class MissionOrchestrator:
             current_agent_names = list(self.active_agents.keys())
             
             for name in current_agent_names:
+                if name not in self.active_agents:
+                    continue
                 agent = self.active_agents[name]
                 
                 if agent.is_finished:
@@ -352,7 +366,8 @@ class MissionOrchestrator:
 
             for branch in task['branches']:
                 child_name = branch['new_agent_hint']
-                await self._spawn_agent(child_name, _init_pos=_last_pos)
+                _last_pos_llt = self._lnglat2utm_convertor.utm_to_lng_lat_array(np.array([_last_pos]))[0].tolist() + [_last_pos[2]]
+                await self._spawn_agent(child_name, _init_pos=_last_pos_llt)
             
 
                 
@@ -383,7 +398,8 @@ class MissionOrchestrator:
                 # 3. 启动合并后的新 agent
                 new_agent_name = self._find_agent_name_by_segment_id(target_seg)
                 if new_agent_name:
-                    await self._spawn_agent(new_agent_name, _init_pos=_last_pos)
+                    _last_pos_llt = self._lnglat2utm_convertor.utm_to_lng_lat_array(np.array([_last_pos]))[0].tolist() + [_last_pos[2]]
+                    await self._spawn_agent(new_agent_name, _init_pos=_last_pos_llt)
                 else:
                     print(f"Error: Could not find agent definition for segment {target_seg}")
             else:
@@ -393,13 +409,8 @@ class MissionOrchestrator:
 
 
 async def start_agent(server, password):
-    current_dir = os.path.dirname(__file__)
-    key_path_instructions_path = os.path.join(current_dir,"data" ,"key-path-analyzer.log")
-    asl_file = os.path.join(current_dir, "uav_key_path.asl")
-    digraph_attrs_reference = os.path.join(current_dir, "data", "digraph_with_attrs.json")
-    key_path_instructions = json.load(open(key_path_instructions_path, "r"))
-    bdi_instructions = key_path_instructions["bdi_instructions"]
-    
+
+
     orchestrator = MissionOrchestrator(
         bdi_instructions=bdi_instructions,
         server=server,

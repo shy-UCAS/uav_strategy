@@ -6,7 +6,7 @@ from spade.behaviour import PeriodicBehaviour
 from examples.uavs_strategy.planning_modules import avoidance_agents as a_agents
 
 # ==== 势场与步进参数 ====
-DT = 1.0       # 周期（秒）
+DT = 0.30       # 周期（秒）
 STEP = 8.0     # 每步“最大位移”/速度上限（米/步）
 K_ATT = 0.95   # 引力系数 (独立飞行时)
 K_ATT_FORM = 1.5 # 引力系数 (编队飞行时，需要更强的跟随力)
@@ -169,7 +169,7 @@ class APFStep(PeriodicBehaviour):
             # 如果当前轨迹没有写入redis，则写入
             io.set_ref_traj(agent.self_uid, traj)
             agent.bdi.set_belief("if_set_ref_traj", "false")
-            print(f"ref_traj add to redis")
+            print(f"[{agent.self_uid}] ref_traj add to redis")
 
         # 获取当前预瞄点的位置（从参考轨迹中）
         lookahead = io.get_lookahead(agent.self_uid)
@@ -185,12 +185,20 @@ class APFStep(PeriodicBehaviour):
 
         # 结束当前task的标志位
         dist_to_end = io.get_dist_2d(agent.self_uid)
-        print(f"current_dist_to_end: {dist_to_end}")
-        if dist_to_end <= 50:
+        print(f"[{agent.self_uid}] current_dist_to_end: {dist_to_end}")
+        if dist_to_end is not None and dist_to_end <= 50:
             # 重置当任务状态
             io.set_lookahead(agent.self_uid, 0)
             agent.bdi.set_belief("can_task_start", True)
-            print(f"near end")
+            if agent.is_final_task:
+                agent.is_finished = True
+            else:
+                if hasattr(agent, "add_achievement_goal"):
+                    agent.add_achievement_goal("task_digraph")
+                else:
+                    print(f"[{agent.self_uid}] Warning: add_achievement_goal method not found.")
+            print(f"[{agent.self_uid}] near end")
+
             return
 
         obstacle_positions = []
@@ -218,12 +226,11 @@ class APFStep(PeriodicBehaviour):
                 obstacle_positions=obstacle_positions,
                 obstacle_vels=obstacle_vels,
             )
-        print(f"obs_pos: {obstacle_positions}, obs_vel: {obstacle_vels}, F_rep: {F_rep}")
+        print(f"[{agent.self_uid}] obs_pos: {obstacle_positions}, obs_vel: {obstacle_vels}, F_rep: {F_rep}")
 
         # ---- 引力：朝向目标（预瞄点） ----
         F_att = v_scale(v_sub(goal, self_pos), K_ATT)
-        print(f"F_att: {F_att}")
-
+        print(f"[{agent.self_uid}] F_att: {F_att}")
         # ---- 合力：引力和斥力合成 ----
         F = v_add(F_att, F_rep)
 
@@ -240,7 +247,7 @@ class APFStep(PeriodicBehaviour):
         io.set_pos(agent.self_uid, nxt[0], nxt[1], nxt[2])
         io.append_traj_points(agent.self_uid, [nxt[0], nxt[1], nxt[2]])
 
-        print(f"New position for {agent.self_uid}: {nxt}")
+        print(f"[{agent.self_uid}] New position for {agent.self_uid}: {nxt}, target_loc: {traj[-1]}")
 
 # 世界状态查询行为
 class FetchWorldState(PeriodicBehaviour):

@@ -192,13 +192,13 @@
         "to": "2_1",
         "attrs": {
             "order_mode": "independent",
-            "order_type": "breakthrough",
-            "target": "headquarter",
+            "order_type": "detour",
+            "target": "antiair_facilities",
             "formation": "vshape",
             "fleet_no": "fleet2",
             "plan": {
-                "type": "breakthrough",
-                "target": "headquarter",
+                "type": "detour",
+                "target": "antiair_facilities",
                 "trajectory": [
                     [
                         122.10258217246229,

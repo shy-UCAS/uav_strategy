@@ -1,0 +1,105 @@
+{
+  "bdi_instructions": {
+    "agent_1": [
+      {
+        "segment_id": "seg_0",
+        "path": [
+          "1_0",
+          "1_1",
+          "1_2",
+          "3_0"
+        ],
+        "action_at_end": "merge_and_terminate",
+        "next_segment_hint": "seg_4",
+        "role_in_merge": "initiator"
+      }
+    ],
+    "agent_2": [
+      {
+        "segment_id": "seg_5",
+        "path": [
+          "2_0",
+          "2_1",
+          "2_2",
+          "3_0"
+        ],
+        "action_at_end": "merge_and_terminate",
+        "next_segment_hint": "seg_4",
+        "role_in_merge": "participant"
+      }
+    ],
+    "agent_merged_at_3_0": [
+      {
+        "segment_id": "seg_4",
+        "path": [
+          "3_0",
+          "3_1"
+        ],
+        "action_at_end": "split_and_terminate",
+        "branches": [
+          {
+            "new_agent_hint": "agent_merged_at_3_0_sub_seg_1",
+            "segment_id": "seg_1",
+            "path": [
+              "3_1",
+              "4_1",
+              "4_2"
+            ]
+          },
+          {
+            "new_agent_hint": "agent_merged_at_3_0_sub_seg_2",
+            "segment_id": "seg_2",
+            "path": [
+              "3_1",
+              "5_1",
+              "5_2"
+            ]
+          },
+          {
+            "new_agent_hint": "agent_merged_at_3_0_sub_seg_3",
+            "segment_id": "seg_3",
+            "path": [
+              "3_1",
+              "6_1",
+              "6_2"
+            ]
+          }
+        ]
+      }
+    ],
+    "agent_merged_at_3_0_sub_seg_1": [
+      {
+        "segment_id": "seg_1",
+        "path": [
+          "3_1",
+          "4_1",
+          "4_2"
+        ],
+        "action_at_end": "finish"
+      }
+    ],
+    "agent_merged_at_3_0_sub_seg_2": [
+      {
+        "segment_id": "seg_2",
+        "path": [
+          "3_1",
+          "5_1",
+          "5_2"
+        ],
+        "action_at_end": "finish"
+      }
+    ],
+    "agent_merged_at_3_0_sub_seg_3": [
+      {
+        "segment_id": "seg_3",
+        "path": [
+          "3_1",
+          "6_1",
+          "6_2"
+        ],
+        "action_at_end": "finish"
+      }
+    ]
+  }
+}
+

@@ -22,7 +22,7 @@ uav_planning_actions.py
 """
 
 import random
-from typing import Any, Dict, List
+from typing import Any, Dict, List, TYPE_CHECKING
 
 import numpy as np
 import agentspeak
@@ -31,6 +31,8 @@ import examples.uavs_strategy.planning_modules.basic_functions as bfunc
 import examples.uavs_strategy.planning_modules.quick_path_planners as qpp
 import examples.uavs_strategy.planning_modules.math_curves_generators as curve_gen
 
+if TYPE_CHECKING:
+    from examples.uavs_strategy.uav_dynamic_agents import BlueUAVAgent
 
 def _ground(term, intention):
     """简化 agentspeak.grounded 的调用。"""
@@ -50,7 +52,7 @@ class PlanningLib:
     通过asl的BDI 动作触发调用。
     """
 
-    def __init__(self, self_agent):
+    def __init__(self, self_agent: "BlueUAVAgent"):
         self.self_agent = self_agent
 
     # 为了书写方便，提供一个别名
@@ -74,13 +76,15 @@ class PlanningLib:
         # 生成随机起终高度
         alt_start_rand = random.randint(default_range[0][0], default_range[0][1])
         alt_end_rand = random.randint(default_range[1][0], default_range[1][1])
-
+        print(f"[{self.agent.jid}] Default 2d traj: {traj}")
         # 起点高度
         if len(traj[0]) == 2:
+            print(f"[{self.agent.jid}] Insert start height: {start_height} (rand: {alt_start_rand})")
             traj[0].append(start_height if start_height != -1 else alt_start_rand)
 
         # 终点高度
         if len(traj[-1]) == 2:
+            print(f"[{self.agent.jid}] Insert end height: {end_height} (rand: {alt_end_rand})")
             traj[-1].append(end_height if end_height != -1 else alt_end_rand)
 
         # 此时只有首尾是三维，中间点需要补 z
@@ -238,50 +242,23 @@ class PlanningLib:
             return [list(p) if isinstance(p, tuple) else list(p) for p in border_traj]
 
     # ---------- 执行动作封装 (解耦 BDI) ---------- #
-    def execute_path_planning_from_digraph(self, digraph: Dict[str, any],start_h: int, end_h: int):
-        # 根据 digraph_attr 进行路径规划
-        # 目前只考虑了 order_mode : independent\aggreagate\disperse三种
-        # 读取当前片段的轨迹规划参数
+    def execute_path_planning_from_digraph(self, digraph: Dict[str, Any], start_h: int, end_h: int):
+        """
+        根据 digraph_attr 进行路径规划
+        目前逻辑简化为根据 order_type 分发，不再冗余判断 order_mode
+        """
         digraph_attr = digraph['attrs']
-        order_mode = digraph_attr['order_mode']
         order_type = digraph_attr['order_type']
         cur_target = digraph_attr['target']
-        formation = digraph_attr['formation']
-        fleet_no = digraph_attr['fleet_no']
 
-        if order_mode == 'independent':
-            if order_type == 'breakthrough':
-                return self.execute_breakthrough(cur_target, start_h, end_h)
-            elif order_type == 'escape':
-                return self.execute_escape(cur_target, start_h, end_h)
-            elif order_type == 'detour':
-                return self.execute_detour(cur_target, start_h, end_h)
-        
-        elif order_mode == 'aggregate':
-            if cur_target == 'aggregate_point':
-                # 多机汇合点之前仍是独立飞行
-                # 但是需要查找到汇合点的坐标才能继续处理
-                if order_type == 'breakthrough':
-                    return self.execute_breakthrough(cur_target, start_h, end_h)
-                elif order_type == 'escape':
-                    return self.execute_escape(cur_target, start_h, end_h)
-                elif order_type == 'detour':
-                    return self.execute_detour(cur_target, start_h, end_h)
-            else:
-                if order_type == 'breakthrough':
-                    return self.execute_breakthrough(cur_target, start_h, end_h)
-                elif order_type == 'escape':
-                    return self.execute_escape(cur_target, start_h, end_h)
-                elif order_type == 'detour':
-                    return self.execute_detour(cur_target, start_h, end_h)
-
-        elif order_mode == 'disperse':
-            if order_type == 'breakthrough':
-                return self.execute_breakthrough(cur_target, start_h, end_h)
-            elif order_type == 'escape':
-                return self.execute_escape(cur_target, start_h, end_h)
-            elif order_type == 'detour':
-                return self.execute_detour(cur_target, start_h, end_h)
+        if order_type == 'breakthrough':
+            return self.execute_breakthrough(cur_target, start_h, end_h)
+        elif order_type == 'escape':
+            return self.execute_escape(cur_target, start_h, end_h)
+        elif order_type == 'detour':
+            return self.execute_detour(cur_target, start_h, end_h)
+        else:
+            print(f"[{self.agent.name}] Unknown order_type: {order_type}")
 
 
     def execute_breakthrough(self, target: str, start_h: int, end_h: int):
@@ -296,6 +273,7 @@ class PlanningLib:
             traj_2d = self.plan_breakthrough_target(self.agent.traj[-1], target)
         elif target == 'aggregate_point':
             # 多机汇合点
+            print(f"[{self.agent.name}] is act aggregating to rendezvous point, merge_peers: {self.agent.merge_peers}")
             rendezvous_pos = self.agent.io.get_rendezvous_point(self.agent.merge_peers)
             traj_2d = self.planbreakthrough_target_location(self.agent.traj[-1], rendezvous_pos)
         else:
@@ -327,6 +305,7 @@ class PlanningLib:
         执行迂回动作
         """
         traj_2d = self.plan_detour(self.agent.traj[-1], target)
+        traj_2d[0].append(self.agent.traj[-1][2])  # 保持当前高度不变
         traj_3d = self.insert_height_val("detour", traj_2d, start_h, end_h)
 
         self.agent.cur_reference_traj = traj_3d
