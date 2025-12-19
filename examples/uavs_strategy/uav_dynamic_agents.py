@@ -17,11 +17,11 @@ import collections
 import random
 import math
 
-from typing import Dict, List, Optional, Iterable, Tuple, Any
 
+from typing import Dict, List, Optional, Iterable, Tuple, Any
+from matplotlib.animation import FuncAnimation
 # from time import time
 from datetime import datetime
-
 from sympy import N
 
 from spade_bdi.bdi import BDIAgent
@@ -30,6 +30,7 @@ from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
 from examples.uavs_strategy.planning_modules.uav_planning_actions import PlanningLib
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
 from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FormationAPFStep, APFStep, FetchWorldState ,DT
+
 
 init_loc1 = [
     122.09686551225597,
@@ -71,15 +72,15 @@ direction_range_set = {
 }
 
 current_dir = os.path.dirname(__file__)
-digraph_attrs_reference_path = os.path.join(current_dir, "data", "digraph_with_attrs.json")
-key_path_instructions_path = os.path.join(current_dir,"data" ,"key-path-analyzer.log")
+digraph_attrs_reference_path = os.path.join(current_dir, "data", "digraph_with_attrs02.json")
+key_path_instructions_path = os.path.join(current_dir,"data" ,"key-path-analyzer02.json")
 asl_file = os.path.join(current_dir, "uav_key_path.asl")
 
 digraph_attrs = json.load(open(digraph_attrs_reference_path, "r"))
 key_path_instructions = json.load(open(key_path_instructions_path, "r"))
 bdi_instructions = key_path_instructions["bdi_instructions"]
-# facilities_file = os.path.join(current_dir,"data" ,"facilities.json")
-facilities_file = os.path.join(current_dir,"data" ,"test_facilities_locations.json")
+facilities_file = os.path.join(current_dir,"data" ,"facilities.json")
+# facilities_file = os.path.join(current_dir,"data" ,"test_facilities_locations.json")
 # =============================
 # 1. Blue UAV Agent
 # =============================
@@ -116,7 +117,7 @@ class BlueUAVAgent(BDIAgent):
         # Redis I/O 模块
         self.io = UavRedisIO(**kwargs.get("redis_cfg", {}))
         # Redis 初始化数据
-        self.self_uid = jid.split("@")[0]
+        self.self_uid = jid.split("@")[0] 
         self.io.add_uav_id(self.self_uid, blue=True)
         self.io.set_pos(self.self_uid, self.traj[0][0], self.traj[0][1], self.position[2])
         self.io.set_traj(self.self_uid, [[self.traj[0][0], self.traj[0][1], self.position[2]]])

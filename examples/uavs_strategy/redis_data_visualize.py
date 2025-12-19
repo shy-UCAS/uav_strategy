@@ -3,11 +3,12 @@ import time
 import matplotlib.pyplot as plt
 import json
 import numpy as np
-from matplotlib.animation import FuncAnimation
 import os.path as osp
-from examples.uavs_strategy.planning_modules import basic_functions as bfunc
 import os
 
+from matplotlib.animation import FuncAnimation
+from examples.uavs_strategy.planning_modules import basic_functions as bfunc
+from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import DT
 class MapVisualizer:
     """
     地图可视化类，负责从Redis中读取无人机数据并绘制实时地图。
@@ -288,9 +289,10 @@ class MapVisualizer:
 
 # 运行可视化，并实现动态更新
 if __name__ == "__main__":
+    # 运行：python -m examples.uavs_strategy.redis_data_visualize
     current_dir = os.path.dirname(__file__)
-    # facilities_file_name = 'facilities.json'
-    facilities_file_name = 'test_facilities_locations.json'
+    facilities_file_name = 'facilities.json'
+    # facilities_file_name = 'test_facilities_locations.json'
     facilities_file = os.path.join(current_dir,"data" ,facilities_file_name)
     visualizer = MapVisualizer(facilities_file=facilities_file)
 
@@ -299,7 +301,7 @@ if __name__ == "__main__":
     fig.canvas.mpl_connect('button_press_event', visualizer.handle_click)
 
     # 使用FuncAnimation动态更新图像，每秒更新一次
-    ani = FuncAnimation(fig, visualizer.update_plot, fargs=(ax, True), interval=1000, cache_frame_data=False)  # 每秒更新一次
+    ani = FuncAnimation(fig, visualizer.update_plot, fargs=(ax, True), interval=DT*1000, cache_frame_data=False)  # 每秒更新一次
     plt.show()
 
 
