@@ -142,6 +142,28 @@ class UavRedisIO:
         key = f"uav:{uid}:ref_traj"
         self.r.set(key, json.dumps(points))
 
+    def set_members_ref_traj(self, master_uid: str, members_traj: List[List[List[float]]]) -> None:
+        """
+        为集群内的每一架从机定义uid并写入参考轨迹
+        members_traj: List of trajectories, where each trajectory is a list of points [x, y, z]
+        """
+        # 假设 members_traj 是一个列表，每个元素是一条轨迹
+        for i, traj in enumerate(members_traj):
+            # 定义从机UID: master_uid + "_sub_" + index
+            sub_uid = f"{master_uid}_sub_{i}"
+            # 写入参考轨迹
+            self.set_ref_traj(sub_uid, traj)
+            # 将从机ID加入到 uav:ids 集合中，以便被感知
+            self.add_uav_id(sub_uid, blue=True)
+            # 初始化从机位置（可选，设为轨迹起点）
+            if traj and len(traj) > 0:
+                start_pt = traj[0]
+                # 检查是否已有位置，如果没有则初始化
+                if not self.get_pos(sub_uid, blue=True):
+                    self.set_pos(sub_uid, start_pt[0], start_pt[1], start_pt[2])
+                    self.set_lookahead(sub_uid, 0)
+
+
     def get_ref_traj(self, uid: str) -> List[List[float]]:
         """获取参考轨迹"""
         key = f"uav:{uid}:ref_traj"

@@ -5,7 +5,7 @@ import sys
 import threading
 import time
 
-sys.stdout = open('key-path-analyzer.log', 'w') # Optional: Uncomment to log to file
+# sys.stdout = open('key-path-analyzer.log', 'w') # Optional: Uncomment to log to file
 
 class KeyPathAnalyzer:
     def __init__(self, key_paths):

@@ -161,15 +161,17 @@ class APFStep(PeriodicBehaviour):
 
         # 获取当前的参考轨迹 (_cur_reference_traj)
         traj = agent.cur_reference_traj
+        members_traj = agent.members_cur_reference_traj
         if not traj:
-            return  # 如果没有参考轨迹，跳过
+            return  # 如果没有主机参考轨迹，跳过（没有主机则从机也不会生成）
         if_set_ref_traj_belief = agent.bdi.get_belief("if_set_ref_traj")[len("if_set_ref_traj("):-1]
 
         if if_set_ref_traj_belief == "true":
             # 如果当前轨迹没有写入redis，则写入
             io.set_ref_traj(agent.self_uid, traj)
+            io.set_members_ref_traj(agent.self_uid, members_traj)
             agent.bdi.set_belief("if_set_ref_traj", "false")
-            print(f"[{agent.self_uid}] ref_traj add to redis")
+            print(f"[{agent.self_uid}] ref_traj and members ref_traj add to redis")
 
         # 获取当前预瞄点的位置（从参考轨迹中）
         lookahead = io.get_lookahead(agent.self_uid)

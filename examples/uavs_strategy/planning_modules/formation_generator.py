@@ -1,6 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+class Formation_Elements:
+    def __init__(self, member_num = 5, radius=20.0, traj = None, angle=45, max_offset=30.0, noise_scale=0.1, angle_noise_scale=3,
+                 formation_type='vshape'):
+        self.member_num = member_num
+        self.radius = radius
+        self.traj = traj
+        self.angle = angle
+        self.max_offset = max_offset
+        self.noise_scale = noise_scale
+        self.angle_noise_scale = angle_noise_scale
+        self.formation_type = formation_type
+
 class FormationGenerator3D:
     def __init__(self,
                  formation_elements=None,
@@ -55,7 +67,7 @@ class FormationGenerator3D:
                 α = self.angle + np.random.uniform(-self.angle_noise_scale, self.angle_noise_scale)
                 off = self.max_offset * abs(i) / half
                 xs.append(off * np.cos(np.deg2rad(α)) * np.sign(i))
-                ys.append(-off * np.sin(np.deg2rad(α)))
+                ys.append(-off * np.sin(np.deg2rad(α )))
             return np.array(xs), np.array(ys)
         elif self.formation_type == 'arc':
             θ = np.linspace(np.deg2rad(self.angle),
@@ -136,7 +148,7 @@ class FormationGenerator3D:
     def generate_members_formation_3d(self):
         """
         生成每个从机的世界坐标轨迹列表
-        :return: list of arrays, each shape (N,3)
+        :return: list of lists, each shape (N,3)
         """
         x_offs, y_offs = self.generate_formation_offsets()
         Rs = self.compute_orientation_matrices()
@@ -158,11 +170,11 @@ class FormationGenerator3D:
                       + np.random.normal(scale=self.noise_scale, size=3)
                 paths[m][i] = p_w
 
-        return paths
+        return [path.tolist() for path in paths]
 
     def plot_formation(self):
         """3D 可视化主机与编队从机轨迹与机体坐标系"""
-        paths = self.generate_members_formation_3d()
+        paths = [np.asarray(p) for p in self.generate_members_formation_3d()]
         fig = plt.figure(figsize=(10, 8))
         ax = fig.add_subplot(111, projection='3d')
 
@@ -194,79 +206,3 @@ class FormationGenerator3D:
         ax.legend()
         plt.tight_layout()
         plt.show()
-
-# planning_modules/formation_adapter.py
-import numpy as np
-# 导入你提供的类 (假设文件名是 formation_generator.py)
-from planning_modules.formation_generator import FormationGenerator3D
-
-class AdvancedFormationManager:
-    """
-    基于 FormationGenerator3D 的高级编队管理器
-    支持分层切片生成：多集群合并成一个大队形
-    """
-    def __init__(self):
-        pass
-
-    def calculate_global_formation(self, 
-                                   formation_type, 
-                                   formation_params, 
-                                   virtual_center_pos, 
-                                   virtual_heading_vel,
-                                   my_cluster_index,
-                                   total_clusters,
-                                   my_drone_num):
-        """
-        计算当前集群（子群）的目标点列表
-        核心逻辑：先生成全局大队形的所有点，然后截取属于自己的那一段
-        """
-        # 1. 构造虚拟的全局轨迹（只需要当前时刻的一个点）
-        # 为了利用 FormationGenerator3D 的切向量计算，我们需要至少两个点
-        # P0 = current_pos, P1 = current_pos + velocity
-        p0 = np.array(virtual_center_pos)
-        vel = np.array(virtual_heading_vel)
-        if np.linalg.norm(vel) < 1e-6: vel = np.array([1.0, 0, 0]) # 防止静止
-        p1 = p0 + vel 
-        
-        dummy_traj = np.array([p0, p1])
-        
-        # 2. 计算全局所需的总无人机数量
-        # 假设所有集群的规模都和自己一样（简化假设），或者通过通信获取真实总数
-        # 这里为了演示，我们假设每个集群贡献 my_drone_num 架飞机
-        # 如果是不同规模的集群合并，需要传入更详细的列表
-        estimated_total_drones = my_drone_num * total_clusters
-        
-        # 3. 实例化你的生成器，生成全局队形
-        # 注意：这里我们只生成当前这一帧的队形
-        fg = FormationGenerator3D(
-            member_num=estimated_total_drones,
-            radius=formation_params.get('radius', 50),
-            traj=dummy_traj,
-            angle=formation_params.get('angle', 45),
-            max_offset=formation_params.get('max_offset', 30),
-            noise_scale=0, # 轨迹规划阶段不要噪声，控制执行时再加
-            formation_type=formation_type
-        )
-        
-        # 4. 获取所有成员在当前时刻(第0帧)的世界坐标
-        # paths 是一个 list，每个元素是 (N_points, 3) 的数组
-        # 我们只需要取出每个成员的第0个点
-        all_member_paths = fg.generate_members_formation_3d()
-        
-        all_positions = []
-        for member_path in all_member_paths:
-            all_positions.append(member_path[0]) # 取第0个轨迹点
-            
-        # 5. 切片分配 (Slicing)
-        # 按照 cluster_index 分配属于我的那一部分
-        # 简单的线性切分：
-        start_idx = my_cluster_index * my_drone_num
-        end_idx = start_idx + my_drone_num
-        
-        # 边界保护
-        start_idx = min(start_idx, len(all_positions))
-        end_idx = min(end_idx, len(all_positions))
-        
-        my_targets = all_positions[start_idx : end_idx]
-        
-        return my_targets

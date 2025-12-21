@@ -24,14 +24,15 @@ from matplotlib.animation import FuncAnimation
 from datetime import datetime
 from sympy import N
 
+from examples.uavs_strategy.key_path_analyzer import KeyPathAnalyzer
 from spade_bdi.bdi import BDIAgent
 from spade.behaviour import PeriodicBehaviour
 from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
 from examples.uavs_strategy.planning_modules.uav_planning_actions import PlanningLib
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
+from examples.uavs_strategy.planning_modules.formation_generator import FormationGenerator3D, Formation_Elements
 from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FormationAPFStep, APFStep, FetchWorldState ,DT
-
-
+# from examples.uavs_strategy.key_path_analyzer import KeyPathAnalyzer
 init_loc1 = [
     122.09686551225597,
     37.56536338371063,
@@ -85,7 +86,7 @@ facilities_file = os.path.join(current_dir,"data" ,"facilities.json")
 # 1. Blue UAV Agent
 # =============================
 class BlueUAVAgent(BDIAgent):
-    def __init__(self, jid, password, asl_file, task_lists, init_pos=None, facilities=None, merge_peers = None  ,**kwargs):
+    def __init__(self, jid, password, asl_file, task_lists, init_pos=None, facilities=None, merge_peers = None, **kwargs):
         super().__init__(jid, password, asl_file)
         # 读取任务列表
         self.task = task_lists[0]
@@ -114,6 +115,7 @@ class BlueUAVAgent(BDIAgent):
             self.traj = self._lnglat2utm_convertor.lng_lat_to_utm_array(np.array(_rdm_init_pos)).tolist()
             self.traj[0].append(self.position[2])  # 添加高度信息
         print(f"{self.jid} initialized at position: {self.position}, traj: {self.traj}")
+
         # Redis I/O 模块
         self.io = UavRedisIO(**kwargs.get("redis_cfg", {}))
         # Redis 初始化数据
@@ -131,6 +133,8 @@ class BlueUAVAgent(BDIAgent):
         self.planning_lib = PlanningLib(self)
         # 轨迹相关
         self.cur_reference_traj = []
+        # 从机集群参考轨迹
+        self.members_cur_reference_traj = []
         self.blue_ids = []
         self.red_ids = []
         self.height_range_set = height_range_value_set
@@ -191,6 +195,27 @@ class BlueUAVAgent(BDIAgent):
                     # 读取当前片段的轨迹规划参数，并设定参考轨迹 
                     print(f"[{self.jid}] cur order_mode:{digraph_attr['attrs']['order_mode']},order_type:{digraph_attr['attrs']['order_type']}")
                     self.planning_lib.execute_path_planning_from_digraph(digraph_attr, -1, -1)
+                    _member_num = digraph_attr['members_num']
+                    _radius = random.randint(20,30)
+                    _angle = random.randint(30,60)
+                    _max_offset = random.uniform(0.0001,0.0004)
+                    _noise_scale = random.uniform(0.000001,0.000005)
+                    _angle_noise_scale = random.uniform(1.0,5.0)
+                    _formation_type = random.choice(['circular', 'vertical', 'horizontal', 'vshape', 'arc'])
+                    # 处理集群从机队形轨迹
+                    fleet_formation_config = Formation_Elements(
+                        member_num=_member_num,
+                        radius=_radius,
+                        angle=_angle,
+                        traj=self.cur_reference_traj,
+                        max_offset=_max_offset,
+                        noise_scale=_noise_scale,
+                        angle_noise_scale=_angle_noise_scale,
+                        formation_type=_formation_type,
+                    ) 
+                    members_traj = FormationGenerator3D(formation_elements=fleet_formation_config).generate_members_formation_3d()
+                    self.members_cur_reference_traj = members_traj
+                    print(f"[{self.jid}] Generated formation trajectories for {_member_num} members: \n{json.dumps(members_traj, indent=2)}")
                     # 规划完成后，设置标志位通知 APFStep 将新轨迹写入 Redis
                     # self.bdi.set_belief("if_set_ref_traj", "true")
                     print(f"[{self.jid}] cur if_set_ref_traj flag is:{self.bdi.get_belief_value('if_set_ref_traj')[0]}")
@@ -211,21 +236,6 @@ class BlueUAVAgent(BDIAgent):
                 
             except ValueError:
                 print(f"Error: Could not find nodes {cur_start_node} or {cur_end_node} in key_path {self.key_path}")
-
-            
-            # 休眠暂时代替规划过程
-            # waiting_sec = random.uniform(1, 3)
-            # print(f"{self.jid} planning... will take {waiting_sec:.2f} seconds.")
-            # time.sleep(waiting_sec)
-            # self.bdi.set_belief("can_task_start", True)
-
-            # can_task_start_belief = self.bdi.get_belief_value("can_task_start")[0]
-            # if self.is_final_task:
-            #     self.is_finished = True
-            #     print(f"{self.jid} agent has completed its final task.")
-            # else:
-            #     # 添加新的成就目标以继续任务，替代掉原先的while循环触发asl目标的方式
-            #     self.add_achievement_goal("task_digraph")
 
             yield 
 
@@ -307,7 +317,7 @@ class MissionOrchestrator:
             注册运行bdi智能体，根据nodes查询任务列表并执行轨迹规划与位置
             依次执行每一段的任务规划，每当执行完当前阶段的规划与推理后，才更改标志位agent.is_finished=True(以及其他标志位)
             再返回到MissionOrchestrator中的run进行下一步处理
-
+            队形数据目前的方法是添加一点随机数据
         """
         agent = self.BlueBDIAgentTemplate(jid, self.password, self.asl_file, tasks, _init_pos, facilities=facilities_file, merge_peers=merge_peers)
         
@@ -410,7 +420,14 @@ class MissionOrchestrator:
 
 
 async def start_agent(server, password):
-
+    # 从key_paths解析bdi指令
+    key_paths = [
+        [0, 1, 4, 5, 2, 14],
+        [3, 4, 5, 2, 14],
+        [6, 7, 8, 9, 10, 14],
+        [11, 12, 13, 14]        
+    ]
+    bdi_instructions = KeyPathAnalyzer(key_paths).generate_bdi_instructions()
 
     orchestrator = MissionOrchestrator(
         bdi_instructions=bdi_instructions,
