@@ -2,13 +2,17 @@
 
 import numpy as np
 from time import time
+from typing import TYPE_CHECKING
 from spade.behaviour import PeriodicBehaviour
 from examples.uavs_strategy.planning_modules import avoidance_agents as a_agents
 
+if TYPE_CHECKING:
+    from examples.uavs_strategy.uav_dynamic_agents import BlueUAVAgent
+
 # ==== 势场与步进参数 ====
-DT = 0.30       # 周期（秒）
+DT = 1.0       # 周期（秒）
 STEP = 8.0     # 每步“最大位移”/速度上限（米/步）
-K_ATT = 0.95   # 引力系数 (独立飞行时)
+K_ATT = 0.7   # 引力系数 (独立飞行时)
 K_ATT_FORM = 1.5 # 引力系数 (编队飞行时，需要更强的跟随力)
 K_REP = 2.5    # 斥力系数
 CLOSE_TH = 100.0 # 到达判定阈值
@@ -25,132 +29,140 @@ def v_unit(a):
     return [a[0] / n, a[1] / n, a[2] / n]
 
 class FormationAPFStep(PeriodicBehaviour):
-    """根据 agent.formation_state 决定是执行轨迹跟随(Independent)还是编队跟随(Follower)"""
+    """
+    集群编队飞行控制 (Master-Slave 模式)
+    - 主机 (BlueUAVAgent) 负责计算自己和所有从机 (Sub-Agents) 的位置更新
+    - 统一使用主机的 lookahead 索引来同步推进
+    - 区分 队内斥力 (弱) 和 队间斥力 (强)
+    """
     async def run(self):
-        agent = self.agent
+        agent: "BlueUAVAgent" = self.agent
         io = agent.io
         
-        # 1. 获取本机实时位置
-        me = io.get_pos(agent.self_uid, blue=True)
-        if not me: return
-        self_pos = [me["x"], me["y"], me["z"]]
-        
-        # 2. 获取态势感知数据 (速度用于动态避障)
-        # 这里的 blue_ids 由 agent.FetchWorldState 更新
-        all_blue_speed = io.mget_speed_from_traj(agent.blue_ids, blue=True, dt=DT)
-        all_blue_pos = io.mget_pos(agent.blue_ids, blue=True)
-        self_vel = all_blue_speed.get(agent.self_uid, [0.0, 0.0, 0.0])
-
-        # 3. 处理参考轨迹写入 (ASL 触发的)
+        # 1. 轨迹同步 (如果 BDI 刚刚生成了新轨迹)
         if_set_ref = agent.bdi.get_belief("if_set_ref_traj")
         if if_set_ref:
             val_str = if_set_ref[len("if_set_ref_traj("):-1]
             if val_str == "true" and agent.cur_reference_traj:
                 io.set_ref_traj(agent.self_uid, agent.cur_reference_traj)
+                if agent.members_cur_reference_traj:
+                    io.set_members_ref_traj(agent.self_uid, agent.members_cur_reference_traj)
                 agent.bdi.set_belief("if_set_ref_traj", "false")
-                # print(f"[{agent.name}] Reference trajectory updated in Redis.")
+                print(f"[{agent.self_uid}] Cluster trajectories synced.")
 
-        # ==========================================
-        # 核心状态机: Independent vs Follower
-        # ==========================================
-        formation_role = agent.formation_state.get("role", "independent")
-        F_att = [0.0, 0.0, 0.0]
-        current_goal = None
+        # 2. 准备数据
+        master_traj = agent.cur_reference_traj
+        if not master_traj: return
 
-        if formation_role == "follower":
-            # --- 僚机模式 ---
-            leader_id = agent.formation_state.get("leader_id")
-            offset = agent.formation_state.get("offset", np.array([0,0,0]))
-            
-            # 从世界观缓存中获取 Leader 位置
-            leader_data = agent.world["blue_pos"].get(leader_id)
-            
-            if leader_data:
-                l_pos = np.array([leader_data["x"], leader_data["y"], leader_data["z"]])
-                # 目标点 = 领长位置 + 设定偏移量
-                formation_target = l_pos + offset
-                current_goal = formation_target.tolist()
-                
-                # 僚机引力：强力指向编队阵位
-                F_att = v_scale(v_sub(current_goal, self_pos), K_ATT_FORM)
+        slave_trajs = agent.members_cur_reference_traj or []
+        
+        # 定义集群成员 ID
+        cluster_ids = [agent.self_uid] + [f"{agent.self_uid}_sub_{i}" for i in range(len(slave_trajs))]
+        
+        # 获取环境信息
+        # 使用 agent.blue_ids (由 FetchWorldState 更新) 或直接读 Redis
+        # 为了确保获取到从机位置，最好重新 scan 或读 ids
+        all_ids = io.get_ids(blue=True)
+        all_pos_map = io.mget_pos(all_ids, blue=True)
+        
+        # 获取进度
+        lookahead = io.get_lookahead(agent.self_uid) or 0
+        max_idx = len(master_traj) - 1
+        lookahead = max(0, min(lookahead, max_idx))
+
+        # 3. 物理计算循环
+        next_positions = {}
+        master_reached = False
+        
+        # 斥力参数
+        K_REP_INTRA = 0.000008   # 队内弱斥力
+        K_REP_INTER = 0.00001   # 队间强斥力
+        DIST_SAFE_INTRA = 8.0
+        DIST_SAFE_INTER = 20.0
+
+        for i, uid in enumerate(cluster_ids):
+            # --- A. 当前位置 ---
+            pos_data = all_pos_map.get(uid)
+            if pos_data:
+                curr = [pos_data['x'], pos_data['y'], pos_data['z']]
             else:
-                # 丢失 Leader 信号，悬停或维持惯性
-                F_att = [0, 0, 0]
+                # 初始化位置 fallback
+                if uid == agent.self_uid: curr = master_traj[0]
+                elif (i-1) < len(slave_trajs): curr = slave_trajs[i-1][0]
+                else: continue
 
-        else:
-            # --- 独立/领长模式 ---
-            traj = agent.cur_reference_traj
-            if traj:
-                lookahead = io.get_lookahead(agent.self_uid)
-                if lookahead is None: lookahead = 0
-                # 防止索引越界
-                lookahead = max(0, min(lookahead, len(traj) - 1))
-                
-                current_goal = traj[lookahead]
-                
-                # 独立引力：指向轨迹上的预瞄点
-                F_att = v_scale(v_sub(current_goal, self_pos), K_ATT)
-                
-                # 到达终点检测 (可选)
-                dist_to_end = io.get_dist_2d(agent.self_uid)
-                if dist_to_end is not None and dist_to_end <= 50:
-                    io.set_lookahead(agent.self_uid, 0)
-                    agent.bdi.set_belief("can_task_start", "true")
-
-        # ==========================================
-        # 通用逻辑: 避障与位置更新
-        # ==========================================
-        
-        # 1. 构建障碍物列表 (排除自己)
-        obstacle_positions = []
-        obstacle_vels = []
-        for uid, pos in all_blue_pos.items():
-            if uid == agent.self_uid: continue
+            # --- B. 目标引力 ---
+            if uid == agent.self_uid:
+                target = master_traj[lookahead]
+            else:
+                # 从机使用对应的轨迹，但索引与主机同步
+                s_traj = slave_trajs[i-1]
+                s_idx = min(lookahead, len(s_traj)-1)
+                target = s_traj[s_idx]
             
-            # 策略：僚机不避让自己的 Leader (防止为了避障而掉队)，信任编队保持力
-            if formation_role == "follower" and uid == agent.formation_state.get("leader_id"):
-                continue
+            F_att = v_scale(v_sub(target, curr), K_ATT)
 
-            obstacle_positions.append([pos["x"], pos["y"], pos["z"]])
-            vel = all_blue_speed.get(uid, [0.0, 0.0, 0.0])
-            obstacle_vels.append(vel)
+            # --- C. 群体斥力 ---
+            F_rep = [0.0, 0.0, 0.0]
+            for other_uid, other_data in all_pos_map.items():
+                if other_uid == uid: continue
+                if not other_data: continue
+                
+                other_pos = [other_data['x'], other_data['y'], other_data['z']]
+                dist = v_norm(v_sub(curr, other_pos))
+                
+                # 区分队内/队间
+                is_teammate = (other_uid in cluster_ids)
+                
+                k_r = K_REP_INTRA if is_teammate else K_REP_INTER
+                d_safe = DIST_SAFE_INTRA if is_teammate else DIST_SAFE_INTER
+                
+                if dist < d_safe:
+                    # 简易斥力模型
+                    rep_mag = k_r * (1.0/dist - 1.0/d_safe) * 100.0
+                    rep_dir = v_unit(v_sub(curr, other_pos))
+                    F_rep = v_add(F_rep, v_scale(rep_dir, rep_mag))
 
-        # 2. 计算人工势场斥力
-        if not obstacle_positions:
-            F_rep = np.zeros(3)
-        else:
-            F_rep = a_agents.compute_dynamic_repulsive_force(
-                agent_pos=self_pos,
-                agent_vel=self_vel,
-                obstacle_positions=obstacle_positions,
-                obstacle_vels=obstacle_vels,
-                target_pos=current_goal if current_goal else None
-            )
+            # --- D. 合成与移动 ---
+            F_total = v_add(F_att, F_rep)
+            # if v_norm(F_total) > STEP:
+            #     F_total = v_scale(v_unit(F_total), STEP)
+            
+            nxt = v_add(curr, F_total)
+            next_positions[uid] = nxt
+            
+            # 判定主机是否到达
+            if uid == agent.self_uid:
+                if v_norm(v_sub(target, nxt)) <= CLOSE_TH:
+                    master_reached = True
 
-        # 3. 合成最终力矢量
-        F_total = v_add(F_att, F_rep)
+        # 4. 状态更新
+        # 推进 Lookahead
+        if master_reached and lookahead < max_idx:
+            io.set_lookahead(agent.self_uid, lookahead + 1)
+            
+        # 检查终点
+        dist_end = io.get_dist_2d(agent.self_uid)
+        if dist_end is not None and dist_end <= 50:
+            io.set_lookahead(agent.self_uid, 0)
+            agent.bdi.set_belief("can_task_start", True)
+            if agent.is_final_task:
+                agent.is_finished = True
+            else:
+                if hasattr(agent, "add_achievement_goal"):
+                    agent.add_achievement_goal("task_digraph")
+            print(f"[{agent.self_uid}] Segment completed.")
+            return
 
-        # 4. 限制最大速度 (步长)
-        move_vec = F_total
-        if v_norm(move_vec) > STEP:
-            move_vec = v_scale(v_unit(move_vec), STEP)
-        
-        nxt = v_add(self_pos, move_vec)
-
-        # 5. 更新预瞄点 (仅独立模式需要更新进度)
-        if formation_role != "follower" and current_goal:
-             if v_norm(v_sub(current_goal, nxt)) <= CLOSE_TH:
-                 if lookahead < len(traj) - 1:
-                     io.set_lookahead(agent.self_uid, lookahead + 1)
-
-        # 6. 写入 Redis
-        io.set_pos(agent.self_uid, nxt[0], nxt[1], nxt[2])
-        io.append_traj_points(agent.self_uid, nxt)
+        # 写入 Redis
+        for uid, pos in next_positions.items():
+            io.set_pos(uid, pos[0], pos[1], pos[2])
+            io.append_traj_points(uid, pos)
 
 # 单机APF步进控制行为
 class APFStep(PeriodicBehaviour):
     async def run(self):
-        agent = self.agent
+        agent: "BlueUAVAgent" = self.agent
         io = agent.io
         current_time = time()  # 获取当前时间
         
@@ -177,6 +189,10 @@ class APFStep(PeriodicBehaviour):
         lookahead = io.get_lookahead(agent.self_uid)
         lookahead = max(1, min(lookahead, len(traj) - 1))
         goal = traj[lookahead]  # 当前目标点（预瞄点）
+
+        # 查询蓝红方 ID
+        agent.blue_ids = io.get_ids(blue=True) or io.scan_ids_by_key("uav")
+        agent.red_ids = io.get_ids(blue=False) or io.scan_ids_by_key("red")
 
         # 获取无人机的位置及速度
         all_blue_speed = io.mget_speed_from_traj(agent.blue_ids, blue=True, dt=DT)
@@ -254,7 +270,7 @@ class APFStep(PeriodicBehaviour):
 # 世界状态查询行为
 class FetchWorldState(PeriodicBehaviour):
     async def run(self):
-        agent = self.agent  # BlueUAVAgent 实例
+        agent: "BlueUAVAgent" = self.agent
         io = agent.io
 
         # 查询蓝红方 ID

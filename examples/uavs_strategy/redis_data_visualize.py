@@ -5,7 +5,7 @@ import json
 import numpy as np
 import os.path as osp
 import os
-
+from matplotlib.widgets import RectangleSelector
 from matplotlib.animation import FuncAnimation
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
 from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import DT
@@ -30,6 +30,14 @@ class MapVisualizer:
 
         # 加载设施信息
         self.facilities = self._default_facilities(facilities_file)
+        self.custom_xlim = None
+        self.custom_ylim = None
+        self.is_zoomed = False
+        self.zoom_selector = None
+        self.zoom_margin = 200
+        self._fig = None
+        self._ax = None
+
 
     def _default_facilities(self, default_json_path=None):
         """
@@ -175,6 +183,7 @@ class MapVisualizer:
 
     def update_plot(self, frame, ax, blue=True):
         ax.clear()  # 清除上一帧
+        self._restore_zoom_artists(ax)
         
         # 设置标题和坐标轴
         ax.set_title(f"{'Blue' if blue else 'Red'} UAVs - Real-time Monitor")
@@ -234,10 +243,13 @@ class MapVisualizer:
         ax.set_ylabel('Y Coordinate')
         ax.legend(loc='best')
 
-        # 如果你有 compute_static_range，可以继续用
-        # xmin, xmax, ymin, ymax = self.compute_static_range(positions)
-        # ax.set_xlim(xmin, xmax)
-        # ax.set_ylim(ymin, ymax)
+        if self.is_zoomed and self.custom_xlim and self.custom_ylim:
+            ax.set_xlim(*self.custom_xlim)
+            ax.set_ylim(*self.custom_ylim)
+        else:
+            xmin, xmax, ymin, ymax = self.compute_static_range(positions)
+            ax.set_xlim(xmin, xmax)
+            ax.set_ylim(ymin, ymax)
 
         return ax
 
@@ -249,6 +261,59 @@ class MapVisualizer:
             return
 
         print(f"Clicked coordinates: ({event.xdata:.13f}, {event.ydata:.13f})")
+
+    def init_interaction(self, fig, ax):
+        """初始化框选放大与视角重置的交互。"""
+        self._fig = fig
+        self._ax = ax
+        if self.zoom_selector is None:
+            self.zoom_selector = RectangleSelector(
+                ax,
+                self.on_select,
+                useblit=True,
+                button=[1],
+                interactive=True,
+                drag_from_anywhere=True,
+            )
+        fig.canvas.mpl_connect('key_press_event', self.on_key_press)
+
+    def on_select(self, eclick, erelease):
+        if eclick.xdata is None or erelease.xdata is None:
+            return
+        xmin, xmax = sorted([eclick.xdata, erelease.xdata])
+        ymin, ymax = sorted([eclick.ydata, erelease.ydata])
+        if abs(xmax - xmin) < 1e-6 or abs(ymax - ymin) < 1e-6:
+            return
+        pad = self.zoom_margin
+        self.custom_xlim = (xmin - pad, xmax + pad)
+        self.custom_ylim = (ymin - pad, ymax + pad)
+        self.is_zoomed = True
+        if self._ax is not None:
+            self._ax.set_xlim(*self.custom_xlim)
+            self._ax.set_ylim(*self.custom_ylim)
+            if self._fig is not None:
+                self._fig.canvas.draw_idle()
+
+    def on_key_press(self, event):
+        if event.key in ('r', 'escape'):
+            self.is_zoomed = False
+            self.custom_xlim = None
+            self.custom_ylim = None
+            if self._fig is not None:
+                self._fig.canvas.draw_idle()
+
+    def _restore_zoom_artists(self, ax):
+        if not self.zoom_selector:
+            return
+        selection_artist = getattr(self.zoom_selector, "_selection_artist", None)
+        if selection_artist is not None and selection_artist not in ax.patches:
+            ax.add_patch(selection_artist)
+            selection_artist.set_visible(False)
+        handles = getattr(self.zoom_selector, "_handles_artists", None)
+        if handles:
+            for artist in handles:
+                if artist not in ax.get_children():
+                    ax.add_artist(artist)
 
     def compute_static_range(self, positions = None , buffer = 3000):
         """
@@ -273,10 +338,11 @@ class MapVisualizer:
             xs.extend(poly[:, 0])
             ys.extend(poly[:, 1])
 
-        # # ③ 加入 UAV 位置
-        # for uid, pos in positions.items():
-        #     xs.append(pos["x"])
-        #     ys.append(pos["y"])
+        # ③ 加入 UAV 位置
+        if positions:
+            for _uid, pos in positions.items():
+                xs.append(pos["x"])
+                ys.append(pos["y"])
 
         # ④ 计算范围 + buffer
         xmin, xmax = min(xs), max(xs)
@@ -289,7 +355,7 @@ class MapVisualizer:
 
 # 运行可视化，并实现动态更新
 if __name__ == "__main__":
-    # 运行：python -m examples.uavs_strategy.redis_data_visualize
+	    # 运行：python -m examples.uavs_strategy.redis_data_visualize
     current_dir = os.path.dirname(__file__)
     facilities_file_name = 'facilities.json'
     # facilities_file_name = 'test_facilities_locations.json'
@@ -299,12 +365,10 @@ if __name__ == "__main__":
     # 创建绘图和轴
     fig, ax = plt.subplots()
     fig.canvas.mpl_connect('button_press_event', visualizer.handle_click)
+    visualizer.init_interaction(fig, ax)
 
     # 使用FuncAnimation动态更新图像，每秒更新一次
     ani = FuncAnimation(fig, visualizer.update_plot, fargs=(ax, True), interval=DT*1000, cache_frame_data=False)  # 每秒更新一次
     plt.show()
-
-
-
 
 

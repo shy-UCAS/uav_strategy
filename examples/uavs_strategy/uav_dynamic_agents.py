@@ -24,7 +24,7 @@ from matplotlib.animation import FuncAnimation
 from datetime import datetime
 from sympy import N
 
-from examples.uavs_strategy.key_path_analyzer import KeyPathAnalyzer
+
 from spade_bdi.bdi import BDIAgent
 from spade.behaviour import PeriodicBehaviour
 from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
@@ -32,7 +32,8 @@ from examples.uavs_strategy.planning_modules.uav_planning_actions import Plannin
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
 from examples.uavs_strategy.planning_modules.formation_generator import FormationGenerator3D, Formation_Elements
 from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FormationAPFStep, APFStep, FetchWorldState ,DT
-# from examples.uavs_strategy.key_path_analyzer import KeyPathAnalyzer
+from examples.uavs_strategy.key_path_analyzer import KeyPathAnalyzer
+
 init_loc1 = [
     122.09686551225597,
     37.56536338371063,
@@ -174,7 +175,8 @@ class BlueUAVAgent(BDIAgent):
     
     async def setup(self):
         # 注册周期任务
-        self.add_behaviour(self.APFStep(period=DT))
+        # self.add_behaviour(self.APFStep(period=DT))
+        self.add_behaviour(FormationAPFStep(period=DT))
     
     def add_custom_actions(self, actions):
         @actions.add(".act_digraph_path_planning", 2)
@@ -198,8 +200,8 @@ class BlueUAVAgent(BDIAgent):
                     _member_num = digraph_attr['members_num']
                     _radius = random.randint(20,30)
                     _angle = random.randint(30,60)
-                    _max_offset = random.uniform(0.0001,0.0004)
-                    _noise_scale = random.uniform(0.000001,0.000005)
+                    _max_offset = random.uniform(30,50)
+                    _noise_scale = random.uniform(0.00001,0.00005)
                     _angle_noise_scale = random.uniform(1.0,5.0)
                     _formation_type = random.choice(['circular', 'vertical', 'horizontal', 'vshape', 'arc'])
                     # 处理集群从机队形轨迹
@@ -215,7 +217,7 @@ class BlueUAVAgent(BDIAgent):
                     ) 
                     members_traj = FormationGenerator3D(formation_elements=fleet_formation_config).generate_members_formation_3d()
                     self.members_cur_reference_traj = members_traj
-                    print(f"[{self.jid}] Generated formation trajectories for {_member_num} members: \n{json.dumps(members_traj, indent=2)}")
+                    print(f"[{self.jid}] Generated {_formation_type} formation trajectories for {_member_num} members")
                     # 规划完成后，设置标志位通知 APFStep 将新轨迹写入 Redis
                     # self.bdi.set_belief("if_set_ref_traj", "true")
                     print(f"[{self.jid}] cur if_set_ref_traj flag is:{self.bdi.get_belief_value('if_set_ref_traj')[0]}")

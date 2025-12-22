@@ -73,6 +73,15 @@
   - 轨迹：set_traj（覆盖）/ append_traj_points / get_traj / mget_traj / clear_traj.参考轨迹：set_ref_traj / get_ref_traj.
   - 预瞄索引：set_lookahead / get_lookahead.
   - 辅助：mget_speed_from_traj（用前两帧算速度）、get_dist_2d（当前位置到参考终点的平面距离）、get_rendezvous_point（一组 ID 的质心）、filter_stale（过滤超时位置）。
+- BlueUAVAgent与Redis的交互：
+  - |数据|Redis Key 模式|读/写|作用|
+    |:---:|:---:|:---:|:---:|
+    |Position|`uav:{id}:pos`|读+写|当前实时坐标 (x, y, z, ts)|
+    |Trajectory|`uav:{id}:traj`|读+写|历史飞行轨迹 (用于显示和算速)|
+    |Lookahead|`uav:{id}:lookahead`|读+写|当前在参考轨迹上的进度索引|
+    |Ref Trajectory|`uav:{id}:ref_traj`|写|当前任务的规划路径|
+    |IDs|`uav:ids`|读+写|在线agent列表|
+
 
 ## 4. 数据配置：
 - `data/digraph_with_attrs02.json`（有向图及规划属性）、`data/key-path-analyzer02.json`（任务段、合并/分裂规则）、`data/facilities.json`（设施信息）
