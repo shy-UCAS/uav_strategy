@@ -430,7 +430,7 @@ async def start_agent(server, password):
         [11, 12, 13, 14]        
     ]
     bdi_instructions = KeyPathAnalyzer(key_paths).generate_bdi_instructions()
-
+    print(f"BDI instructions: {json.dumps(bdi_instructions, indent=2)}")
     orchestrator = MissionOrchestrator(
         bdi_instructions=bdi_instructions,
         server=server,
