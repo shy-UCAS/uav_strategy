@@ -1,0 +1,408 @@
+[System] Redis database flushed successfully.
+BDI instructions: {
+  "agent_1": [
+    {
+      "segment_id": "seg_0",
+      "path": [
+        "1_0",
+        "1_1",
+        "1_2",
+        "3_0"
+      ],
+      "action_at_end": "merge_and_terminate",
+      "next_segment_hint": "seg_1",
+      "role_in_merge": "initiator"
+    }
+  ],
+  "agent_2": [
+    {
+      "segment_id": "seg_5",
+      "path": [
+        "2_0",
+        "2_1",
+        "2_2",
+        "3_0"
+      ],
+      "action_at_end": "merge_and_terminate",
+      "next_segment_hint": "seg_1",
+      "role_in_merge": "participant"
+    }
+  ],
+  "agent_merged_at_3_0": [
+    {
+      "segment_id": "seg_1",
+      "path": [
+        "3_0",
+        "3_1"
+      ],
+      "action_at_end": "split_and_terminate",
+      "branches": [
+        {
+          "new_agent_hint": "agent_merged_at_3_0_sub_seg_2",
+          "segment_id": "seg_2",
+          "path": [
+            "3_1",
+            "4_1",
+            "4_2"
+          ]
+        },
+        {
+          "new_agent_hint": "agent_merged_at_3_0_sub_seg_3",
+          "segment_id": "seg_3",
+          "path": [
+            "3_1",
+            "5_1",
+            "5_2"
+          ]
+        },
+        {
+          "new_agent_hint": "agent_merged_at_3_0_sub_seg_4",
+          "segment_id": "seg_4",
+          "path": [
+            "3_1",
+            "6_1",
+            "6_2"
+          ]
+        }
+      ]
+    }
+  ],
+  "agent_merged_at_3_0_sub_seg_2": [
+    {
+      "segment_id": "seg_2",
+      "path": [
+        "3_1",
+        "4_1",
+        "4_2"
+      ],
+      "action_at_end": "finish"
+    }
+  ],
+  "agent_merged_at_3_0_sub_seg_3": [
+    {
+      "segment_id": "seg_3",
+      "path": [
+        "3_1",
+        "5_1",
+        "5_2"
+      ],
+      "action_at_end": "finish"
+    }
+  ],
+  "agent_merged_at_3_0_sub_seg_4": [
+    {
+      "segment_id": "seg_4",
+      "path": [
+        "3_1",
+        "6_1",
+        "6_2"
+      ],
+      "action_at_end": "finish"
+    }
+  ]
+}
+Mission Orchestrator Started.
+Spawning agent: agent_1@127.0.0.1 with path len 4
+agent_1@127.0.0.1 initialized at position: [122.10258217246229, 37.56342057758475, 200.0], traj: [[420743.4687200667, 4157755.8427242595, 200.0]]
+Spawning agent: agent_2@127.0.0.1 with path len 4
+agent_2@127.0.0.1 initialized at position: [122.09686551225597, 37.56536338371063, 200.0], traj: [[420240.6557623435, 4157976.2288220283, 200.0]]
+agent_1@127.0.0.1 Mission Start:  1_0  ->  1_1
+agent_1@127.0.0.1 Planning segment:  1_0  ->  1_1
+[agent_1@127.0.0.1] is act_digraph_path_planning from 1_0 to 1_1
+[agent_1@127.0.0.1] cur order_mode:independent,order_type:breakthrough
+[agent_1@127.0.0.1] Default 2d traj: [[420743.4687200667, 4157755.8427242595, 200.0], [427579.30925537116, 4150826.3327355217]]
+[agent_1@127.0.0.1] Insert end height: -1 (rand: 44)
+agent_1 is breaking through headquarter, trajectory:
+[[420743.4687200667, 4157755.8427242595, 200.0], [421225.2530163425, 4157254.558316244, 147.3083668763282], [421695.9263476208, 4156742.7123618945, 112.41422222214119], [422158.38973552675, 4156223.3225734197, 89.30616390310006], [422615.6486263265, 4155699.2977934782, 74.00324232218281], [423070.7824555932, 4155173.4668951295, 63.86914080320153], [423526.9154900941, 4154648.608898281, 57.15800312573438], [423987.1885352138, 4154127.483882048, 52.71366547611052], [424454.7310801032, 4153612.8642896214, 49.770477883612955], [424932.6334440144, 4153107.5662318254, 47.82140157853863], [425423.91848571616, 4152614.4803973064, 46.530658693958], [425931.5124434202, 4152136.602171181, 45.675886005090916], [426458.2144853911, 4151677.0605500713, 45.109827219595104], [427006.66457165265, 4151239.1454200535, 44.73496434340555], [427579.30925537116, 4150826.3327355217, 44.0]]
+[agent_1@127.0.0.1] Generated circular formation trajectories for 5 members
+[agent_1@127.0.0.1] Initialized Redis for new sub-agent: agent_1_sub_0
+[agent_1@127.0.0.1] Initialized Redis for new sub-agent: agent_1_sub_1
+[agent_1@127.0.0.1] Initialized Redis for new sub-agent: agent_1_sub_2
+[agent_1@127.0.0.1] Initialized Redis for new sub-agent: agent_1_sub_3
+[agent_1@127.0.0.1] Initialized Redis for new sub-agent: agent_1_sub_4
+[agent_1@127.0.0.1] cur if_set_ref_traj flag is:true
+agent_2@127.0.0.1 Mission Start:  2_0  ->  2_1
+agent_2@127.0.0.1 Planning segment:  2_0  ->  2_1
+[agent_2@127.0.0.1] is act_digraph_path_planning from 2_0 to 2_1
+[agent_2@127.0.0.1] cur order_mode:independent,order_type:detour
+[agent_2@127.0.0.1] Default 2d traj: [[420240.6557623435, 4157976.2288220283, 200.0], [427232.5463100972, 4151269.7183398656], [427184.2066414109, 4151205.389923809], [427146.81196235336, 4151134.140315675], [427121.3307754698, 4151057.814842889], [427108.42303011566, 4150978.3902951037]]
+[agent_2@127.0.0.1] Insert end height: -1 (rand: 250)
+agent_2 is detouring antiair_facilities, trajectory:
+[[420240.6557623435, 4157976.2288220283, 200.0], [424107.4046464633, 4154289.0640776763, 203.57142857142858], [426343.8318210228, 4152139.7517019217, 207.14285714285714], [427356.789042436, 4151144.605434582, 210.71428571428572], [427553.12806711666, 4150919.9390154746, 214.28571428571428], [427339.7006514786, 4151082.0661844164, 217.85714285714286], [427117.8774016419, 4151252.471461182, 221.42857142857142], [427075.94920606056, 4151253.653436386, 225.0], [427125.4088633584, 4151169.2350884834, 228.57142857142856], [427163.8742514645, 4151095.9282560847, 232.14285714285714], [427158.1514136693, 4151065.168519644, 235.7142857142857], [427128.30757996463, 4151058.1416668296, 239.28571428571428], [427095.7800430227, 4151054.740886137, 242.85714285714286], [427082.0060955157, 4151034.8593660626, 246.42857142857142], [427108.42303011566, 4150978.3902951037, 250.0]]
+[agent_2@127.0.0.1] Generated horizontal formation trajectories for 7 members
+[agent_2@127.0.0.1] Initialized Redis for new sub-agent: agent_2_sub_0
+[agent_2@127.0.0.1] Initialized Redis for new sub-agent: agent_2_sub_1
+[agent_2@127.0.0.1] Initialized Redis for new sub-agent: agent_2_sub_2
+[agent_2@127.0.0.1] Initialized Redis for new sub-agent: agent_2_sub_3
+[agent_2@127.0.0.1] Initialized Redis for new sub-agent: agent_2_sub_4
+[agent_2@127.0.0.1] Initialized Redis for new sub-agent: agent_2_sub_5
+[agent_2@127.0.0.1] Initialized Redis for new sub-agent: agent_2_sub_6
+[agent_2@127.0.0.1] cur if_set_ref_traj flag is:true
+[agent_1] Cluster trajectories synced.
+[agent_2] Cluster trajectories synced.
+[agent_2] Segment completed.
+agent_2@127.0.0.1 Planning segment:  2_1  ->  2_2
+[agent_2@127.0.0.1] is act_digraph_path_planning from 2_1 to 2_2
+[agent_2@127.0.0.1] cur order_mode:independent,order_type:detour
+[agent_2@127.0.0.1] Default 2d traj: [[427108.42303011566, 4150978.3902951037, 250.0], [427108.42303011566, 4150978.3902951037], [427108.42303011566, 4150897.923726387], [427121.3307754698, 4150818.4991786014], [427146.81196235336, 4150742.1737058153], [427184.2066414109, 4150670.9240976814]]
+[agent_2@127.0.0.1] Insert end height: -1 (rand: 223)
+agent_2 is detouring antiair_facilities, trajectory:
+[[427108.42303011566, 4150978.3902951037, 250.0], [427109.455091126, 4150994.0830970197, 248.07142857142858], [427109.14098560106, 4150991.0919995573, 246.14285714285714], [427108.2285838384, 4150974.0949507346, 244.2142857142857], [427107.4657561351, 4150947.7698985673, 242.28571428571428], [427107.6003727887, 4150916.7947910693, 240.35714285714283], [427109.3700723079, 4150885.785821957, 238.42857142857142], [427113.1147324286, 4150856.9584864983, 236.5], [427118.657525574, 4150829.409687771, 234.5714285714286], [427125.7949238931, 4150802.0798158315, 232.64285714285717], [427134.44058963936, 4150774.6859544483, 230.71428571428575], [427144.5983982405, 4150747.543087745, 228.78571428571428], [427156.2745457202, 4150720.981579918, 226.85714285714286], [427169.47522810235, 4150695.331795165, 224.92857142857142], [427184.20664141094, 4150670.9240976814, 223.0]]
+[agent_2@127.0.0.1] Generated horizontal formation trajectories for 7 members
+[agent_2@127.0.0.1] cur if_set_ref_traj flag is:true
+[agent_2] Cluster trajectories synced.
+[agent_1] Segment completed.
+agent_1@127.0.0.1 Planning segment:  1_1  ->  1_2
+[agent_1@127.0.0.1] is act_digraph_path_planning from 1_1 to 1_2
+[agent_1@127.0.0.1] cur order_mode:independent,order_type:detour
+[agent_1@127.0.0.1] Default 2d traj: [[427579.30925537116, 4150826.3327355217, 44.0], [427506.78883729473, 4150448.261684724], [427586.6687141281, 4150438.5625116597], [427667.07002431044, 4150441.8025736962], [427745.910416141, 4150457.8979549296], [427821.1479648843, 4150486.43179344]]
+[agent_1@127.0.0.1] Insert end height: -1 (rand: 348)
+agent_1 is detouring antiair_facilities, trajectory:
+[[427579.30925537116, 4150826.3327355217, 44.0], [427523.85539940384, 4150620.717293674, 65.71428571428571], [427503.56919331156, 4150499.0043371003, 87.42857142857142], [427509.7123944559, 4150440.684823368, 109.14285714285715], [427533.54676019895, 4150425.2497100434, 130.8571428571429], [427566.33404790243, 4150432.189954694, 152.57142857142858], [427599.4524669423, 4150441.2728468296, 174.28571428571428], [427628.80729874223, 4150443.008080293, 196.0], [427656.18465143704, 4150441.8601121088, 217.7142857142857], [427683.66550176917, 4150442.992045515, 239.4285714285714], [427711.8621078218, 4150448.066038021, 261.14285714285717], [427740.25610514625, 4150456.0492121745, 282.8571428571429], [427768.30004575587, 4150465.8393648677, 304.5714285714286], [427795.44648166414, 4150476.334292993, 326.28571428571433], [427821.1479648843, 4150486.43179344, 348.0]]
+[agent_1@127.0.0.1] Generated arc formation trajectories for 5 members
+[agent_1@127.0.0.1] cur if_set_ref_traj flag is:true
+[agent_1] Cluster trajectories synced.
+[agent_2] Segment completed.
+agent_2@127.0.0.1 Planning segment:  2_2  ->  3_0
+[agent_2@127.0.0.1] is act_digraph_path_planning from 2_2 to 3_0
+[agent_2@127.0.0.1] cur order_mode:aggregate,order_type:breakthrough
+[agent_2] is act aggregating to rendezvous point, merge_peers: ['agent_1', 'agent_2']
+[agent_2@127.0.0.1] Default 2d traj: [[427184.20664141094, 4150670.9240976814, 223.0], [427404.09543374984, 4150574.1720583513, 217.08339163981628]]
+agent_2 is breaking through aggregate_point, trajectory:
+[[427184.20664141094, 4150670.9240976814, 223.0], [427199.59428620816, 4150663.330049905, 221.18764811324903], [427214.39614962146, 4150654.602630525, 219.93044863163507], [427228.72538474214, 4150645.076001842, 219.05834948349235], [427242.73307793983, 4150635.065444447, 218.45338826984715], [427256.5968269105, 4150624.8709719004, 218.03373636353072], [427270.5100808209, 4150614.782432127, 217.7426305562445], [427284.6720459248, 4150605.0855677496, 217.54069511937348], [427299.2778939575, 4150596.0685436083, 217.40061574052348], [427314.5089753102, 4150588.0284712757, 217.30344491858628], [427330.52273273317, 4150581.2774645956, 217.23603907546027], [427347.44203362527, 4150576.14774627, 217.189280721492], [427365.34369067394, 4150572.9952947414, 217.15684520011243], [427384.24602377485, 4150572.2014765893, 217.13434519833993], [427404.09543374984, 4150574.1720583513, 217.08339163981628]]
+[agent_2@127.0.0.1] Generated arc formation trajectories for 7 members
+[agent_2@127.0.0.1] cur if_set_ref_traj flag is:true
+agent_2@127.0.0.1 Reached end of path.
+[agent_2] Cluster trajectories synced.
+[agent_1] Segment completed.
+agent_1@127.0.0.1 Planning segment:  1_2  ->  3_0
+[agent_1@127.0.0.1] is act_digraph_path_planning from 1_2 to 3_0
+[agent_1@127.0.0.1] cur order_mode:aggregate,order_type:breakthrough
+[agent_1] is act aggregating to rendezvous point, merge_peers: ['agent_1', 'agent_2']
+[agent_1@127.0.0.1] Default 2d traj: [[427821.1479648843, 4150486.43179344, 348.0], [427510.17763264355, 4150555.677464233, 267.87415086725036]]
+agent_1 is breaking through aggregate_point, trajectory:
+[[427821.1479648843, 4150486.43179344, 348.0], [427799.0608464282, 4150491.909351237, 333.02432000547606], [427777.2052134802, 4150498.2813657313, 320.8476242803958], [427755.5381450348, 4150505.2984706596, 310.9467771178359], [427734.00047408673, 4150512.715360653, 302.8964179112355], [427712.5214050464, 4150520.2900498263, 296.35068679437035], [427691.0230414633, 4150527.78278115, 291.0283657954306], [427669.4248464787, 4150534.954705097, 286.7007971388492], [427647.64806698955, 4150541.5664437204, 283.1820596404615], [427625.6201571761, 4150547.3766549355, 280.3209811538776], [427603.27923789044, 4150552.140711473, 277.99464390645755], [427580.57862543623, 4150555.6096099117, 276.1031037008633], [427557.4914564599, 4150557.5292271855, 274.56509610830665], [427534.01542495535, 4150557.640044798, 273.3145451827878], [427510.17763264355, 4150555.677464233, 267.87415086725036]]
+[agent_1@127.0.0.1] Generated horizontal formation trajectories for 5 members
+[agent_1@127.0.0.1] cur if_set_ref_traj flag is:true
+agent_1@127.0.0.1 Reached end of path.
+[agent_1] Cluster trajectories synced.
+[agent_2] Segment completed.
+Agent agent_2 ready to merge into seg_1. Waiting for others...
+[agent_2] Segment completed.
+[agent_2] Segment completed.
+[agent_2] Segment completed.
+[agent_2] Segment completed.
+[agent_2] Segment completed.
+[agent_2] Segment completed.
+[agent_1] Segment completed.
+[agent_2] Segment completed.
+[agent_1] Segment completed.
+[agent_2] Segment completed.
+[agent_1] Segment completed.
+[agent_2] Segment completed.
+[agent_1] Segment completed.
+[agent_2] Segment completed.
+[agent_1] Segment completed.
+[agent_2] Segment completed.
+Agent agent_1 ready to merge into seg_1. Waiting for others...
+Merge condition met for seg_1 (2/2). Merging...
+Spawning agent: agent_merged_at_3_0@127.0.0.1 with path len 2
+agent_merged_at_3_0@127.0.0.1 initialized at position: [122.17990462538596, 37.49908522710536, 267.87415086725036], traj: [[427510.17763264256, 4150555.6774642337, 267.87415086725036]]
+agent_merged_at_3_0@127.0.0.1 Mission Start:  3_0  ->  3_1
+agent_merged_at_3_0@127.0.0.1 Planning segment:  3_0  ->  3_1
+[agent_merged_at_3_0@127.0.0.1] is act_digraph_path_planning from 3_0 to 3_1
+[agent_merged_at_3_0@127.0.0.1] cur order_mode:aggregate,order_type:breakthrough
+[agent_merged_at_3_0@127.0.0.1] Default 2d traj: [[427510.17763264256, 4150555.6774642337, 267.87415086725036], [428184.39223929326, 4150775.5956324]]
+[agent_merged_at_3_0@127.0.0.1] Insert end height: -1 (rand: 98)
+agent_merged_at_3_0 is breaking through antiair, trajectory:
+[[427510.17763264256, 4150555.6774642337, 267.87415086725036], [427557.8241743133, 4150572.8755184673, 267.4664446875335], [427604.53285620024, 4150592.56859864, 267.2257123066879], [427650.4865417523, 4150614.0478681033, 266.8428381529905], [427695.92694731825, 4150636.62589312, 266.233893826288], [427741.13758518844, 4150659.632504444, 265.2653949358766], [427786.4273175953, 4150682.409021698, 263.72504049032744], [427832.11436322035, 4150704.3014045414, 261.27517519733254], [427878.51054591284, 4150724.652874186, 257.37877331972356], [427925.9055472252, 4150742.7965366123, 251.18171928771375], [427974.55091933184, 4150758.04853645, 241.32558024406478], [428024.6436327115, 4150769.702278422, 225.64982909747744], [428076.3089739888, 4150777.024270673, 200.7182435220817], [428129.58267436223, 4150779.252169271, 161.06566461273846], [428184.39223929326, 4150775.5956324, 98.0]]
+[agent_merged_at_3_0@127.0.0.1] Generated arc formation trajectories for 13 members
+[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_0
+[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_1
+[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_2
+[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_3
+[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_4
+[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_5
+[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_6
+[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_7
+[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_8
+[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_9
+[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_10
+[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_11
+[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_12
+[agent_merged_at_3_0@127.0.0.1] cur if_set_ref_traj flag is:true
+agent_merged_at_3_0@127.0.0.1 Reached end of path.
+[agent_merged_at_3_0] Cluster trajectories synced.
+[agent_merged_at_3_0] Segment completed.
+[agent_merged_at_3_0] Segment completed.
+[agent_merged_at_3_0] Segment completed.
+[agent_merged_at_3_0] Segment completed.
+Agent agent_merged_at_3_0 splitting.
+Spawning agent: agent_merged_at_3_0_sub_seg_2@127.0.0.1 with path len 3
+agent_merged_at_3_0_sub_seg_2@127.0.0.1 initialized at position: [122.18751, 37.50112000000001, 98.0], traj: [[428184.39223929326, 4150775.5956324, 98.0]]
+Spawning agent: agent_merged_at_3_0_sub_seg_3@127.0.0.1 with path len 3
+agent_merged_at_3_0_sub_seg_3@127.0.0.1 initialized at position: [122.18751, 37.50112000000001, 98.0], traj: [[428184.39223929326, 4150775.5956324, 98.0]]
+agent_merged_at_3_0_sub_seg_2@127.0.0.1 Mission Start:  3_1  ->  4_1
+agent_merged_at_3_0_sub_seg_2@127.0.0.1 Planning segment:  3_1  ->  4_1
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] is act_digraph_path_planning from 3_1 to 4_1
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] cur order_mode:disperse,order_type:breakthrough
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] Default 2d traj: [[428184.39223929326, 4150775.5956324, 98.0], [427606.8016841828, 4150938.1570107453]]
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] Insert end height: -1 (rand: 13)
+agent_merged_at_3_0_sub_seg_2 is breaking through antiair, trajectory:
+[[428184.39223929326, 4150775.5956324, 98.0], [428142.6878006872, 4150785.478118452, 91.92857142857143], [428100.3383479512, 4150792.407481504, 85.85714285714286], [428057.63636186253, 4150797.165544474, 79.78571428571428], [428014.7815959124, 4150800.55578729, 73.71428571428572], [427971.9060645217, 4150803.393452121, 67.64285714285714], [427929.09980228613, 4150806.499125526, 61.57142857142857], [427886.43700634694, 4150810.6946627353, 55.5], [427844.00232328376, 4150816.8002899014, 49.42857142857143], [427801.91712470446, 4150825.631707898, 43.35714285714286], [427760.36563084123, 4150837.996019625, 37.28571428571429], [427719.62068871397, 4150854.6853100043, 31.214285714285722], [427680.06889124087, 4150876.466727026, 25.14285714285714], [427642.23453741445, 4150904.0679510743, 19.07142857142857], [427606.8016841828, 4150938.1570107453, 13.0]]
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] Generated arc formation trajectories for 6 members
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_2_sub_0
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_2_sub_1
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_2_sub_2
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_2_sub_3
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_2_sub_4
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_2_sub_5
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] cur if_set_ref_traj flag is:true
+Spawning agent: agent_merged_at_3_0_sub_seg_4@127.0.0.1 with path len 3
+agent_merged_at_3_0_sub_seg_4@127.0.0.1 initialized at position: [122.18751, 37.50112000000001, 98.0], traj: [[428184.39223929326, 4150775.5956324, 98.0]]
+agent_merged_at_3_0_sub_seg_3@127.0.0.1 Mission Start:  3_1  ->  5_1
+agent_merged_at_3_0_sub_seg_3@127.0.0.1 Planning segment:  3_1  ->  5_1
+[agent_merged_at_3_0_sub_seg_3@127.0.0.1] is act_digraph_path_planning from 3_1 to 5_1
+[agent_merged_at_3_0_sub_seg_3@127.0.0.1] cur order_mode:disperse,order_type:escape
+_outside_border_traj: [[428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0]]
+[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Default 2d traj: [[428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0]]
+agent_merged_at_3_0_sub_seg_3 is escaping antiair_facilities, trajectory:
+[[428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0]]
+[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Generated arc formation trajectories for 3 members
+[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_3_sub_0
+[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_3_sub_1
+[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_3_sub_2
+[agent_merged_at_3_0_sub_seg_3@127.0.0.1] cur if_set_ref_traj flag is:true
+[agent_merged_at_3_0_sub_seg_2] Cluster trajectories synced.
+agent_merged_at_3_0_sub_seg_4@127.0.0.1 Mission Start:  3_1  ->  6_1
+agent_merged_at_3_0_sub_seg_4@127.0.0.1 Planning segment:  3_1  ->  6_1
+[agent_merged_at_3_0_sub_seg_4@127.0.0.1] is act_digraph_path_planning from 3_1 to 6_1
+[agent_merged_at_3_0_sub_seg_4@127.0.0.1] cur order_mode:disperse,order_type:escape
+_outside_border_traj: [[428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0]]
+[agent_merged_at_3_0_sub_seg_4@127.0.0.1] Default 2d traj: [[428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0]]
+agent_merged_at_3_0_sub_seg_4 is escaping antiair_facilities, trajectory:
+[[428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0], [428184.39223929326, 4150775.5956324, 98.0]]
+[agent_merged_at_3_0_sub_seg_4@127.0.0.1] Generated vertical formation trajectories for 2 members
+[agent_merged_at_3_0_sub_seg_4@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_4_sub_0
+[agent_merged_at_3_0_sub_seg_4@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_4_sub_1
+[agent_merged_at_3_0_sub_seg_4@127.0.0.1] cur if_set_ref_traj flag is:true
+[agent_merged_at_3_0_sub_seg_3] Cluster trajectories synced.
+[agent_merged_at_3_0_sub_seg_3] Segment completed.
+agent_merged_at_3_0_sub_seg_3@127.0.0.1 Planning segment:  5_1  ->  5_2
+[agent_merged_at_3_0_sub_seg_3@127.0.0.1] is act_digraph_path_planning from 5_1 to 5_2
+[agent_merged_at_3_0_sub_seg_3@127.0.0.1] cur order_mode:disperse,order_type:breakthrough
+[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Default 2d traj: [[428184.39223929326, 4150775.5956324, 98.0], [427913.18424617266, 4150591.538926289]]
+[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Insert end height: -1 (rand: 80)
+agent_merged_at_3_0_sub_seg_3 is breaking through headquarter, trajectory:
+[[428184.39223929326, 4150775.5956324, 98.0], [428165.1151191818, 4150762.3099941364, 91.21881571179507], [428146.00011655537, 4150748.790649894, 86.99232366529], [428127.0045985177, 4150735.1024406143, 84.35808836656179], [428108.08466283913, 4150721.3093313887, 82.71625501334303], [428089.19549687137, 4150707.4746457012, 81.69295357894083], [428070.2917308039, 4150693.6613078373, 81.05516301170894], [428051.32778709545, 4150679.9320907, 80.65764885412585], [428032.2582279742, 4150666.3498663167, 80.40989118319507], [428013.03810293385, 4150652.977856342, 80.25547186923083], [427993.6232981579, 4150639.879879872, 80.15922732335825], [427973.97088978294, 4150627.1205958533, 80.0992412220577], [427954.03950286604, 4150614.765737366, 80.06185383229327], [427933.78967784427, 4150602.8823349737, 80.0385514858648], [427913.18424617266, 4150591.538926289, 80.0]]
+[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Generated arc formation trajectories for 3 members
+[agent_merged_at_3_0_sub_seg_3@127.0.0.1] cur if_set_ref_traj flag is:true
+agent_merged_at_3_0_sub_seg_3@127.0.0.1 Reached end of path.
+[agent_merged_at_3_0_sub_seg_4] Cluster trajectories synced.
+[agent_merged_at_3_0_sub_seg_4] Segment completed.
+agent_merged_at_3_0_sub_seg_4@127.0.0.1 Planning segment:  6_1  ->  6_2
+[agent_merged_at_3_0_sub_seg_4@127.0.0.1] is act_digraph_path_planning from 6_1 to 6_2
+[agent_merged_at_3_0_sub_seg_4@127.0.0.1] cur order_mode:disperse,order_type:breakthrough
+[agent_merged_at_3_0_sub_seg_4@127.0.0.1] Default 2d traj: [[428184.39223929326, 4150775.5956324, 98.0], [427913.18424617266, 4150591.538926289]]
+[agent_merged_at_3_0_sub_seg_4@127.0.0.1] Insert end height: -1 (rand: 76)
+agent_merged_at_3_0_sub_seg_4 is breaking through headquarter, trajectory:
+[[428184.39223929326, 4150775.5956324, 98.0], [428165.3297408325, 4150762.0038445746, 96.42857142857143], [428146.80698365986, 4150747.6705409153, 94.85714285714286], [428128.6928683783, 4150732.8098874087, 93.28571428571429], [428110.84325311176, 4150717.6267154403, 91.71428571428571], [428093.1047974286, 4150702.318817824, 90.14285714285714], [428075.31861065904, 4150687.0795145705, 88.57142857142857], [428057.3237642887, 4150672.1003943007, 87.0], [428038.9607344477, 4150657.5741419606, 85.42857142857143], [428020.07484393683, 4150643.6973661636, 83.85714285714286], [428000.51977383957, 4150630.673340001, 82.28571428571429], [427980.161212605, 4150618.714567433, 80.71428571428572], [427958.88070549275, 4150608.045083493, 79.14285714285714], [427936.5797593033, 4150598.9023906677, 77.57142857142857], [427913.18424617266, 4150591.538926289, 76.0]]
+[agent_merged_at_3_0_sub_seg_4@127.0.0.1] Generated vshape formation trajectories for 2 members
+[agent_merged_at_3_0_sub_seg_4@127.0.0.1] cur if_set_ref_traj flag is:true
+agent_merged_at_3_0_sub_seg_4@127.0.0.1 Reached end of path.
+[agent_merged_at_3_0_sub_seg_3] Cluster trajectories synced.
+[agent_merged_at_3_0_sub_seg_4] Cluster trajectories synced.
+[agent_merged_at_3_0_sub_seg_2] Segment completed.
+agent_merged_at_3_0_sub_seg_2@127.0.0.1 Planning segment:  4_1  ->  4_2
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] is act_digraph_path_planning from 4_1 to 4_2
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] cur order_mode:disperse,order_type:escape
+_inside_border_traj: [[427606.8016841828, 4150938.1570107453, 13.0], [427586.6687141281, 4151437.751509831]]
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] Default 2d traj: [[427606.8016841828, 4150938.1570107453, 13.0], [427586.6687141281, 4151437.751509831]]
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] Insert end height: -1 (rand: 384)
+agent_merged_at_3_0_sub_seg_2 is escaping antiair_facilities, trajectory:
+[[427606.8016841828, 4150938.1570107453, 13.0], [427607.0859929828, 4150973.870164801, 117.14793387986693], [427610.28438327956, 4151009.5006273016, 192.05923128683597], [427615.59596091264, 4151044.9383411994, 245.9412649493412], [427622.22107658605, 4151080.1795638953, 284.69741591859747], [427629.3660827421, 4151115.29707685, 312.5738551666024], [427636.2434894936, 4151150.4105088245, 332.62475923507276], [427642.06906635786, 4151185.6569334813, 347.04692952684604], [427646.0574245972, 4151221.161674851, 357.4204765357304], [427647.4176015895, 4151257.0091297342, 364.88193867135067], [427645.35016519093, 4151293.2133936197, 370.2488027877049], [427639.0473655257, 4151329.688555743, 374.109069035778], [427627.69787876355, 4151366.2187100826, 376.8856728742473], [427610.4976985829, 4151402.428013466, 378.8828223920172], [427586.6687141281, 4151437.751509831, 384.0]]
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] Generated vshape formation trajectories for 6 members
+[agent_merged_at_3_0_sub_seg_2@127.0.0.1] cur if_set_ref_traj flag is:true
+agent_merged_at_3_0_sub_seg_2@127.0.0.1 Reached end of path.
+[agent_merged_at_3_0_sub_seg_3] Segment completed.
+[agent_merged_at_3_0_sub_seg_2] Cluster trajectories synced.
+[agent_merged_at_3_0_sub_seg_4] Segment completed.
+[agent_merged_at_3_0_sub_seg_3] Segment completed.
+[agent_merged_at_3_0_sub_seg_4] Segment completed.
+[agent_merged_at_3_0_sub_seg_3] Segment completed.
+[agent_merged_at_3_0_sub_seg_4] Segment completed.
+[agent_merged_at_3_0_sub_seg_3] Segment completed.
+[agent_merged_at_3_0_sub_seg_4] Segment completed.
+[agent_merged_at_3_0_sub_seg_3] Segment completed.
+Agent agent_merged_at_3_0_sub_seg_3 finished mission. Terminating.
+[agent_merged_at_3_0_sub_seg_4] Segment completed.
+Agent agent_merged_at_3_0_sub_seg_4 finished mission. Terminating.
+[agent_merged_at_3_0_sub_seg_2] Segment completed.
+[agent_merged_at_3_0_sub_seg_2] Segment completed.
+[agent_merged_at_3_0_sub_seg_2] Segment completed.
+[agent_merged_at_3_0_sub_seg_2] Segment completed.
+[agent_merged_at_3_0_sub_seg_2] Segment completed.
+Agent agent_merged_at_3_0_sub_seg_2 finished mission. Terminating.
+All missions completed.
+Child to Parents Mapping: {
+  "agent_merged_at_3_0": [
+    "agent_1",
+    "agent_2"
+  ],
+  "agent_merged_at_3_0_sub_seg_2": [
+    "agent_merged_at_3_0"
+  ],
+  "agent_merged_at_3_0_sub_seg_3": [
+    "agent_merged_at_3_0"
+  ],
+  "agent_merged_at_3_0_sub_seg_4": [
+    "agent_merged_at_3_0"
+  ]
+}
+Agent Lineage Mapping: {
+  "agent_2": [
+    "agent_merged_at_3_0"
+  ],
+  "agent_1": [
+    "agent_merged_at_3_0"
+  ],
+  "agent_merged_at_3_0": [
+    "agent_merged_at_3_0_sub_seg_2",
+    "agent_merged_at_3_0_sub_seg_3",
+    "agent_merged_at_3_0_sub_seg_4"
+  ]
+}
+Reconstructing trajectories for root agent_2 with path: [
+  [
+    "agent_2",
+    "agent_merged_at_3_0",
+    "agent_merged_at_3_0_sub_seg_2"
+  ],
+  [
+    "agent_2",
+    "agent_merged_at_3_0",
+    "agent_merged_at_3_0_sub_seg_3"
+  ],
+  [
+    "agent_2",
+    "agent_merged_at_3_0",
+    "agent_merged_at_3_0_sub_seg_4"
+  ]
+].
+Reconstructing trajectories for root agent_1 with path: [
+  [
+    "agent_1",
+    "agent_merged_at_3_0",
+    "agent_merged_at_3_0_sub_seg_2"
+  ],
+  [
+    "agent_1",
+    "agent_merged_at_3_0",
+    "agent_merged_at_3_0_sub_seg_3"
+  ],
+  [
+    "agent_1",
+    "agent_merged_at_3_0",
+    "agent_merged_at_3_0_sub_seg_4"
+  ]
+].

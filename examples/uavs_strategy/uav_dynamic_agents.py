@@ -46,20 +46,20 @@ init_loc2 = [
     200.0
 ]
 init_locs = [
-    [122.06711375, 37.57744204,200],
-    [122.11945753, 37.57340029,180],
-    [122.12628947, 37.52707223,190],
-    [122.07039604, 37.52213903,220]
-    # [
-    #     122.10258217246229,
-    #     37.56342057758475,
-    #     200.0
-    # ],
-    # [
-    #     122.09686551225597,
-    #     37.56536338371063,
-    #     200.0
-    # ]
+    # [122.06711375, 37.57744204,200],
+    # [122.11945753, 37.57340029,180],
+    # [122.12628947, 37.52707223,190],
+    # [122.07039604, 37.52213903,220]
+    [
+        122.10258217246229,
+        37.56342057758475,
+        200.0
+    ],
+    [
+        122.09686551225597,
+        37.56536338371063,
+        200.0
+    ]
 ]
 
 height_range_value_set = {
@@ -74,15 +74,15 @@ direction_range_set = {
 }
 
 current_dir = os.path.dirname(__file__)
-digraph_attrs_reference_path = os.path.join(current_dir, "data", "digraph_with_attrs02.json")
+digraph_attrs_reference_path = os.path.join(current_dir, "data", "digraph_with_attrs.json")
 key_path_instructions_path = os.path.join(current_dir,"data" ,"key-path-analyzer02.json")
 asl_file = os.path.join(current_dir, "uav_key_path.asl")
 
 digraph_attrs = json.load(open(digraph_attrs_reference_path, "r"))
 key_path_instructions = json.load(open(key_path_instructions_path, "r"))
 bdi_instructions = key_path_instructions["bdi_instructions"]
-facilities_file = os.path.join(current_dir,"data" ,"facilities.json")
-# facilities_file = os.path.join(current_dir,"data" ,"test_facilities_locations.json")
+# facilities_file = os.path.join(current_dir,"data" ,"facilities.json")
+facilities_file = os.path.join(current_dir,"data" ,"test_facilities_locations.json")
 # =============================
 # 1. Blue UAV Agent
 # =============================
@@ -218,6 +218,21 @@ class BlueUAVAgent(BDIAgent):
                     members_traj = FormationGenerator3D(formation_elements=fleet_formation_config).generate_members_formation_3d()
                     self.members_cur_reference_traj = members_traj
                     print(f"[{self.jid}] Generated {_formation_type} formation trajectories for {_member_num} members")
+                    
+                    # 立即为生成的从机初始化 Redis 状态（位置与轨迹起点）
+                    # 防止首次 APF 步进时缺失起点导致轨迹滞后 (Master初始化时已有p0, Sub无)
+                    for m_i, m_traj in enumerate(members_traj):
+                        if m_traj and len(m_traj) > 0:
+                            s_uid = f"{self.self_uid}_sub_{m_i}"
+                            # 仅当 Redis 中没有该从机历史时才初始化 (避免覆盖多段任务的历史)
+                            exist_traj = self.io.get_traj(s_uid)
+                            if not exist_traj:
+                                s_start = m_traj[0]
+                                self.io.add_uav_id(s_uid, blue=True)
+                                self.io.set_pos(s_uid, s_start[0], s_start[1], s_start[2])
+                                self.io.set_traj(s_uid, [[s_start[0], s_start[1], s_start[2]]])
+                                print(f"[{self.jid}] Initialized Redis for new sub-agent: {s_uid}")
+
                     # 规划完成后，设置标志位通知 APFStep 将新轨迹写入 Redis
                     # self.bdi.set_belief("if_set_ref_traj", "true")
                     print(f"[{self.jid}] cur if_set_ref_traj flag is:{self.bdi.get_belief_value('if_set_ref_traj')[0]}")
@@ -250,6 +265,9 @@ class MissionOrchestrator:
         self.asl_file = asl_file
         self.BlueBDIAgentTemplate = BlueBDIAgentTemplate
 
+        self.all_trajectories = {}
+        # parent -> list of children
+        self.agent_lineage = collections.defaultdict(list) 
         self.active_agents: Dict[str, BlueUAVAgent] = {}
         # 经纬度 -> UTM 转换器
         self._lnglat2utm_convertor = bfunc.LngLat2UTM()
@@ -330,6 +348,236 @@ class MissionOrchestrator:
         await agent.start()
         self.active_agents[agent_name] = agent
 
+    def _reconstruct_full_trajectories(self):
+        # 1. 准备工作：构建子节点到父节点的反向映射，用于确定合并时的顺序
+        child_to_parents = collections.defaultdict(list)
+        for parent, children in self.agent_lineage.items():
+            for child in children:
+                child_to_parents[child].append(parent)
+
+        # 按照字符串顺序对父节点排序 (确保 Determinism: 字母序最小的父节点在合并时被视为 Master 身份的继承者)
+        for child in child_to_parents:
+            child_to_parents[child].sort()
+        print(f"Child to Parents Mapping: {json.dumps(dict(child_to_parents), indent=2)}")
+        print(f"Agent Lineage Mapping: {json.dumps(dict(self.agent_lineage), indent=2)}")
+
+        # 统计每个主从机编队（Agent）实际上拥有多少个从机（Sub-agents）
+        _agent_sub_counts = collections.defaultdict(int)
+        for key in self.all_trajectories.keys():
+            if "_sub_" in key:
+                # 解析 "agent_name_sub_idx"
+                try:
+                    parts = key.rsplit("_sub_", 1)
+                    if len(parts) == 2:
+                        agent_name = parts[0]
+                        idx = int(parts[1])
+                        # 记录 count 为 max_index + 1
+                        if idx + 1 > _agent_sub_counts[agent_name]:
+                            _agent_sub_counts[agent_name] = idx + 1
+                except ValueError:
+                    continue
+        
+        def get_sub_count(agent_name):
+            return _agent_sub_counts.get(agent_name, 0)
+
+        # 3. 识别 Roots (没有父节点的 Master)
+        all_children = set()
+        for children in self.agent_lineage.values():
+            all_children.update(children)
+        
+        executed_masters = [k for k in self.all_trajectories.keys() if "_sub_" not in k]
+        roots = [a for a in executed_masters if a not in all_children]
+        
+        reconstructed = {}
+        
+        for root in roots:
+            paths = self._trace_paths(root)
+            print(f"Reconstructing trajectories for root {root} with path: {json.dumps(paths, indent=2)}.")
+            for i, path in enumerate(paths):
+                root_sub_count = get_sub_count(root)
+                
+                # 初始化容器
+                # 'master' 存储 Root Master 的轨迹
+                # 数字键存储 Root Sub k 的轨迹
+                path_trajs = {'master': {'lats': [], 'lngs': []}}
+                for idx in range(root_sub_count):
+                    path_trajs[idx] = {'lats': [], 'lngs': []}
+                
+                # 追踪当前的逻辑角色 (Logical Role) 映射到 物理实体 (Physical Entity)
+                # 初始状态下（在 Root 节点）：
+                # Root Master -> Physical Master ('master')
+                # Root Sub k  -> Physical Sub k  (k)
+                # 随着只有 step 向前推进，我们更新这个映射关系。
+                
+                # mapping: { logical_id (str/int) -> physical_role (str/int) }
+                # logical_id: 'master' or int (sub index)
+                # physical_role: 'master' or int (sub index in current agent) 或 None (如果该角色在当前层级消失/被挤出)
+                
+                current_mapping = {'master': 'master'}
+                for idx in range(root_sub_count):
+                    current_mapping[idx] = idx
+                    
+                for step_idx, agent_name in enumerate(path):
+                    # 如果不是起点，计算从 prev -> curr 的映射变换
+                    if step_idx > 0:
+                        prev_name = path[step_idx - 1]
+
+                        # --- 1. Split Logic (Prev -> (..., Curr, ...)) ---
+                        # 判断 prev 是否分裂为多个子节点，如果是，计算当前 child (curr) 继承的分片
+                        prev_siblings = self.agent_lineage[prev_name]
+                        split_offset = 0
+                        split_capacity = 999999 
+
+                        if len(prev_siblings) > 1:
+                            try:
+                                # 计算在分裂中的位次
+                                my_rank_in_split = prev_siblings.index(agent_name)
+                                # 累加前面的兄弟占据的份额
+                                for sib in prev_siblings[:my_rank_in_split]:
+                                    split_offset += (1 + get_sub_count(sib))
+                                
+                                # 当前节点的“接收容量”
+                                split_capacity = 1 + get_sub_count(agent_name)
+                            except ValueError:
+                                pass 
+
+        #                 # --- 2. Merge Logic ((..., Prev, ...) -> Curr) ---
+        #                 # 确定 prev 在 curr 的合并列表中的位置
+        #                 parents = child_to_parents[agent_name]
+                        
+        #                 try:
+        #                     parent_rank = parents.index(prev_name)
+        #                 except ValueError:
+        #                     # 理论上不应发生，除非 lineage 数据不一致
+        #                     print(f"Warning: {prev_name} is not in parents of {agent_name}")
+        #                     parent_rank = 0
+
+        #                 # 计算 prev 在 curr 中的“起始 Sub 偏移量”
+        #                 # 规则：
+        #                 # Initiator (rank 0): Master->Master, Subs->Subs [0...N]
+        #                 # Follower (rank > 0): Master->Sub [offset], Subs->Subs [offset+1...offset+1+N]
+        #                 # offset 累加之前所有 sibling 的 (1(Master) + Sub_Count)
+                        
+        #                 base_sub_offset = 0
+        #                 is_initiator = (parent_rank == 0)
+                        
+        #                 if not is_initiator:
+        #                     # 累加前面的兄弟占用的位置
+        #                     # 优化循环：直接利用 enumerate 判断是否为 initiator，避免重复查找
+        #                     for idx, sibling in enumerate(parents):
+        #                         if idx == parent_rank:
+        #                             break
+        #                         sibling_sub_count = get_sub_count(sibling)
+        #                         sibling_is_initiator = (idx == 0)
+        #                         if sibling_is_initiator:
+        #                             base_sub_offset += sibling_sub_count
+        #                         else:
+        #                             base_sub_offset += (1 + sibling_sub_count)
+                        
+        #                 # --- 3. Execute Mapping Update ---
+        #                 next_mapping = {}
+                        
+        #                 for logical_id, phys_role in current_mapping.items():
+        #                     if phys_role is None:
+        #                         next_mapping[logical_id] = None
+        #                         continue
+
+        #                     # Step A: Convert phys_role (in Prev) to Linear Index
+        #                     curr_linear_in_prev = 0 if phys_role == 'master' else (phys_role + 1)
+
+        #                     # Step B: Apply Split Filter
+        #                     # 相对索引 = 绝对索引 - 分裂偏移
+        #                     rel_idx = curr_linear_in_prev - split_offset
+                            
+        #                     # check bounds
+        #                     if rel_idx < 0 or rel_idx >= split_capacity:
+        #                         # 这个实体被分给了其他分裂分支，不在当前路径中
+        #                         next_mapping[logical_id] = None
+        #                         continue
+
+        #                     # Step C: Convert Back to "Transfer Role" (as if 1-to-1 transfer)
+        #                     transfer_phys_role = 'master' if rel_idx == 0 else (rel_idx - 1)
+                            
+        #                     # Step D: Apply Merge Offset to land in Curr
+        #                     new_phys_role = None
+                            
+        #                     if is_initiator:
+        #                         # Initiator: 角色保持不变 (Master->Master, Sub k->Sub k) (相对于 Transfer Role)
+        #                         new_phys_role = transfer_phys_role 
+        #                     else:
+        #                         # Follower: 全部降级为 Sub
+        #                         if transfer_phys_role == 'master':
+        #                             new_phys_role = base_sub_offset
+        #                         elif isinstance(transfer_phys_role, int):
+        #                             new_phys_role = base_sub_offset + 1 + transfer_phys_role
+        #                         else:
+        #                             new_phys_role = None
+                                    
+        #                     next_mapping[logical_id] = new_phys_role
+                        
+        #                 current_mapping = next_mapping
+
+        #             # --- 数据提取 ---
+        #             # 根据 current_mapping 提取当前 agent_name 下的数据
+        #             for logical_id, phys_role in current_mapping.items():
+        #                 # logical_id: 'master' (Root Master) or int (Root Sub k)
+                        
+        #                 target_key = None
+        #                 if phys_role == 'master':
+        #                     target_key = agent_name
+        #                 elif isinstance(phys_role, int):
+        #                     target_key = f"{agent_name}_sub_{phys_role}"
+                        
+        #                 if target_key:
+        #                     data = self.all_trajectories.get(target_key)
+        #                     if data:
+        #                         path_trajs[logical_id]['lats'].extend(data.get('lats', []))
+        #                         path_trajs[logical_id]['lngs'].extend(data.get('lngs', []))
+
+        #         # 5. 保存结果
+        #         branch_suffix = f"_branch_{i}" if len(paths) > 1 else ""
+                
+        #         # 保存 Master
+        #         if path_trajs['master']['lats']:
+        #             reconstructed[f"{root}{branch_suffix}"] = {
+        #                 'lats': path_trajs['master']['lats'],
+        #                 'lngs': path_trajs['master']['lngs'],
+        #                 'ts': list(range(len(path_trajs['master']['lats'])))
+        #             }
+                
+        #         # 保存 Subs
+        #         for idx in range(root_sub_count):
+        #             if not path_trajs[idx]['lats']: continue
+        #             reconstructed[f"{root}_sub_{idx}{branch_suffix}"] = {
+        #                 'lats': path_trajs[idx]['lats'],
+        #                 'lngs': path_trajs[idx]['lngs'],
+        #                 'ts': list(range(len(path_trajs[idx]['lats'])))
+        #             }
+        
+        # print(f"Traj Reconstruction Report:")
+        # print(f"  - Identifying independent drone entities from {len(roots)} root groups.")
+        # print(f"  - Total independent trajectories reconstructed: {len(reconstructed)}")
+        # for key in reconstructed:
+        #     points = len(reconstructed[key]['ts'])
+        #     print(f"    * Entity '{key}': {points} points")
+        _dict_str = {}
+        # _dict_str = {
+        #     "uavs_coords_str": reconstructed
+        # }
+        return _dict_str if _dict_str else {}
+
+    def _trace_paths(self, current_node):
+        children = self.agent_lineage.get(current_node, [])
+        if not children:
+            return [[current_node]]
+        
+        paths = []
+        for child in children:
+            child_paths = self._trace_paths(child)
+            for cp in child_paths:
+                paths.append([current_node] + cp)
+        return paths
+
     async def run(self):
         print("Mission Orchestrator Started.")
         
@@ -359,8 +607,46 @@ class MissionOrchestrator:
             await asyncio.sleep(0.5)
         
         print("All missions completed.")
+        
+        reconstructed_trajs = self._reconstruct_full_trajectories()
+        # reconstructed_trajs.update(json.load(open(facilities_file, "r")))
+        # with open('uav_trajectories_from_BDI.json', 'w') as f:
+        #     json.dump(reconstructed_trajs, f, indent=2)
+        # print("Reconstructed trajectories saved to uav_trajectories_from_BDI.json")
 
     async def _handle_agent_completion(self, agent_name, agent):
+        # Extract and store trajectory data
+        traj_utm = agent.io.get_traj(agent.self_uid)
+        if traj_utm:
+            traj_utm_np = np.array(traj_utm)
+            if traj_utm_np.shape[0] > 0:
+                lng_lat = self._lnglat2utm_convertor.utm_to_lng_lat_array(traj_utm_np)
+                self.all_trajectories[agent_name] = {
+                    # 'uav_name': agent_name,
+                    'lats': lng_lat[:, 1].tolist(),
+                    'lngs': lng_lat[:, 0].tolist(),
+                    'ts': list(range(len(traj_utm)))
+                }
+
+        # Extract sub-agent trajectories
+        sub_idx = 0
+        while True:
+            sub_uid = f"{agent.self_uid}_sub_{sub_idx}"
+            sub_traj_utm = agent.io.get_traj(sub_uid)
+            if not sub_traj_utm:
+                break
+            
+            sub_traj_np = np.array(sub_traj_utm)
+            if sub_traj_np.shape[0] > 0:
+                sub_agent_key = f"{agent_name}_sub_{sub_idx}"
+                lng_lat_sub = self._lnglat2utm_convertor.utm_to_lng_lat_array(sub_traj_np)
+                self.all_trajectories[sub_agent_key] = {
+                    'lats': lng_lat_sub[:, 1].tolist(),
+                    'lngs': lng_lat_sub[:, 0].tolist(),
+                    'ts': list(range(len(sub_traj_utm)))
+                }
+            sub_idx += 1
+
         # 获取该agent的任务配置
         tasks = self.bdi_instructions[agent_name]
         task = tasks[0]
@@ -379,6 +665,7 @@ class MissionOrchestrator:
 
             for branch in task['branches']:
                 child_name = branch['new_agent_hint']
+                self.agent_lineage[agent_name].append(child_name)
                 _last_pos_llt = self._lnglat2utm_convertor.utm_to_lng_lat_array(np.array([_last_pos]))[0].tolist() + [_last_pos[2]]
                 await self._spawn_agent(child_name, _init_pos=_last_pos_llt)
             
@@ -398,8 +685,12 @@ class MissionOrchestrator:
             
             if current_count >= required_count:
                 print(f"Merge condition met for {target_seg} ({current_count}/{required_count}). Merging...")
+                
+                # Capture participants before clearing
+                participants = list(self.pending_merges[target_seg])
+                
                 # 1. 停止所有参与合并的 agent
-                for participant in self.pending_merges[target_seg]:
+                for participant in participants:
                     if participant in self.active_agents:
                         p_agent = self.active_agents[participant]
                         await p_agent.stop()
@@ -411,6 +702,10 @@ class MissionOrchestrator:
                 # 3. 启动合并后的新 agent
                 new_agent_name = self._find_agent_name_by_segment_id(target_seg)
                 if new_agent_name:
+                    # Update lineage
+                    for participant in participants:
+                        self.agent_lineage[participant].append(new_agent_name)
+                        
                     _last_pos_llt = self._lnglat2utm_convertor.utm_to_lng_lat_array(np.array([_last_pos]))[0].tolist() + [_last_pos[2]]
                     await self._spawn_agent(new_agent_name, _init_pos=_last_pos_llt)
                 else:
@@ -422,12 +717,26 @@ class MissionOrchestrator:
 
 
 async def start_agent(server, password):
+    # 清空 Redis 数据库，防止历史数据干扰
+    try:
+        # 假设 Redis 运行在本地默认端口
+        r_conn = redis.Redis(host='127.0.0.1', port=6379, db=0)
+        r_conn.flushdb()
+        print("[System] Redis database flushed successfully.")
+    except Exception as e:
+        print(f"[System] Warning: Failed to flush Redis: {e}")
+
     # 从key_paths解析bdi指令
+    # key_paths = [
+    #     [0, 1, 4, 5, 2, 14],
+    #     [3, 4, 5, 2, 14],
+    #     [6, 7, 8, 9, 10, 14],
+    #     [11, 12, 13, 14]        
+    # ]
     key_paths = [
-        [0, 1, 4, 5, 2, 14],
-        [3, 4, 5, 2, 14],
-        [6, 7, 8, 9, 10, 14],
-        [11, 12, 13, 14]        
+        ["1_0","1_1","1_2","3_0","3_1","4_1","4_2"],
+        ["2_0","2_1","2_2","3_0","3_1","5_1","5_2"],
+        ["1_0","1_1","1_2","3_0","3_1","6_1","6_2"]
     ]
     bdi_instructions = KeyPathAnalyzer(key_paths).generate_bdi_instructions()
     print(f"BDI instructions: {json.dumps(bdi_instructions, indent=2)}")

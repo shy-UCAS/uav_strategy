@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from examples.uavs_strategy.uav_dynamic_agents import BlueUAVAgent
 
 # ==== 势场与步进参数 ====
-DT = 1.0       # 周期（秒）
+DT = 0.1       # 周期（秒）
 STEP = 8.0     # 每步“最大位移”/速度上限（米/步）
 K_ATT = 0.7   # 引力系数 (独立飞行时)
 K_ATT_FORM = 1.5 # 引力系数 (编队飞行时，需要更强的跟随力)
