@@ -348,235 +348,72 @@ class MissionOrchestrator:
         await agent.start()
         self.active_agents[agent_name] = agent
 
-    def _reconstruct_full_trajectories(self):
-        # 1. 准备工作：构建子节点到父节点的反向映射，用于确定合并时的顺序
-        child_to_parents = collections.defaultdict(list)
-        for parent, children in self.agent_lineage.items():
-            for child in children:
-                child_to_parents[child].append(parent)
+    def extract_uav_trajectories(json_data, key_paths):
+        # 1. 构建图结构和属性索引
+        edge_attrs = {}
+        graph = collections.defaultdict(list)
+        
+        for item in json_data:
+            u, v = item["from"], item["to"]
+            # members_num + 1 (1个主机 + N个从机)
+            total_drones = item["members_num"] + 1 
+            edge_attrs[(u, v)] = {
+                "count": total_drones,
+                "trajectory": item["attrs"]["plan"]["trajectory"]
+            }
+            graph[u].append(v)
 
-        # 按照字符串顺序对父节点排序 (确保 Determinism: 字母序最小的父节点在合并时被视为 Master 身份的继承者)
-        for child in child_to_parents:
-            child_to_parents[child].sort()
-        print(f"Child to Parents Mapping: {json.dumps(dict(child_to_parents), indent=2)}")
-        print(f"Agent Lineage Mapping: {json.dumps(dict(self.agent_lineage), indent=2)}")
-
-        # 统计每个主从机编队（Agent）实际上拥有多少个从机（Sub-agents）
-        _agent_sub_counts = collections.defaultdict(int)
-        for key in self.all_trajectories.keys():
-            if "_sub_" in key:
-                # 解析 "agent_name_sub_idx"
-                try:
-                    parts = key.rsplit("_sub_", 1)
-                    if len(parts) == 2:
-                        agent_name = parts[0]
-                        idx = int(parts[1])
-                        # 记录 count 为 max_index + 1
-                        if idx + 1 > _agent_sub_counts[agent_name]:
-                            _agent_sub_counts[agent_name] = idx + 1
-                except ValueError:
-                    continue
+        # 2. 统计所有可能的路径片段并进行路径拆分
+        # uav_paths 存储格式: { uav_id: [ [coord1, coord2...], [coord1... ] ] }
+        uav_trajectories = []
         
-        def get_sub_count(agent_name):
-            return _agent_sub_counts.get(agent_name, 0)
-
-        # 3. 识别 Roots (没有父节点的 Master)
-        all_children = set()
-        for children in self.agent_lineage.values():
-            all_children.update(children)
+        # 我们需要跟踪每一条边剩余的“可用名额”
+        remaining_flow = {edge: attr["count"] for edge, attr in edge_attrs.items()}
+        print("Initial remaining flow:", json.dumps({str(k): v for k, v in remaining_flow.items()}, indent=2))
         
-        executed_masters = [k for k in self.all_trajectories.keys() if "_sub_" not in k]
-        roots = [a for a in executed_masters if a not in all_children]
+        # 找到所有的起点 (这里根据 key_paths 的第一个元素确定)
+        starts = set(path[0] for path in key_paths)
         
-        reconstructed = {}
-        
-        for root in roots:
-            paths = self._trace_paths(root)
-            print(f"Reconstructing trajectories for root {root} with path: {json.dumps(paths, indent=2)}.")
-            for i, path in enumerate(paths):
-                root_sub_count = get_sub_count(root)
+        for start_node in starts:
+            # 查找从该起点出发的总流量
+            start_edges = [e for e in remaining_flow if e[0] == start_node]
+            print(f"Processing start node: {start_node} with edges: {start_edges}")
+            total_at_start = sum(remaining_flow[e] for e in start_edges)
+            print(f"  Total UAVs to route from {start_node}: {total_at_start}")
+            
+            for i in range(total_at_start):
+                current_node = start_node
+                single_uav_path = []
                 
-                # 初始化容器
-                # 'master' 存储 Root Master 的轨迹
-                # 数字键存储 Root Sub k 的轨迹
-                path_trajs = {'master': {'lats': [], 'lngs': []}}
-                for idx in range(root_sub_count):
-                    path_trajs[idx] = {'lats': [], 'lngs': []}
-                
-                # 追踪当前的逻辑角色 (Logical Role) 映射到 物理实体 (Physical Entity)
-                # 初始状态下（在 Root 节点）：
-                # Root Master -> Physical Master ('master')
-                # Root Sub k  -> Physical Sub k  (k)
-                # 随着只有 step 向前推进，我们更新这个映射关系。
-                
-                # mapping: { logical_id (str/int) -> physical_role (str/int) }
-                # logical_id: 'master' or int (sub index)
-                # physical_role: 'master' or int (sub index in current agent) 或 None (如果该角色在当前层级消失/被挤出)
-                
-                current_mapping = {'master': 'master'}
-                for idx in range(root_sub_count):
-                    current_mapping[idx] = idx
+                # 随机游走直到没有出边或流量耗尽
+                while True:
+                    possible_next = [v for v in graph[current_node] if remaining_flow.get((current_node, v), 0) > 0]
                     
-                for step_idx, agent_name in enumerate(path):
-                    # 如果不是起点，计算从 prev -> curr 的映射变换
-                    if step_idx > 0:
-                        prev_name = path[step_idx - 1]
-
-                        # --- 1. Split Logic (Prev -> (..., Curr, ...)) ---
-                        # 判断 prev 是否分裂为多个子节点，如果是，计算当前 child (curr) 继承的分片
-                        prev_siblings = self.agent_lineage[prev_name]
-                        split_offset = 0
-                        split_capacity = 999999 
-
-                        if len(prev_siblings) > 1:
-                            try:
-                                # 计算在分裂中的位次
-                                my_rank_in_split = prev_siblings.index(agent_name)
-                                # 累加前面的兄弟占据的份额
-                                for sib in prev_siblings[:my_rank_in_split]:
-                                    split_offset += (1 + get_sub_count(sib))
-                                
-                                # 当前节点的“接收容量”
-                                split_capacity = 1 + get_sub_count(agent_name)
-                            except ValueError:
-                                pass 
-
-        #                 # --- 2. Merge Logic ((..., Prev, ...) -> Curr) ---
-        #                 # 确定 prev 在 curr 的合并列表中的位置
-        #                 parents = child_to_parents[agent_name]
-                        
-        #                 try:
-        #                     parent_rank = parents.index(prev_name)
-        #                 except ValueError:
-        #                     # 理论上不应发生，除非 lineage 数据不一致
-        #                     print(f"Warning: {prev_name} is not in parents of {agent_name}")
-        #                     parent_rank = 0
-
-        #                 # 计算 prev 在 curr 中的“起始 Sub 偏移量”
-        #                 # 规则：
-        #                 # Initiator (rank 0): Master->Master, Subs->Subs [0...N]
-        #                 # Follower (rank > 0): Master->Sub [offset], Subs->Subs [offset+1...offset+1+N]
-        #                 # offset 累加之前所有 sibling 的 (1(Master) + Sub_Count)
-                        
-        #                 base_sub_offset = 0
-        #                 is_initiator = (parent_rank == 0)
-                        
-        #                 if not is_initiator:
-        #                     # 累加前面的兄弟占用的位置
-        #                     # 优化循环：直接利用 enumerate 判断是否为 initiator，避免重复查找
-        #                     for idx, sibling in enumerate(parents):
-        #                         if idx == parent_rank:
-        #                             break
-        #                         sibling_sub_count = get_sub_count(sibling)
-        #                         sibling_is_initiator = (idx == 0)
-        #                         if sibling_is_initiator:
-        #                             base_sub_offset += sibling_sub_count
-        #                         else:
-        #                             base_sub_offset += (1 + sibling_sub_count)
-                        
-        #                 # --- 3. Execute Mapping Update ---
-        #                 next_mapping = {}
-                        
-        #                 for logical_id, phys_role in current_mapping.items():
-        #                     if phys_role is None:
-        #                         next_mapping[logical_id] = None
-        #                         continue
-
-        #                     # Step A: Convert phys_role (in Prev) to Linear Index
-        #                     curr_linear_in_prev = 0 if phys_role == 'master' else (phys_role + 1)
-
-        #                     # Step B: Apply Split Filter
-        #                     # 相对索引 = 绝对索引 - 分裂偏移
-        #                     rel_idx = curr_linear_in_prev - split_offset
-                            
-        #                     # check bounds
-        #                     if rel_idx < 0 or rel_idx >= split_capacity:
-        #                         # 这个实体被分给了其他分裂分支，不在当前路径中
-        #                         next_mapping[logical_id] = None
-        #                         continue
-
-        #                     # Step C: Convert Back to "Transfer Role" (as if 1-to-1 transfer)
-        #                     transfer_phys_role = 'master' if rel_idx == 0 else (rel_idx - 1)
-                            
-        #                     # Step D: Apply Merge Offset to land in Curr
-        #                     new_phys_role = None
-                            
-        #                     if is_initiator:
-        #                         # Initiator: 角色保持不变 (Master->Master, Sub k->Sub k) (相对于 Transfer Role)
-        #                         new_phys_role = transfer_phys_role 
-        #                     else:
-        #                         # Follower: 全部降级为 Sub
-        #                         if transfer_phys_role == 'master':
-        #                             new_phys_role = base_sub_offset
-        #                         elif isinstance(transfer_phys_role, int):
-        #                             new_phys_role = base_sub_offset + 1 + transfer_phys_role
-        #                         else:
-        #                             new_phys_role = None
-                                    
-        #                     next_mapping[logical_id] = new_phys_role
-                        
-        #                 current_mapping = next_mapping
-
-        #             # --- 数据提取 ---
-        #             # 根据 current_mapping 提取当前 agent_name 下的数据
-        #             for logical_id, phys_role in current_mapping.items():
-        #                 # logical_id: 'master' (Root Master) or int (Root Sub k)
-                        
-        #                 target_key = None
-        #                 if phys_role == 'master':
-        #                     target_key = agent_name
-        #                 elif isinstance(phys_role, int):
-        #                     target_key = f"{agent_name}_sub_{phys_role}"
-                        
-        #                 if target_key:
-        #                     data = self.all_trajectories.get(target_key)
-        #                     if data:
-        #                         path_trajs[logical_id]['lats'].extend(data.get('lats', []))
-        #                         path_trajs[logical_id]['lngs'].extend(data.get('lngs', []))
-
-        #         # 5. 保存结果
-        #         branch_suffix = f"_branch_{i}" if len(paths) > 1 else ""
+                    if not possible_next:
+                        break
+                    
+                    # 随机选择一个还有剩余流量的分支
+                    next_node = random.choice(possible_next)
+                    
+                    # 记录该片段的轨迹
+                    edge = (current_node, next_node)
+                    single_uav_path.append({
+                        "segment": edge,
+                        "coords": []
+                        # "coords": edge_attrs[edge]["trajectory"]
+                    })
+                    
+                    # 消耗一个流量
+                    remaining_flow[edge] -= 1
+                    current_node = next_node
                 
-        #         # 保存 Master
-        #         if path_trajs['master']['lats']:
-        #             reconstructed[f"{root}{branch_suffix}"] = {
-        #                 'lats': path_trajs['master']['lats'],
-        #                 'lngs': path_trajs['master']['lngs'],
-        #                 'ts': list(range(len(path_trajs['master']['lats'])))
-        #             }
-                
-        #         # 保存 Subs
-        #         for idx in range(root_sub_count):
-        #             if not path_trajs[idx]['lats']: continue
-        #             reconstructed[f"{root}_sub_{idx}{branch_suffix}"] = {
-        #                 'lats': path_trajs[idx]['lats'],
-        #                 'lngs': path_trajs[idx]['lngs'],
-        #                 'ts': list(range(len(path_trajs[idx]['lats'])))
-        #             }
-        
-        # print(f"Traj Reconstruction Report:")
-        # print(f"  - Identifying independent drone entities from {len(roots)} root groups.")
-        # print(f"  - Total independent trajectories reconstructed: {len(reconstructed)}")
-        # for key in reconstructed:
-        #     points = len(reconstructed[key]['ts'])
-        #     print(f"    * Entity '{key}': {points} points")
-        _dict_str = {}
-        # _dict_str = {
-        #     "uavs_coords_str": reconstructed
-        # }
-        return _dict_str if _dict_str else {}
+                if single_uav_path:
+                    uav_trajectories.append({
+                        "id": f'agent_{start_node}' if i==0 else f'agent_{start_node}_sub_{i}',
+                        "path": single_uav_path
+                    })
 
-    def _trace_paths(self, current_node):
-        children = self.agent_lineage.get(current_node, [])
-        if not children:
-            return [[current_node]]
-        
-        paths = []
-        for child in children:
-            child_paths = self._trace_paths(child)
-            for cp in child_paths:
-                paths.append([current_node] + cp)
-        return paths
+        return uav_trajectories
 
     async def run(self):
         print("Mission Orchestrator Started.")
