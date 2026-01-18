@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from turtle import st
 import numpy as np
 from time import time
 from typing import TYPE_CHECKING
@@ -7,15 +8,15 @@ from spade.behaviour import PeriodicBehaviour
 from examples.uavs_strategy.planning_modules import avoidance_agents as a_agents
 
 if TYPE_CHECKING:
-    from examples.uavs_strategy.uav_dynamic_agents import BlueUAVAgent
+    from examples.uavs_strategy.uav_dynamic_agents02 import BlueUAVAgent
 
 # ==== 势场与步进参数 ====
-DT = 0.1       # 周期（秒）
+DT = 0.3       # 周期（秒）
 STEP = 8.0     # 每步“最大位移”/速度上限（米/步）
-K_ATT = 0.7   # 引力系数 (独立飞行时)
+K_ATT = 0.85   # 引力系数 (独立飞行时)
 K_ATT_FORM = 1.5 # 引力系数 (编队飞行时，需要更强的跟随力)
 K_REP = 2.5    # 斥力系数
-CLOSE_TH = 100.0 # 到达判定阈值
+CLOSE_TH = 30.0 # 到达判定阈值
 
 # ==== 简单向量函数 (从原文件移动过来) ====
 def v_sub(a, b): return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
@@ -165,7 +166,7 @@ class APFStep(PeriodicBehaviour):
         agent: "BlueUAVAgent" = self.agent
         io = agent.io
         current_time = time()  # 获取当前时间
-        
+
         # 获取本机数据
         me = io.get_pos(agent.self_uid, blue=True)
         if not me:
@@ -267,6 +268,146 @@ class APFStep(PeriodicBehaviour):
 
         print(f"[{agent.self_uid}] New position for {agent.self_uid}: {nxt}, target_loc: {traj[-1]}")
 
+class Single_APFStep(PeriodicBehaviour):
+    async def run(self):
+        agent: "BlueUAVAgent" = self.agent
+        io = agent.io
+        
+        # 将自己的 BDI 状态同步到 Redis (can_task_start)
+        my_can_start = agent.bdi.get_belief("can_task_start", "false") # 如果没获取到，默认为 "false"
+        # 注意：get_belief 返回的可能是 Tuple 或 None，需要解析一下
+        # 你的 ASL 定义: can_task_start(true). -> 所以这里获取的是 "can_task_start(true)" 这样的结构
+        # 简单起见，我们根据是否包含 "true" 来判断
+        state_val = "true" if "true" in str(my_can_start) else "false"
+        io.set_uav_state(agent.self_uid, "can_task_start", state_val)
+
+        if agent.merge_peers and state_val == "true":
+            # print(f"[{agent.self_uid}] Checking sync with peers: {agent.merge_peers}")
+            states = io.mget_uav_states(agent.merge_peers, "can_task_start")
+            all_ready = True
+            for pid, status in states.items():
+                if status != "true":
+                    all_ready = False
+                    # print(f"[{agent.self_uid}] Peer {pid} is NOT ready.")
+                    break
+            
+            if not all_ready:
+                # 如果同伴没准备好，自己就先原地等待，不要执行后面的运动计算
+                print(f"[{agent.self_uid}] Waiting for peers to be ready...")
+                return 
+            else:
+                 print(f"[{agent.self_uid}] All merge peers are READY!")
+                 # 只有首次满足时打印一下，避免刷屏
+                 if not hasattr(agent, "_merge_ready_flag") or not agent._merge_ready_flag:
+                     print(f"[{agent.self_uid}] All merge peers are READY! Proceeding.")
+                     agent._merge_ready_flag = True
+                     # 【补全逻辑】汇聚完成，统一触发下一段任务
+                     if hasattr(agent, "add_achievement_goal"):
+                        agent.add_achievement_goal("task_digraph")
+                     # 重置 merge_peer 防止重复进入
+                     # agent.merge_peers = []
+                 return # 【关键修复】触发后依然要等待BDI更新状态，防止飞回旧轨迹起点
+
+        # # 如果没有汇聚同伴，但状态是 "true" (单机任务完成)，也应该等待
+        # if state_val == "true":
+        #      return
+
+        # 0. 轨迹同步 (与 Formation 保持一致的这种写法更干净)
+        if_set_ref = agent.bdi.get_belief("if_set_ref_traj")
+        if if_set_ref:
+             val_str = if_set_ref[len("if_set_ref_traj("):-1]
+             if val_str == "true" and agent.cur_reference_traj:
+                 io.set_ref_traj(agent.self_uid, agent.cur_reference_traj)
+                 agent.bdi.set_belief("if_set_ref_traj", "false")
+                 print(f"[{agent.self_uid}] Trajectory synced to Redis.")
+
+        # 1. 获取状态与预瞄
+        # ----------------------------------------------------
+        me = io.get_pos(agent.self_uid, blue=True)
+        if not me: return
+
+        traj = agent.cur_reference_traj
+        if not traj: return
+
+        lookahead = io.get_lookahead(agent.self_uid)
+        max_idx = len(traj) - 1
+        lookahead = max(0, min(lookahead, max_idx)) # 修正索引边界
+        
+        target = traj[lookahead]
+        self_pos = [me["x"], me["y"], me["z"]]
+        
+        # 2. 检查任务结束 (借鉴 Formation 的逻辑，放在计算前或后都可以，放在前效率高)
+        # ----------------------------------------------------
+        # 优先使用 redis 里的距离计算（假设 io.get_dist_2d 已经在某处更新，或者我们自己算）
+        dist_to_target = v_norm(v_sub(target, self_pos))
+        
+        # 如果已经到了轨迹末端，且距离很近，认为段结束
+        if lookahead >= max_idx and dist_to_target <= CLOSE_TH:
+            # 或者使用 io.get_dist_2d(agent.self_uid) 如果它是全局终点距离
+            io.set_lookahead(agent.self_uid, 0)
+            agent.bdi.set_belief("can_task_start", True)
+
+            if agent.is_final_task:
+                agent.is_finished = True
+            else:
+                # 触发 BDI 下一步
+                if not agent.is_finished: # 防止重复触发
+                    if hasattr(agent, "add_achievement_goal") and not agent.merge_peers:
+                        agent.add_achievement_goal("task_digraph")
+                    print(f"[{agent.self_uid}] Segment completed (reached end).")
+            return
+
+        # 3. 物理计算 (改进斥力)
+        # ----------------------------------------------------
+        # 获取周围环境
+        agent.blue_ids = io.get_ids(blue=True)
+        all_blue_pos = io.mget_pos(agent.blue_ids, blue=True)
+        
+        # 引力
+        F_att = v_scale(v_sub(target, self_pos), K_ATT)
+        
+        # 斥力 (这里可以改进：区分不同类型的邻居)
+        F_rep = [0.0, 0.0, 0.0]
+        
+        # 简单的改进版斥力计算，不依赖复杂的外部库，保持轻量
+        for other_uid, other_data in all_blue_pos.items():
+            if other_uid == agent.self_uid or not other_data: continue
+            
+            other_pos = [other_data['x'], other_data['y'], other_data['z']]
+            dist = v_norm(v_sub(self_pos, other_pos))
+            
+            # 使用较大的安全距离，因为是独立飞行
+            d_safe = 15.0  
+            if dist < d_safe:
+                # 越近斥力指数级增大
+                rep_mag = K_REP * (1.0/dist - 1.0/d_safe) * 50.0 
+                rep_dir = v_unit(v_sub(self_pos, other_pos))
+                F_rep = v_add(F_rep, v_scale(rep_dir, rep_mag))
+
+        # 合成
+        # F_total = v_add(F_att, F_rep)
+        F_total = F_att  # 先只用引力测试效果
+        # 速度限制/归一化 (Formation 里用了 nxt = curr + Force，这里建议加一个限幅)
+        # 这样能防止斥力过大时飞出地球
+        # force_mag = v_norm(F_total)
+        # if force_mag > STEP:
+        #     F_total = v_scale(v_unit(F_total), STEP)
+
+        nxt = v_add(self_pos, F_total)
+
+        # 4. 状态更新与因为
+        # ----------------------------------------------------
+        # 推进 Lookahead (阈值判定)
+        if dist_to_target <= CLOSE_TH and lookahead < max_idx:
+            io.set_lookahead(agent.self_uid, lookahead + 1)
+            # 这种快速推进可以让飞机在直线上飞得更快，转弯时自动减速
+
+        # 写入
+        io.set_pos(agent.self_uid, nxt[0], nxt[1], nxt[2])
+        io.append_traj_points(agent.self_uid, nxt)
+        
+        # print (可选，减少日志垃圾)
+        # print(f"[{agent.self_uid}] Pos: {[round(x,1) for x in nxt]} -> Target: {lookahead}")
 # 世界状态查询行为
 class FetchWorldState(PeriodicBehaviour):
     async def run(self):

@@ -121,6 +121,7 @@ class BlueUAVAgent(BDIAgent):
         self.io = UavRedisIO(**kwargs.get("redis_cfg", {}))
         # Redis 初始化数据
         self.self_uid = jid.split("@")[0] 
+        self.server = jid.split("@")[1]
         self.io.add_uav_id(self.self_uid, blue=True)
         self.io.set_pos(self.self_uid, self.traj[0][0], self.traj[0][1], self.position[2])
         self.io.set_traj(self.self_uid, [[self.traj[0][0], self.traj[0][1], self.position[2]]])
@@ -196,7 +197,8 @@ class BlueUAVAgent(BDIAgent):
                 if str(digraph_attr['from']) == cur_start_node and str(digraph_attr['to']) == cur_end_node:
                     # 读取当前片段的轨迹规划参数，并设定参考轨迹 
                     print(f"[{self.jid}] cur order_mode:{digraph_attr['attrs']['order_mode']},order_type:{digraph_attr['attrs']['order_type']}")
-                    self.planning_lib.execute_path_planning_from_digraph(digraph_attr, -1, -1)
+                    self.cur_reference_traj = self.planning_lib.execute_path_planning_from_digraph(digraph_attr, -1, -1)
+                    self.traj.extend(self.cur_reference_traj[1:])  # 避免重复添加起点
                     _member_num = digraph_attr['members_num']
                     _radius = random.randint(20,30)
                     _angle = random.randint(30,60)
@@ -415,6 +417,221 @@ class MissionOrchestrator:
 
         return uav_trajectories
 
+    def _reconstruct_full_trajectories(self):
+        # 1. 准备工作：构建子节点到父节点的反向映射，用于确定合并时的顺序
+        child_to_parents = collections.defaultdict(list)
+        for parent, children in self.agent_lineage.items():
+            for child in children:
+                child_to_parents[child].append(parent)
+        
+        # 按照字符串顺序对父节点排序 (确保 determinism)
+        for child in child_to_parents:
+            child_to_parents[child].sort()
+
+        # 辅助函数：获取某 Agent 拥有的从机数量
+        def get_sub_count(agent_name):
+            count = 0
+            while f"{agent_name}_sub_{count}" in self.all_trajectories:
+                count += 1
+            return count
+
+        # 3. 识别 Roots
+        all_children = set()
+        for children in self.agent_lineage.values():
+            all_children.update(children)
+        
+        executed_masters = [k for k in self.all_trajectories.keys() if "_sub_" not in k]
+        roots = [a for a in executed_masters if a not in all_children]
+        
+        reconstructed = {}
+        
+        for root in roots:
+            paths = self._trace_paths(root)
+            print(f"Reconstructing trajectories for root {root} with path: {paths}.")
+            for i, path in enumerate(paths):
+                root_sub_count = get_sub_count(root)
+                
+                # 初始化容器
+                # 'master' 存储 Root Master 的轨迹
+                # 数字键存储 Root Sub k 的轨迹
+                path_trajs = {'master': {'lats': [], 'lngs': []}}
+                for idx in range(root_sub_count):
+                    path_trajs[idx] = {'lats': [], 'lngs': []}
+                
+                # 追踪当前的逻辑角色 (Logical Role) 映射到 物理实体 (Physical Entity)
+                # 初始状态下（在 Root 节点）：
+                # Root Master -> Physical Master ('master')
+                # Root Sub k  -> Physical Sub k  (k)
+                # 随着只有 step 向前推进，我们更新这个映射关系。
+                
+                # mapping: { logical_id (str/int) -> physical_role (str/int) }
+                # logical_id: 'master' or int (sub index)
+                # physical_role: 'master' or int (sub index in current agent) 或 None (如果该角色在当前层级消失/被挤出)
+                
+                current_mapping = {'master': 'master'}
+                for idx in range(root_sub_count):
+                    current_mapping[idx] = idx
+                    
+                for step_idx, agent_name in enumerate(path):
+                    # 如果不是起点，计算从 prev -> curr 的映射变换
+                    # 如果不是起点，计算从 prev -> curr 的映射变换
+                    if step_idx > 0:
+                        prev_name = path[step_idx - 1]
+
+                        # --- 1. Split Logic (Prev -> (..., Curr, ...)) ---
+                        # 判断 prev 是否分裂为多个子节点，如果是，计算当前 child (curr) 继承的分片
+                        prev_siblings = self.agent_lineage[prev_name]
+                        split_offset = 0
+                        split_capacity = 999999 
+
+                        if len(prev_siblings) > 1:
+                            try:
+                                # 计算在分裂中的位次
+                                my_rank_in_split = prev_siblings.index(agent_name)
+                                # 累加前面的兄弟占据的份额
+                                for sib in prev_siblings[:my_rank_in_split]:
+                                    split_offset += (1 + get_sub_count(sib))
+                                
+                                # 当前节点的“接收容量” (简单假设：有多少收多少)
+                                split_capacity = 1 + get_sub_count(agent_name)
+                            except ValueError:
+                                pass 
+
+                        # --- 2. Merge Logic ((..., Prev, ...) -> Curr) ---
+                        # 确定 prev 在 curr 的合并列表中的位置
+                        parents = child_to_parents[agent_name]
+                        
+                        try:
+                            parent_rank = parents.index(prev_name)
+                        except ValueError:
+                            # 理论上不应发生，除非 lineage 数据不一致
+                            print(f"Warning: {prev_name} is not in parents of {agent_name}")
+                            parent_rank = 0
+
+                        # 计算 prev 在 curr 中的“起始 Sub 偏移量”
+                        # 规则：
+                        # Initiator (rank 0): Master->Master, Subs->Subs [0...N]
+                        # Follower (rank > 0): Master->Sub [offset], Subs->Subs [offset+1...offset+1+N]
+                        # offset 累加之前所有 sibling 的 (1(Master) + Sub_Count)
+                        
+                        base_sub_offset = 0
+                        is_initiator = (parent_rank == 0)
+                        
+                        if not is_initiator:
+                            # 累加前面的兄弟占用的位置
+                            # 前面的兄弟如果是 Initiator，占用 count(Subs) 个 Sub 位 (它的Master占了Master位，不占Sub位)
+                            # 前面的兄弟如果是 Follower，占用 1(Master) + count(Subs) 个 Sub 位
+                            for sibling in parents[:parent_rank]:
+                                sibling_sub_count = get_sub_count(sibling)
+                                sibling_is_initiator = (parents.index(sibling) == 0)
+                                if sibling_is_initiator:
+                                    base_sub_offset += sibling_sub_count
+                                else:
+                                    base_sub_offset += (1 + sibling_sub_count)
+                        
+                        # --- 3. Execute Mapping Update ---
+                        next_mapping = {}
+                        
+                        for logical_id, phys_role in current_mapping.items():
+                            if phys_role is None:
+                                next_mapping[logical_id] = None
+                                continue
+
+                            # Step A: Convert phys_role (in Prev) to Linear Index
+                            curr_linear_in_prev = 0 if phys_role == 'master' else (phys_role + 1)
+
+                            # Step B: Apply Split Filter
+                            # 相对索引 = 绝对索引 - 分裂偏移
+                            rel_idx = curr_linear_in_prev - split_offset
+                            
+                            # check bounds
+                            if rel_idx < 0 or rel_idx >= split_capacity:
+                                # 这个实体被分给了其他分裂分支，不在当前路径中
+                                next_mapping[logical_id] = None
+                                continue
+
+                            # Step C: Convert Back to "Transfer Role" (as if 1-to-1 transfer)
+                            transfer_phys_role = 'master' if rel_idx == 0 else (rel_idx - 1)
+                            
+                            # Step D: Apply Merge Offset to land in Curr
+                            new_phys_role = None
+                            
+                            if is_initiator:
+                                # Initiator: 角色保持不变 (Master->Master, Sub k->Sub k) (相对于 Transfer Role)
+                                new_phys_role = transfer_phys_role 
+                            else:
+                                # Follower: 全部降级为 Sub
+                                if transfer_phys_role == 'master':
+                                    new_phys_role = base_sub_offset
+                                elif isinstance(transfer_phys_role, int):
+                                    new_phys_role = base_sub_offset + 1 + transfer_phys_role
+                                else:
+                                    new_phys_role = None
+                                    
+                            next_mapping[logical_id] = new_phys_role
+                        
+                        current_mapping = next_mapping
+
+                    # --- 数据提取 ---
+                    # 根据 current_mapping 提取当前 agent_name 下的数据
+                    for logical_id, phys_role in current_mapping.items():
+                        # logical_id: 'master' (Root Master) or int (Root Sub k)
+                        
+                        target_key = None
+                        if phys_role == 'master':
+                            target_key = agent_name
+                        elif isinstance(phys_role, int):
+                            target_key = f"{agent_name}_sub_{phys_role}"
+                        
+                        if target_key:
+                            data = self.all_trajectories.get(target_key)
+                            if data:
+                                path_trajs[logical_id]['lats'].extend(data['lats'])
+                                path_trajs[logical_id]['lngs'].extend(data['lngs'])
+
+                # 5. 保存结果
+                branch_suffix = f"_{i}" if len(paths) > 1 else ""
+                
+                # 保存 Master
+                if path_trajs['master']['lats']:
+                    reconstructed[f"{root}{branch_suffix}"] = {
+                        'lats': path_trajs['master']['lats'],
+                        'lngs': path_trajs['master']['lngs'],
+                        'ts': list(range(len(path_trajs['master']['lats'])))
+                    }
+                
+                # 保存 Subs
+                for idx in range(root_sub_count):
+                    if not path_trajs[idx]['lats']: continue
+                    reconstructed[f"{root}_sub_{idx}{branch_suffix}"] = {
+                        'lats': path_trajs[idx]['lats'],
+                        'lngs': path_trajs[idx]['lngs'],
+                        'ts': list(range(len(path_trajs[idx]['lats'])))
+                    }
+        
+        print(f"Traj Reconstruction Report:")
+        print(f"  - Identifying independent drone entities from {len(roots)} root groups.")
+        print(f"  - Total independent trajectories reconstructed: {len(reconstructed)}")
+        for key in reconstructed:
+            points = len(reconstructed[key]['ts'])
+            print(f"    * Entity '{key}': {points} points")
+        _dict_str = {
+            "uavs_coords_str": reconstructed
+        }
+        return _dict_str
+
+    def _trace_paths(self, current_node):
+        children = self.agent_lineage.get(current_node, [])
+        if not children:
+            return [[current_node]]
+        
+        paths = []
+        for child in children:
+            child_paths = self._trace_paths(child)
+            for cp in child_paths:
+                paths.append([current_node] + cp)
+        return paths
+
     async def run(self):
         print("Mission Orchestrator Started.")
         
@@ -445,7 +662,7 @@ class MissionOrchestrator:
         
         print("All missions completed.")
         
-        reconstructed_trajs = self._reconstruct_full_trajectories()
+        # reconstructed_trajs = self._reconstruct_full_trajectories()
         # reconstructed_trajs.update(json.load(open(facilities_file, "r")))
         # with open('uav_trajectories_from_BDI.json', 'w') as f:
         #     json.dump(reconstructed_trajs, f, indent=2)

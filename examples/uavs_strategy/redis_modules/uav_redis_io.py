@@ -1,5 +1,6 @@
 # uav_redis_io.py
 # -*- coding: utf-8 -*-
+from doctest import master
 import time
 import json
 from typing import Dict, List, Optional, Iterable, Tuple, Any
@@ -142,6 +143,36 @@ class UavRedisIO:
         key = f"uav:{uid}:ref_traj"
         self.r.set(key, json.dumps(points))
 
+    def set_nodes_pair_base_ref_traj(self, uid_from: str, uid_to: str, traj: List[List[float]]) -> None:
+        '''为digraph_attrs的一对节点定义基准参考轨迹，无人机agent基于这个参考轨迹计算集群内的各个从机轨迹'''
+        # 定义唯一的 master_uid
+        master_uid = f"{uid_from}_to_{uid_to}_base"
+        self.r.set(master_uid, json.dumps(traj))
+
+    # ---------- 协同：状态同步 ----------
+    def set_uav_state(self, uid: str, state_key: str, state_value: str) -> None:
+        """设置无人机的某个状态值 (用于多机协同)"""
+        key = f"uav:{uid}:state:{state_key}"
+        self.r.set(key, state_value)
+
+    def get_uav_state(self, uid: str, state_key: str) -> Optional[str]:
+        """获取无人机的某个状态值"""
+        key = f"uav:{uid}:state:{state_key}"
+        return self.r.get(key)
+    
+    def mget_uav_states(self, uids: List[str], state_key: str) -> Dict[str, str]:
+        """批量获取多个无人机的状态"""
+        p = self.r.pipeline()
+        keys = [f"uav:{uid}:state:{state_key}" for uid in uids]
+        for k in keys:
+            p.get(k)
+        vals = p.execute()
+        
+        result = {}
+        for uid, val in zip(uids, vals):
+            result[uid] = val if val else None
+        return result
+
     def set_members_ref_traj(self, master_uid: str, members_traj: List[List[List[float]]]) -> None:
         """
         为集群内的每一架从机定义uid并写入参考轨迹
@@ -172,6 +203,26 @@ class UavRedisIO:
             return []
         else:
             return json.loads(raw)
+    
+    def get_nodes_pair_base_ref_traj(self, uid_from: str, uid_to: str) -> List[List[float]]:
+        '''获取digraph_attrs的一对节点定义的基准参考轨迹'''
+        master_uid = f"{uid_from}_to_{uid_to}_base"
+        raw = self.r.get(master_uid)
+        if not raw:
+            return []
+        else:
+            return json.loads(raw)
+
+    def set_nodes_pair_member_traj(self, uid_from: str, uid_to: str, member_uid: str, traj: List[List[float]]) -> None:
+        """保存航段中特定成员的轨迹"""
+        key = f"nodes_pair_traj:{uid_from}:{uid_to}:{member_uid}"
+        self.r.set(key, json.dumps(traj))
+
+    def get_nodes_pair_member_traj(self, uid_from: str, uid_to: str, member_uid: str) -> List[List[float]]:
+        """获取航段中特定成员的轨迹"""
+        key = f"nodes_pair_traj:{uid_from}:{uid_to}:{member_uid}"
+        raw = self.r.get(key)
+        return json.loads(raw) if raw else []
 
 
     # ---------- 蓝方：预瞄点 ----------

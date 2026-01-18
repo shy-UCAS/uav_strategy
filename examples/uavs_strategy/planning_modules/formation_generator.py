@@ -1,5 +1,7 @@
+from email import generator
 import numpy as np
 import matplotlib.pyplot as plt
+from sympy import im
 
 class Formation_Elements:
     def __init__(self, member_num = 5, radius=20.0, traj = None, angle=45, max_offset=30.0, noise_scale=0.1, angle_noise_scale=3,
@@ -206,3 +208,173 @@ class FormationGenerator3D:
         ax.legend()
         plt.tight_layout()
         plt.show()
+
+    def generate_members_formation_map(self, uav_ids):
+        """
+        生成集群成员的轨迹字典，键为uav_id，值为对应的轨迹列表。
+        该函数检索uav_ids列表（如 cur_siblings_ids），并结合 generate_members_formation_3d 生成的轨迹数据，
+        返回 members_traj 字典。
+        
+        :param uav_ids: list, 集群的所有uav_ids
+        :return: dict, {uav_id: trajectory_list}
+        """
+        members_formation_paths = self.generate_members_formation_3d()
+        
+        # 建立 ID 到 轨迹 的映射
+        members_traj_map = {}
+        # 以此确保ID数量与生成的轨迹数量尽可能对应（取交集长度）
+        # 如果 uav_ids 是乱序的，这里假设与生成的编队位置顺序是一一对应的逻辑（通常0号是0位置，以此类推）
+        count = min(len(uav_ids), len(members_formation_paths))
+        
+        for i in range(count):
+            members_traj_map[uav_ids[i]] = members_formation_paths[i]
+            
+        return members_traj_map
+    
+    def plot_formation_map(self, members_traj_map: dict):
+        """
+        可视化集群成员轨迹字典
+        :param members_traj_map: dict, {uav_id: trajectory_list}, 由 generate_members_formation_map 生成
+        """
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # 画主机基准轨迹（如果有 self.traj）
+        if self.traj is not None:
+             ax.plot(*self.traj.T, '-k', label='Reference (Leader Base)', linewidth=2)
+
+        # 遍历字典画每个成员的轨迹
+        # 使用 matplotlib colormap 区分不同成员
+        colors = plt.cm.tab20(np.linspace(0, 1, len(members_traj_map)))
+        
+        for i, (uav_id, path_list) in enumerate(members_traj_map.items()):
+            path_arr = np.array(path_list)
+            if path_arr.shape[0] > 0:
+                ax.plot(*path_arr.T, color=colors[i], label=f'{uav_id}', alpha=0.8, linewidth=1.5)
+                # 标记起点
+                ax.scatter(*path_arr[0], color=colors[i], marker='o')
+        
+        ax.set_title(f"Formation Trajectories Map (Type: {self.formation_type})")
+        ax.set_xlabel('X (UTM-E)')
+        ax.set_ylabel('Y (UTM-N)')
+        ax.set_zlabel('Z (Altitude)')
+        ax.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+        # plt.tight_layout()
+        plt.show()
+
+if __name__ == "__main__":
+    import os
+    import json
+    import collections
+    import random
+    current_dir = os.path.dirname(__file__)
+    upper_dir = os.path.dirname(current_dir)
+    digraph_attrs_reference_path = os.path.join(upper_dir, "data", "digraph_with_attrs.json")
+    digraph_attrs = json.load(open(digraph_attrs_reference_path, "r"))
+    key_paths = [
+        ["1_0","1_1","1_2","3_0","3_1","4_1","4_2"],
+        ["2_0","2_1","2_2","3_0","3_1","5_1","5_2"],
+        ["1_0","1_1","1_2","3_0","3_1","6_1","6_2"]
+    ]
+    def extract_uav_trajectories(json_data, key_paths):
+        # 1. 构建图结构和属性索引
+        edge_attrs = {}
+        graph = collections.defaultdict(list)
+        
+        for item in json_data:
+            u, v = str(item["from"]), str(item["to"]) # 确保键是字符串
+            # members_num + 1 (1个主机 + N个从机)
+            total_drones = item["members_num"] + 1 
+            edge_attrs[(u, v)] = {
+                "count": total_drones,
+                "uav_ids": []
+            }
+            graph[u].append(v)
+
+        # 2. 统计所有可能的路径片段并进行路径拆分
+        # uav_paths 存储格式: { uav_id: [ [coord1, coord2...], [coord1... ] ] }
+        uav_trajectories = []
+        
+        # 我们需要跟踪每一条边剩余的“可用名额”
+        remaining_flow = {edge: attr["count"] for edge, attr in edge_attrs.items()}
+        # print("Initial remaining flow:", json.dumps({str(k): v for k, v in remaining_flow.items()}, indent=2))
+        
+        # 找到所有的起点 (这里根据 key_paths 的第一个元素确定)
+        # key_paths 的项类似于 "1_0" (节点名称)
+        # 我们需要起始节点。
+        starts = set(path[0] for path in key_paths)
+        
+        for start_node in starts:
+            # 查找从该起点出发的总流量
+            start_edges = [e for e in remaining_flow if e[0] == start_node]
+            total_at_start = sum(remaining_flow[e] for e in start_edges)
+            
+            for i in range(total_at_start):
+                current_node = start_node
+                single_uav_path = []
+                
+                # 随机游走直到没有出边或流量耗尽
+                while True:
+                    possible_next = [v for v in graph[current_node] if remaining_flow.get((current_node, v), 0) > 0]
+                    
+                    if not possible_next:
+                        break
+                    
+                    # 随机选择一个还有剩余流量的分支
+                    next_node = random.choice(possible_next)
+                    
+                    # 记录该片段的轨迹
+                    edge = (current_node, next_node)
+                    single_uav_path.append(edge)
+                    
+                    # 消耗一个流量
+                    remaining_flow[edge] -= 1
+                    current_node = next_node
+                
+                if single_uav_path:
+                    sorted_starts = sorted(list(starts))
+                    _idx = sorted_starts.index(start_node)
+                    uav_trajectories.append({
+                        "id": f'agent_{_idx+1}_{i}',
+                        "path": single_uav_path
+                    })
+        
+        for _traj in uav_trajectories:
+            for seg in _traj['path']:
+                if (seg[0], seg[1]) in edge_attrs.keys():
+                    edge_attrs[(seg[0], seg[1])]["uav_ids"].append(_traj["id"])
+
+
+        return uav_trajectories, edge_attrs
+    
+    uav_trajectories, edge_attrs = extract_uav_trajectories(digraph_attrs, key_paths)
+
+    for _key_path in key_paths:
+        for i in range(len(_key_path)-1):
+            start_node = _key_path[i]
+            end_node = _key_path[i+1]
+            for digraph_attr in digraph_attrs:
+                if str(digraph_attr["from"]) == start_node and str(digraph_attr["to"]) == end_node:
+                    traj = digraph_attr["attrs"]["plan"]['trajectory']
+                    uav_ids = edge_attrs[(start_node, end_node)]["uav_ids"]
+                    print(f"\nGenerating formation for segment {start_node} -> {end_node} with UAV IDs: {uav_ids}")
+                    formation_elements = Formation_Elements(
+                        member_num=digraph_attr["members_num"]+1,
+                        radius=20.0,
+                        traj=traj,
+                        angle=45,
+                        max_offset=30.0,
+                        noise_scale=0.00001,
+                        angle_noise_scale=3.0,
+                        formation_type='vshape'
+                    )
+                    _generator = FormationGenerator3D(formation_elements=formation_elements)
+                    formation_generator = _generator.generate_members_formation_map(
+                        uav_ids=uav_ids
+                    )
+                    # _generator.plot_formation_map(formation_generator)
+
+                    print(f"Segment {start_node} -> {end_node} formation trajectories:")
+                    for uav_id, uav_traj in formation_generator.items():
+                        print(f"  UAV ID: {uav_id},traj len: {len(uav_traj)} ,Trajectory :\n {json.dumps(uav_traj, indent=2)}")
+

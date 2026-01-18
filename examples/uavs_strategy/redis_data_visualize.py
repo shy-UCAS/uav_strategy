@@ -232,6 +232,13 @@ class MapVisualizer:
                     ref_arr = np.array(ref_traj)  # [[x,y,z],...]
                     ax.plot(ref_arr[:, 0], ref_arr[:, 1],
                             '--', linewidth=1, color='orange', alpha=0.7)
+
+                # 4. 绘制 Lookahead 点
+                lh_idx = lookahead_data.get(uid)
+                if lh_idx is not None and ref_traj and 0 <= lh_idx < len(ref_traj):
+                    lh_pt = ref_traj[lh_idx]  # [x, y, z]
+                    # 用紫色星号表示预瞄点
+                    ax.plot(lh_pt[0], lh_pt[1], 'm*', markersize=10, label=f'{uid} Lookahead')
         
         # 避免图例过多，可以只显示一部分或者不显示
         # ax.legend(loc='upper right', fontsize='small')

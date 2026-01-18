@@ -281,11 +281,12 @@ class PlanningLib:
             traj_2d = [self.agent.traj[-1], self.agent.traj[-1]]
 
         traj_3d = self.insert_height_val("breakthrough", traj_2d, start_h, end_h)
-        self.agent.cur_reference_traj = traj_3d
+        # self.agent.cur_reference_traj = traj_3d
         # 追加到当前完整轨迹
-        self.agent.traj.extend(traj_3d[1:])
+        # self.agent.traj.extend(traj_3d[1:])
 
         print(f"{self.agent.name} is breaking through {target}, trajectory:\n{traj_3d}")
+        return traj_3d
 
 
     def execute_escape(self, target: str, start_h: int, end_h: int):
@@ -294,10 +295,11 @@ class PlanningLib:
         """
         traj_2d = self.plan_escape(self.agent.traj[-1], target)
         traj_3d = self.insert_height_val("escape", traj_2d, start_h, end_h)
-        self.agent.cur_reference_traj = traj_3d
-        self.agent.traj.extend(traj_3d[1:])
+        # self.agent.cur_reference_traj = traj_3d
+        # self.agent.traj.extend(traj_3d[1:])
 
         print(f"{self.agent.name} is escaping {target}, trajectory:\n{traj_3d}")
+        return traj_3d
 
 
     def execute_detour(self, target: str, start_h: int, end_h: int):
@@ -308,10 +310,11 @@ class PlanningLib:
         traj_2d[0].append(self.agent.traj[-1][2])  # 保持当前高度不变
         traj_3d = self.insert_height_val("detour", traj_2d, start_h, end_h)
 
-        self.agent.cur_reference_traj = traj_3d
-        self.agent.traj.extend(traj_3d[1:])
+        # self.agent.cur_reference_traj = traj_3d
+        # self.agent.traj.extend(traj_3d[1:])
 
         print(f"{self.agent.name} is detouring {target}, trajectory:\n{self.agent.cur_reference_traj}")
+        return traj_3d
 
 
     def execute_attack(self, target: str):

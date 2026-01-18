@@ -16,7 +16,7 @@ import time
 import collections
 import random
 import math
-
+import networkx as nx
 
 from typing import Dict, List, Optional, Iterable, Tuple, Any
 from matplotlib.animation import FuncAnimation
@@ -31,18 +31,18 @@ from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
 from examples.uavs_strategy.planning_modules.uav_planning_actions import PlanningLib
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
 from examples.uavs_strategy.planning_modules.formation_generator import FormationGenerator3D, Formation_Elements
-from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FormationAPFStep, APFStep, FetchWorldState ,DT
+from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FormationAPFStep, Single_APFStep, FetchWorldState ,DT
 from examples.uavs_strategy.key_path_analyzer import KeyPathAnalyzer
 
 init_loc1 = [
-    122.09686551225597,
-    37.56536338371063,
+    122.18105710089186,
+    37.51299467977935,
     200.0
 ]
 
 init_loc2 = [
-    122.10258217246229,
-    37.56342057758475,
+    122.16096051695042,
+    37.497235513573486,
     200.0
 ]
 init_locs = [
@@ -87,17 +87,21 @@ facilities_file = os.path.join(current_dir,"data" ,"test_facilities_locations.js
 # 1. Blue UAV Agent
 # =============================
 class BlueUAVAgent(BDIAgent):
-    def __init__(self, jid, password, asl_file, flight_plan, orchestrator, init_pos=None, facilities=None, **kwargs):
+    def __init__(self, jid, password, asl_file, flight_plan, siblings_ref ,orchestrator, init_pos=None, facilities=None, **kwargs):
         super().__init__(jid, password, asl_file)
         self.flight_plan = flight_plan  # 航段列表: [{'segment': (u, v), 'coords': []}, ...]
+        self.siblings_ref = siblings_ref
         self.orchestrator = orchestrator
         self.path_index = 0
         self.is_finished = False
+        self._need_wait_siblings = False
+        self._is_alive = True
+        self.is_final_task = False
         
         # 确定起始节点
         if self.flight_plan:
-            self.current_node = self.flight_plan[0]['segment'][0]
-            self.next_node = self.flight_plan[0]['segment'][1]
+            self.current_node = self.flight_plan[0][0]
+            self.next_node = self.flight_plan[0][1]
         
         # 初始化设施
         self.facilities = self._default_facilities(facilities)
@@ -114,7 +118,9 @@ class BlueUAVAgent(BDIAgent):
              print("No initial position provided, generating random position.")
              _rdm_init_pos = bfunc.generate_circle_positions_from_diameter(1, init_loc1, init_loc2)
              self.position = _rdm_init_pos[0]
-        
+
+        # 汇聚时sibling无人机列表
+        self.merge_peers = []
         self.traj = self._lnglat2utm_convertor.lng_lat_to_utm_array(np.array([self.position])).tolist()
         self.traj[0].append(self.position[2])
         print(f"{self.jid} initialized at position: {self.position}")
@@ -127,7 +133,7 @@ class BlueUAVAgent(BDIAgent):
         self.io.set_traj(self.self_uid, [[self.traj[0][0], self.traj[0][1], self.position[2]]])
         self.io.set_lookahead(self.self_uid, 0)
 
-        self.APFStep = APFStep
+        self.APFStep = Single_APFStep
         self.FetchWorldState = FetchWorldState
         self.planning_lib = PlanningLib(self)
         self.cur_reference_traj = []
@@ -155,9 +161,22 @@ class BlueUAVAgent(BDIAgent):
             _facilities_info['defence_rings']
         )
     
+    def add_achievement_goal(self, name, *args):
+        """添加一个成就目标到意图缓冲区
+        """
+        new_args = ()
+        for x in args:
+            if type(x) == str:
+                new_args += (agentspeak.Literal(x),)
+            else:
+                new_args += (x,)
+        term = agentspeak.Literal(name, tuple(new_args))
+        self.bdi_intention_buffer.append((agentspeak.Trigger.addition, agentspeak.GoalType.achievement, term, agentspeak.runtime.Intention()))
+ 
+
     async def setup(self):
         # 注册周期任务
-        self.add_behaviour(FormationAPFStep(period=DT))
+        self.add_behaviour(Single_APFStep(period=DT))
         
     def add_custom_actions(self, actions):
         @actions.add(".act_digraph_path_planning", 2)
@@ -170,7 +189,104 @@ class BlueUAVAgent(BDIAgent):
                 
             cur_start_node = str(agentspeak.grounded(term.args[0], intention.scope))
             cur_end_node = str(agentspeak.grounded(term.args[1], intention.scope))
+            print(f"[{self.self_uid}] Planning path from node {cur_start_node} to node {cur_end_node}")
+            for digraph_attr in digraph_attrs:
+                if str(digraph_attr["from"]) == cur_start_node and str(digraph_attr["to"]) == cur_end_node:
+                    _order_mode = digraph_attr['attrs']['order_mode']
+                    if _order_mode == 'aggregate':
+                        self._merge_ready_flag = False
+                        # 先清空或初始化一个临时列表
+                        all_merge_peers = []
+                        for k, v in self.siblings_ref.items():
+                            # 找到所有以当前目标点为终点的航段（入边）
+                            if k[1] == cur_end_node:
+                                # 累加这些航段上的所有无人机（排除自己）
+                                peers = [_uav for _uav in v['uav_ids'] if _uav != self.self_uid]
+                                all_merge_peers.extend(peers)
+                        
+                        # 去重
+                        self.merge_peers = list(set(all_merge_peers))
+                        print(f"[{self.self_uid}] Merge peers for aggregation: {self.merge_peers}")
+                    else:
+                        self.merge_peers = []
+
+                    # 获取当前航段的所有成员ID
+                    cur_siblings_ids = self.siblings_ref.get((cur_start_node, cur_end_node), {}).get("uav_ids", [])
+                    print(f"[{self.self_uid}] Current segment siblings: {cur_siblings_ids}")
+                    # 检索当前航段的基准参考轨迹是否存在，如果不存在说明当前agent是第一个执行该航段的，需要设定参考基准轨迹，后续agent就可以直接获取
+                    base_ref_traj = self.io.get_nodes_pair_base_ref_traj(cur_start_node, cur_end_node)
+                    
+                    if not base_ref_traj or len(base_ref_traj) == 0:    
+                        print(f"[{self.self_uid}] No base reference traj found for segment {cur_start_node}->{cur_end_node}. I will generate it.")
+                        # 1. 生成基准参考轨迹
+                        base_ref_traj = self.planning_lib.execute_path_planning_from_digraph(digraph_attr, -1, -1)
+                        # 存储基准参考轨迹
+                        self.io.set_nodes_pair_base_ref_traj(cur_start_node, cur_end_node, base_ref_traj)
+                        # 2. 生成编队配置参数
+                        _member_num = digraph_attr['members_num']
+                        _radius = random.randint(20,30)
+                        _angle = random.randint(30,60)
+                        _max_offset = random.uniform(30,50)
+                        _noise_scale = random.uniform(0.00001,0.00005)
+                        _angle_noise_scale = random.uniform(1.0,5.0)
+                        _formation_type = random.choice(['circular', 'vertical', 'horizontal', 'vshape', 'arc'])
+                        # 处理集群从机队形轨迹
+                        fleet_formation_config = Formation_Elements(
+                            member_num=_member_num+1,
+                            radius=_radius,
+                            angle=_angle,
+                            traj=base_ref_traj,
+                            max_offset=_max_offset,
+                            noise_scale=_noise_scale,
+                            angle_noise_scale=_angle_noise_scale,
+                            formation_type=_formation_type,
+                        ) 
+                        
+                        # 3. 生成并存储所有成员的轨迹,也是只执行一次，后续成员直接获取
+                        members_traj_map = FormationGenerator3D(formation_elements=fleet_formation_config).generate_members_formation_map(cur_siblings_ids)
+                        
+                        for m_uid, m_traj in members_traj_map.items():
+                            self.io.set_nodes_pair_member_traj(cur_start_node, cur_end_node, m_uid, m_traj)
+                        
+                        print(f"[{self.self_uid}] Generated and saved trajectories for {len(members_traj_map)} members.")
+
+                    else:
+                        print(f"[{self.self_uid}] Found existing base reference trajectory for segment {cur_start_node} -> {cur_end_node}.")
+                    
+                    # 4. 获取属于自己的那条轨迹
+                    my_traj = []
+                    my_traj = self.io.get_nodes_pair_member_traj(cur_start_node, cur_end_node, self.self_uid)
+                    
+                    if my_traj:
+                         print(f"[{self.self_uid}] Successfully retrieved my formation trajectory (len={len(my_traj)}).")
+                         self.cur_reference_traj = my_traj
+                         self.traj.extend(my_traj[1:])
+                         self.bdi.set_belief("if_set_ref_traj", "true")
+                    else:
+                         print(f"[{self.self_uid}] FAILED to retrieve formation trajectory after retries!")
+
+            # 更新 path_index 以指向下一段航程
+            current_idx = self.path_index
+            if current_idx + 1 < len(self.flight_plan):
+                next_idx = current_idx + 1
+                next_start = self.flight_plan[next_idx][0]
+                next_end = self.flight_plan[next_idx][1]
+                
+                # 更新 BDI 信念，以便 agent 能够触发对下一段的处理
+                print(f"[{self.self_uid}] Segment planned. Prepared next belief: cur_nodes({next_start}, {next_end})")
+                self.bdi.set_belief("cur_nodes", next_start, next_end)
+                self.path_index = next_idx
+            else:
+                 # 已经是最后一段
+                 print(f"[{self.self_uid}] All segments in flight plan are planned. Marking as final task.")
+                 self.is_final_task = True
             
+            # 将自己的状态设置为 ready，表示已经准备好执行任务（或者已经开始）
+            # 注意：实际任务开始是在 APFStep 中判断 can_task_start
+            # 这里先不设置 True，因为还要等 can_task_start 真正变成 True（即上一段飞完）
+            # 或者我们可以认为 "Plan" 完这一步就代表我想进入下一阶段的状态了
+            # 更好的做法是在 APFStep 结束上一段时设置 "ready_for_next"
+            # 暂时我们只在这里处理路径规划本身的逻辑。
 
             yield
 
@@ -183,12 +299,15 @@ class MissionOrchestrator:
         self.BlueBDIAgentTemplate = BlueBDIAgentTemplate
         
         # 1. 生成全局飞行计划
-        self.uav_flight_plans = self.extract_uav_trajectories(json_data, key_paths)
+        self.uav_flight_plans, self.edge_attrs = self.extract_uav_trajectories(json_data, key_paths)
         print(f"Generated {len(self.uav_flight_plans)} flight plans.")
-
+        print(json.dumps(self.uav_flight_plans, indent=2))
+        print("Edge attributes with assigned UAV IDs:")
+        print(json.dumps({f"{k[0]}->{k[1]}": v for k, v in self.edge_attrs.items()}, indent=2))
         self.active_agents: Dict[str, BlueUAVAgent] = {}
         self._lnglat2utm_convertor = bfunc.LngLat2UTM()
         self.all_trajectories = {}
+        self._plan_graph = nx.DiGraph()
         
         # 同步队列
         # Key: (from_node, to_node) -> Value: List[agent_id] waiting
@@ -202,6 +321,9 @@ class MissionOrchestrator:
              # members_num + 1 Leader
              self.edge_requirements[(u, v)] = item["members_num"] + 1
 
+    def _init_DAG_structure(self):
+        for k, v in self.edge_attrs.items():
+            self._plan_graph.add_edge(k[0], k[1], count=v["count"], uav_ids=v["uav_ids"])
 
 
     def extract_uav_trajectories(self, json_data, key_paths):
@@ -215,7 +337,7 @@ class MissionOrchestrator:
             total_drones = item["members_num"] + 1 
             edge_attrs[(u, v)] = {
                 "count": total_drones,
-                "trajectory": item["attrs"]["plan"]["trajectory"]
+                "uav_ids": []
             }
             graph[u].append(v)
 
@@ -253,22 +375,27 @@ class MissionOrchestrator:
                     
                     # 记录该片段的轨迹
                     edge = (current_node, next_node)
-                    single_uav_path.append({
-                        "segment": edge,
-                        "coords": [] # 占位符
-                    })
+                    single_uav_path.append(edge)
                     
                     # 消耗一个流量
                     remaining_flow[edge] -= 1
                     current_node = next_node
                 
                 if single_uav_path:
+                    sorted_starts = sorted(list(starts))
+                    _idx = sorted_starts.index(start_node)
                     uav_trajectories.append({
-                        "id": f'agent_{start_node}_{i}',
+                        "id": f'agent_{_idx+1}_{i}',
                         "path": single_uav_path
                     })
+        
+        for _traj in uav_trajectories:
+            for seg in _traj['path']:
+                if (seg[0], seg[1]) in edge_attrs.keys():
+                    edge_attrs[(seg[0], seg[1])]["uav_ids"].append(_traj["id"])
 
-        return uav_trajectories
+
+        return uav_trajectories, edge_attrs
 
     async def run(self):
         print("Mission Orchestrator Started (Persistent Mode).")
@@ -296,12 +423,12 @@ class MissionOrchestrator:
             await asyncio.sleep(1.0)
             
         print("All persistent missions completed.")
-        self.save_trajectories()
+        # self.save_trajectories()
 
     async def _spawn_persistent_agent(self, agent_name, flight_plan):
         jid = f"{agent_name}@{self.server}"
         print(f"\nSpawning persistent agent: {jid} with {len(flight_plan)} segments")
-        agent = self.BlueBDIAgentTemplate(jid, self.password, self.asl_file, flight_plan, self)
+        agent = self.BlueBDIAgentTemplate(jid, self.password, self.asl_file, flight_plan, self.edge_attrs, self)
         await agent.start()
         self.active_agents[agent_name] = agent
 
@@ -331,7 +458,7 @@ async def start_agent(server, password):
         # 假设 Redis 运行在本地默认端口
         r_conn = redis.Redis(host='127.0.0.1', port=6379, db=0)
         r_conn.flushdb()
-        print("[System] agent02 code with Redis database flushed successfully.")
+        print("[System] uav_dynamic_agents02 with Redis database flushed successfully.")
     except Exception as e:
         print(f"[System] Warning: Failed to flush Redis: {e}")
 
