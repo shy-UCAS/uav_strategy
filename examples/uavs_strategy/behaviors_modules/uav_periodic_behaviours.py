@@ -425,3 +425,136 @@ class FetchWorldState(PeriodicBehaviour):
         # 写入到 agent.world 中
         agent.world["blue_pos"] = {k: v for k, v in blue_all.items() if v}
         agent.world["red_pos"] = {k: v for k, v in red_all.items() if v}
+
+class SyncAPFStep(PeriodicBehaviour):
+    async def run(self):
+        agent: "BlueUAVAgent" = self.agent
+        io = agent.io
+        
+        # 0. BDI 状态同步
+        my_can_start = agent.bdi.get_belief("can_task_start", "false")
+        state_val = "true" if "true" in str(my_can_start) else "false"
+        io.set_uav_state(agent.self_uid, "can_task_start", state_val)
+
+        if agent.merge_peers and state_val == "true":
+            states = io.mget_uav_states(agent.merge_peers, "can_task_start")
+            all_ready = True
+            for pid, status in states.items():
+                if status != "true":
+                    all_ready = False
+                    break
+            if not all_ready:
+                return 
+            else:
+                 if not hasattr(agent, "_merge_ready_flag") or not agent._merge_ready_flag:
+                     print(f"[{agent.self_uid}] All merge peers are READY! Proceeding.")
+                     agent._merge_ready_flag = True
+                     if hasattr(agent, "add_achievement_goal"):
+                        agent.add_achievement_goal("task_digraph")
+                 return 
+
+        # 1. 轨迹同步
+        if_set_ref = agent.bdi.get_belief("if_set_ref_traj")
+        if if_set_ref:
+             val_str = if_set_ref[len("if_set_ref_traj("):-1]
+             if val_str == "true" and agent.cur_reference_traj:
+                 io.set_ref_traj(agent.self_uid, agent.cur_reference_traj)
+                 agent.bdi.set_belief("if_set_ref_traj", "false")
+                 print(f"[{agent.self_uid}] Trajectory synced to Redis.")
+
+        # 2. 获取状态
+        me = io.get_pos(agent.self_uid, blue=True)
+        if not me: return
+
+        traj = agent.cur_reference_traj
+        if not traj: return
+
+        lookahead = io.get_lookahead(agent.self_uid)
+        max_idx = len(traj) - 1
+        lookahead = max(0, min(lookahead, max_idx))
+        
+        target = traj[lookahead]
+        self_pos = [me["x"], me["y"], me["z"]]
+        dist_to_target = v_norm(v_sub(target, self_pos))
+
+        # ==== 3. Segment Start Synchronization ====
+        # 只有在轨迹起点 (lookahead=0) 且已经到达该点附近时，触发等待
+        if lookahead == 0 and dist_to_target <= CLOSE_TH and hasattr(agent, "current_segment_siblings") and agent.current_segment_siblings:
+             # Check if already synced for THIS segment
+            if not getattr(agent, "has_synced_segment", False):
+                # A. 标记自己正在等待当前特定的 Segment
+                # 使用 current_segment_key 作为值，防止不同步的 Agent (还在上一段的) 干扰
+                target_sync_key = getattr(agent, "current_segment_key", "unknown")
+                io.set_uav_state(agent.self_uid, "current_segment_sync", target_sync_key)
+                
+                # B. 检查队友状态
+                peers_to_check = [p for p in agent.current_segment_siblings if p != agent.self_uid]
+                
+                if peers_to_check:
+                    peer_states = io.mget_uav_states(peers_to_check, "current_segment_sync")
+                    all_arrived = True
+                    for p, s in peer_states.items():
+                        # 必须所有人都声明自己在同一个 Segment Key 上
+                        if s != target_sync_key:
+                            all_arrived = False
+                            break
+                    
+                    if not all_arrived:
+                        # 还没齐，维持位置，不推进 lookahead
+                        # 修复：只更新位置，不要使用 set_traj 会清空历史轨迹
+                        io.set_pos(agent.self_uid, self_pos[0], self_pos[1], self_pos[2])
+                        return 
+                    else:
+                        print(f"[{agent.self_uid}] All siblings synced at start of {target_sync_key}. Starting!")
+                        agent.has_synced_segment = True
+                        io.set_lookahead(agent.self_uid, 1)
+                else:
+                    agent.has_synced_segment = True
+                    io.set_lookahead(agent.self_uid, 1)
+
+        # 4. 检查任务结束
+        if lookahead >= max_idx and dist_to_target <= CLOSE_TH:
+            io.set_lookahead(agent.self_uid, 0)
+            
+            # 清理状态：标记已完成
+            io.set_uav_state(agent.self_uid, "current_segment_sync", "finished")
+
+            agent.bdi.set_belief("can_task_start", True)
+            if agent.is_final_task:
+                agent.is_finished = True
+            else:
+                if not agent.is_finished: 
+                    if hasattr(agent, "add_achievement_goal") and not agent.merge_peers:
+                        agent.add_achievement_goal("task_digraph")
+                    print(f"[{agent.self_uid}] Segment completed (reached end).")
+            return
+
+        # 5. 物理计算 (Attraction + Repulsion)
+        agent.blue_ids = io.get_ids(blue=True)
+        all_blue_pos = io.mget_pos(agent.blue_ids, blue=True)
+        
+        F_att = v_scale(v_sub(target, self_pos), K_ATT)
+        
+        F_rep = [0.0, 0.0, 0.0]
+        for other_uid, other_data in all_blue_pos.items():
+            if other_uid == agent.self_uid or not other_data: continue
+            other_pos = [other_data['x'], other_data['y'], other_data['z']]
+            dist = v_norm(v_sub(self_pos, other_pos))
+            d_safe = 15.0  
+            if dist < d_safe:
+                rep_mag = K_REP * (1.0/dist - 1.0/d_safe) * 50.0 
+                rep_dir = v_unit(v_sub(self_pos, other_pos))
+                F_rep = v_add(F_rep, v_scale(rep_dir, rep_mag))
+
+        # F_total = v_add(F_att, F_rep)
+        F_total = F_att  # 先只用引力测试效果
+        nxt = v_add(self_pos, F_total)
+
+        # 6. 状态更新
+        if dist_to_target <= CLOSE_TH and lookahead < max_idx:
+             # 只有在已同步 (或不需要同步) 后才推进
+            if lookahead > 0 or getattr(agent, "has_synced_segment", False) or not agent.current_segment_siblings:
+                 io.set_lookahead(agent.self_uid, lookahead + 1)
+
+        io.set_pos(agent.self_uid, nxt[0], nxt[1], nxt[2])
+        io.append_traj_points(agent.self_uid, nxt)

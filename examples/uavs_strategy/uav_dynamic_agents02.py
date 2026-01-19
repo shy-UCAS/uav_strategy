@@ -31,7 +31,7 @@ from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
 from examples.uavs_strategy.planning_modules.uav_planning_actions import PlanningLib
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
 from examples.uavs_strategy.planning_modules.formation_generator import FormationGenerator3D, Formation_Elements
-from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FormationAPFStep, Single_APFStep, FetchWorldState ,DT
+from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FormationAPFStep, Single_APFStep, FetchWorldState, SyncAPFStep ,DT
 from examples.uavs_strategy.key_path_analyzer import KeyPathAnalyzer
 
 init_loc1 = [
@@ -83,6 +83,7 @@ key_path_instructions = json.load(open(key_path_instructions_path, "r"))
 bdi_instructions = key_path_instructions["bdi_instructions"]
 # facilities_file = os.path.join(current_dir,"data" ,"facilities.json")
 facilities_file = os.path.join(current_dir,"data" ,"test_facilities_locations.json")
+
 # =============================
 # 1. Blue UAV Agent
 # =============================
@@ -132,8 +133,13 @@ class BlueUAVAgent(BDIAgent):
         self.io.set_pos(self.self_uid, self.traj[0][0], self.traj[0][1], self.position[2])
         self.io.set_traj(self.self_uid, [[self.traj[0][0], self.traj[0][1], self.position[2]]])
         self.io.set_lookahead(self.self_uid, 0)
+        
+        # Sync attributes
+        self.current_segment_siblings = []
+        self.current_segment_key = None
+        self.has_synced_segment = False
 
-        self.APFStep = Single_APFStep
+        self.APFStep = SyncAPFStep
         self.FetchWorldState = FetchWorldState
         self.planning_lib = PlanningLib(self)
         self.cur_reference_traj = []
@@ -176,7 +182,7 @@ class BlueUAVAgent(BDIAgent):
 
     async def setup(self):
         # 注册周期任务
-        self.add_behaviour(Single_APFStep(period=DT))
+        self.add_behaviour(SyncAPFStep(period=DT))
         
     def add_custom_actions(self, actions):
         @actions.add(".act_digraph_path_planning", 2)
@@ -189,6 +195,11 @@ class BlueUAVAgent(BDIAgent):
                 
             cur_start_node = str(agentspeak.grounded(term.args[0], intention.scope))
             cur_end_node = str(agentspeak.grounded(term.args[1], intention.scope))
+            
+            # Reset Sync Flag for new segment
+            self.has_synced_segment = False
+            self.current_segment_key = f"{cur_start_node}_{cur_end_node}"
+            
             print(f"[{self.self_uid}] Planning path from node {cur_start_node} to node {cur_end_node}")
             for digraph_attr in digraph_attrs:
                 if str(digraph_attr["from"]) == cur_start_node and str(digraph_attr["to"]) == cur_end_node:
@@ -212,6 +223,7 @@ class BlueUAVAgent(BDIAgent):
 
                     # 获取当前航段的所有成员ID
                     cur_siblings_ids = self.siblings_ref.get((cur_start_node, cur_end_node), {}).get("uav_ids", [])
+                    self.current_segment_siblings = cur_siblings_ids
                     print(f"[{self.self_uid}] Current segment siblings: {cur_siblings_ids}")
                     # 检索当前航段的基准参考轨迹是否存在，如果不存在说明当前agent是第一个执行该航段的，需要设定参考基准轨迹，后续agent就可以直接获取
                     base_ref_traj = self.io.get_nodes_pair_base_ref_traj(cur_start_node, cur_end_node)
