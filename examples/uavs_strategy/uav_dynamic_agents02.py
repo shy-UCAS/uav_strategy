@@ -435,7 +435,7 @@ class MissionOrchestrator:
             await asyncio.sleep(1.0)
             
         print("All persistent missions completed.")
-        # self.save_trajectories()
+        self.save_trajectories()
 
     async def _spawn_persistent_agent(self, agent_name, flight_plan):
         jid = f"{agent_name}@{self.server}"
@@ -445,20 +445,55 @@ class MissionOrchestrator:
         self.active_agents[agent_name] = agent
 
     def save_trajectories(self):
-        # 从 Redis 提取轨迹
+        print("Collecting trajectories and facility info...")
+        
+        # 1. Load Facilities Info
+        facilities_data = {}
+        if os.path.exists(facilities_file):
+            with open(facilities_file, 'r', encoding='utf-8') as f:
+                facilities_data = json.load(f)
+        
+        facilities_str = facilities_data.get('facilities_str', {})
+        defence_rings = facilities_data.get('defence_rings', {})
+        
+        # 2. Collect UAV Trajectories
+        uavs_coords = {}
+        
         for name, agent in self.active_agents.items():
+            # Get trajectory from Redis
             traj_utm = agent.io.get_traj(agent.self_uid)
+            
             if traj_utm:
                 traj_np = np.array(traj_utm)
-                if traj_np.shape[0]>0:
+                if traj_np.shape[0] > 0:
+                    # Convert to Lat/Lon
                     ll = self._lnglat2utm_convertor.utm_to_lng_lat_array(traj_np)
-                    self.all_trajectories[name] = {
-                        'lats': ll[:,1].tolist(),
-                        'lngs': ll[:,0].tolist()
+                    lats = ll[:, 1].tolist()
+                    lngs = ll[:, 0].tolist()
+                    
+                    # Generate Timesteps
+                    # Assuming DT seconds per step
+                    ts = [i * DT for i in range(len(lats))]
+                    
+                    uavs_coords[name] = {
+                        "lats": lats,
+                        "lngs": lngs,
+                        "ts": ts
                     }
-        # with open('uav_trajectories_persistent.json', 'w') as f:
-        #     json.dump(self.all_trajectories, f)
-        print("Trajectories collected.")
+        
+        # 3. Construct Final Data Structure
+        final_data = {
+            "uavs_coords_str": uavs_coords,
+            "facilities_str": facilities_str,
+            "defence_rings": defence_rings
+        }
+        
+        # 4. Save to File
+        output_file = "uav_trajectories_persistent.json"
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(final_data, f, indent=4)
+            
+        print(f"All data saved to {output_file}")
 
 
 
