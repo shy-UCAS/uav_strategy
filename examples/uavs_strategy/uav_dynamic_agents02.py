@@ -1,4 +1,12 @@
-# 动态创建 / 删除 BlueUAVAgent 
+# agent_dynamic_agents02将所有无人机看做一个独立的agent，不再区分每个任务阶段设置一个agent
+# 所有agent任务完成后不停止,等待下一个任务指令
+# 通过MissionOrchestrator统一管理所有Persistent Agents的生命周期
+# 每个agent根据key_paths生成的bdi_instructions执行任务
+# 每个agent根据当前航段的属性决定是否需要与同航段其他agent同步
+# 如果需要同步，则等待其他agent准备完毕后再开始当前航段任务
+# 每个agent在执行航段任务前，先检查当前航段是否已有基准参考轨迹
+# 如果没有，则生成基准参考轨迹，并根据编队参数生成所有成员的轨迹，存储到redis服务器
+# 如果有，则直接从redis服务器获取自己的轨迹
 # 结合key_paths处理提取出的数据,数据导入redis服务器
 # 使用一个固定通用的asl文件处理uav_key_path.asl
 
@@ -152,6 +160,8 @@ class BlueUAVAgent(BDIAgent):
              self.bdi.set_belief("cur_nodes", self.current_node, self.next_node)
         self.bdi.set_belief("if_set_ref_traj", "False")
         self.bdi.set_belief('my_id', self.self_uid)
+        
+        self.formation_type = "unknown" # 初始化队形类型
 
     def _default_facilities(self, default_json_path=None):
         if default_json_path is None:
@@ -229,7 +239,7 @@ class BlueUAVAgent(BDIAgent):
                     base_ref_traj = self.io.get_nodes_pair_base_ref_traj(cur_start_node, cur_end_node)
                     
                     if not base_ref_traj or len(base_ref_traj) == 0:    
-                        print(f"[{self.self_uid}] No base reference traj found for segment {cur_start_node}->{cur_end_node}. I will generate it.")
+                        print(f"[{self.self_uid}] No base reference traj found for segment {cur_start_node}->{cur_end_node}. Now generate it.")
                         # 1. 生成基准参考轨迹
                         base_ref_traj = self.planning_lib.execute_path_planning_from_digraph(digraph_attr, -1, -1)
                         # 存储基准参考轨迹
@@ -242,6 +252,10 @@ class BlueUAVAgent(BDIAgent):
                         _noise_scale = random.uniform(0.00001,0.00005)
                         _angle_noise_scale = random.uniform(1.0,5.0)
                         _formation_type = random.choice(['circular', 'vertical', 'horizontal', 'vshape', 'arc'])
+                        
+                        # 保存 formation_type 到 Redis 以供后续加入的成员查询
+                        self.io.r.set(f"formation_type:{cur_start_node}:{cur_end_node}", _formation_type)
+                        
                         # 处理集群从机队形轨迹
                         fleet_formation_config = Formation_Elements(
                             member_num=_member_num+1,
@@ -254,7 +268,7 @@ class BlueUAVAgent(BDIAgent):
                             formation_type=_formation_type,
                         ) 
                         
-                        # 3. 生成并存储所有成员的轨迹,也是只执行一次，后续成员直接获取
+                        # 3. 生成并存储所有成员的轨迹,只执行一次，后续成员从redis获取
                         members_traj_map = FormationGenerator3D(formation_elements=fleet_formation_config).generate_members_formation_map(cur_siblings_ids)
                         
                         for m_uid, m_traj in members_traj_map.items():
@@ -264,6 +278,15 @@ class BlueUAVAgent(BDIAgent):
 
                     else:
                         print(f"[{self.self_uid}] Found existing base reference trajectory for segment {cur_start_node} -> {cur_end_node}.")
+                        # 尝试获取此航段的 formation_type
+                        _ft = self.io.r.get(f"formation_type:{cur_start_node}:{cur_end_node}")
+                        # 兼容 decode_responses=True 和 False 的情况
+                        if isinstance(_ft, bytes):
+                             _formation_type = _ft.decode('utf-8')
+                        else:
+                             _formation_type = _ft if _ft else "unknown"
+
+                    self.formation_type = _formation_type
                     
                     # 4. 获取属于自己的那条轨迹
                     my_traj = []
@@ -272,7 +295,22 @@ class BlueUAVAgent(BDIAgent):
                     if my_traj:
                          print(f"[{self.self_uid}] Successfully retrieved my formation trajectory (len={len(my_traj)}).")
                          self.cur_reference_traj = my_traj
-                         self.traj.extend(my_traj[1:])
+                         
+                         #  保证轨迹是连续拼接
+                         if not self.traj:
+                             self.traj.extend(my_traj)
+                         else:
+                             last_pt = np.array(self.traj[-1][:2]) # xy only
+                             first_pt = np.array(my_traj[0][:2])
+                             dist = np.linalg.norm(last_pt - first_pt)
+                             
+
+                             if dist < 1.0:
+                                 self.traj.extend(my_traj[1:])
+                             else:
+                                 print(f"[{self.self_uid}] Detect gap ({dist:.2f}m) between segments. Keeping full trajectory.")
+                                 self.traj.extend(my_traj)
+
                          self.bdi.set_belief("if_set_ref_traj", "true")
                     else:
                          print(f"[{self.self_uid}] FAILED to retrieve formation trajectory after retries!")
@@ -359,7 +397,6 @@ class MissionOrchestrator:
         
         # 我们需要跟踪每一条边剩余的“可用名额”
         remaining_flow = {edge: attr["count"] for edge, attr in edge_attrs.items()}
-        # print("Initial remaining flow:", json.dumps({str(k): v for k, v in remaining_flow.items()}, indent=2))
         
         # 找到所有的起点 (这里根据 key_paths 的第一个元素确定)
         # key_paths 的项类似于 "1_0" (节点名称)
@@ -455,6 +492,12 @@ class MissionOrchestrator:
         
         facilities_str = facilities_data.get('facilities_str', {})
         defence_rings = facilities_data.get('defence_rings', {})
+
+        for _ring_name, _ring_llgs in defence_rings.items():
+            flat = []
+            for _lng, _lat in zip(_ring_llgs['lngs'], _ring_llgs['lats']):
+                flat.extend([_lng, _lat])
+            facilities_str[_ring_name.upper()] = flat
         
         # 2. Collect UAV Trajectories
         uavs_coords = {}
@@ -462,6 +505,7 @@ class MissionOrchestrator:
         for name, agent in self.active_agents.items():
             # Get trajectory from Redis
             traj_utm = agent.io.get_traj(agent.self_uid)
+            traj_extra = agent.io.get_traj_extra(agent.self_uid)
             
             if traj_utm:
                 traj_np = np.array(traj_utm)
@@ -473,12 +517,24 @@ class MissionOrchestrator:
                     
                     # Generate Timesteps
                     # Assuming DT seconds per step
-                    ts = [i * DT for i in range(len(lats))]
+                    ts = [i  for i in range(len(lats))]
                     
+                    # 对齐 Extra Info
+                    aligned_extras = []
+                    # 初始点可能没有 extra info, 用第一个记录补齐或空
+                    diff = len(lats) - len(traj_extra)
+                    if diff > 0:
+                        # 前面的点补空
+                        aligned_extras.extend([{"cur_siblings_ids":[], "formation_type":"unknown"}] * diff)
+                        aligned_extras.extend(traj_extra)
+                    else:
+                        aligned_extras = traj_extra[:len(lats)]
+
                     uavs_coords[name] = {
                         "lats": lats,
                         "lngs": lngs,
-                        "ts": ts
+                        "ts": ts,
+                        "extras": aligned_extras
                     }
         
         # 3. Construct Final Data Structure

@@ -205,16 +205,16 @@ class MapVisualizer:
                 if abs(now_ms - pos['ts']) < 2000:
                     is_active = True
 
-            # 1. 实际飞行轨迹（历史） - 始终显示
-            # 即使是停止的无人机，也保留其轨迹线
-            traj = traj_data.get(uid, [])
-            if traj:
-                traj_arr = np.array(traj)  # [[x,y,z],...]
-                # 活跃的用实线，非活跃的可以用虚线或透明度区别，这里统一用实线
-                style = '-' 
-                alpha = 1.0 if is_active else 0.4  # 非活跃的变淡
-                ax.plot(traj_arr[:, 0], traj_arr[:, 1],
-                        style, linewidth=1.5, alpha=alpha, label=f'{uid} Path')
+            # # 1. 实际飞行轨迹（历史） - 始终显示
+            # # 即使是停止的无人机，也保留其轨迹线
+            # traj = traj_data.get(uid, [])
+            # if traj:
+            #     traj_arr = np.array(traj)  # [[x,y,z],...]
+            #     # 活跃的用实线，非活跃的可以用虚线或透明度区别，这里统一用实线
+            #     style = '-' 
+            #     alpha = 1.0 if is_active else 0.4  # 非活跃的变淡
+            #     ax.plot(traj_arr[:, 0], traj_arr[:, 1],
+            #             style, linewidth=1.5, alpha=alpha, label=f'{uid} Path')
 
             # 2. 当前无人机位置
             # 活跃状态正常显示，不活跃状态变浅
@@ -233,12 +233,12 @@ class MapVisualizer:
                     ax.plot(ref_arr[:, 0], ref_arr[:, 1],
                             '--', linewidth=1, color='orange', alpha=0.7)
 
-                # 4. 绘制 Lookahead 点
-                lh_idx = lookahead_data.get(uid)
-                if lh_idx is not None and ref_traj and 0 <= lh_idx < len(ref_traj):
-                    lh_pt = ref_traj[lh_idx]  # [x, y, z]
-                    # 用紫色星号表示预瞄点
-                    ax.plot(lh_pt[0], lh_pt[1], 'm*', markersize=10, label=f'{uid} Lookahead')
+                # # 4. 绘制 Lookahead 点
+                # lh_idx = lookahead_data.get(uid)
+                # if lh_idx is not None and ref_traj and 0 <= lh_idx < len(ref_traj):
+                #     lh_pt = ref_traj[lh_idx]  # [x, y, z]
+                #     # 用紫色星号表示预瞄点
+                #     ax.plot(lh_pt[0], lh_pt[1], 'm*', markersize=10, label=f'{uid} Lookahead')
         
         # 避免图例过多，可以只显示一部分或者不显示
         # ax.legend(loc='upper right', fontsize='small')

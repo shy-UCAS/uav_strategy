@@ -1,321 +1,1581 @@
-[System] Redis database flushed successfully.
-BDI instructions: {
-  "agent_1": [
-    {
-      "segment_id": "seg_0",
-      "path": [
+[System] uav_dynamic_agents02 with Redis database flushed successfully.
+Generated 14 flight plans.
+[
+  {
+    "id": "agent_2_0",
+    "path": [
+      [
         "2_0",
+        "2_1"
+      ],
+      [
         "2_1",
+        "2_2"
+      ],
+      [
         "2_2",
         "3_0"
       ],
-      "action_at_end": "merge_and_terminate",
-      "next_segment_hint": "seg_1",
-      "role_in_merge": "initiator"
-    }
-  ],
-  "agent_2": [
-    {
-      "segment_id": "seg_2",
-      "path": [
-        "1_0",
-        "1_1",
-        "1_2",
-        "3_0"
-      ],
-      "action_at_end": "merge_and_terminate",
-      "next_segment_hint": "seg_1",
-      "role_in_merge": "participant"
-    }
-  ],
-  "agent_merged_at_3_0": [
-    {
-      "segment_id": "seg_1",
-      "path": [
+      [
         "3_0",
         "3_1"
       ],
-      "action_at_end": "split_and_terminate",
-      "branches": [
-        {
-          "new_agent_hint": "agent_merged_at_3_0_sub_seg_3",
-          "segment_id": "seg_3",
-          "path": [
-            "3_1",
-            "4_1",
-            "4_2"
-          ]
-        },
-        {
-          "new_agent_hint": "agent_merged_at_3_0_sub_seg_4",
-          "segment_id": "seg_4",
-          "path": [
-            "3_1",
-            "5_1",
-            "5_2"
-          ]
-        },
-        {
-          "new_agent_hint": "agent_merged_at_3_0_sub_seg_5",
-          "segment_id": "seg_5",
-          "path": [
-            "3_1",
-            "6_1",
-            "6_2"
-          ]
-        }
-      ]
-    }
-  ],
-  "agent_merged_at_3_0_sub_seg_3": [
-    {
-      "segment_id": "seg_3",
-      "path": [
+      [
         "3_1",
-        "4_1",
-        "4_2"
+        "5_1"
       ],
-      "action_at_end": "finish"
-    }
-  ],
-  "agent_merged_at_3_0_sub_seg_4": [
-    {
-      "segment_id": "seg_4",
-      "path": [
-        "3_1",
+      [
         "5_1",
         "5_2"
+      ]
+    ]
+  },
+  {
+    "id": "agent_2_1",
+    "path": [
+      [
+        "2_0",
+        "2_1"
       ],
-      "action_at_end": "finish"
-    }
-  ],
-  "agent_merged_at_3_0_sub_seg_5": [
-    {
-      "segment_id": "seg_5",
-      "path": [
+      [
+        "2_1",
+        "2_2"
+      ],
+      [
+        "2_2",
+        "3_0"
+      ],
+      [
+        "3_0",
+        "3_1"
+      ],
+      [
         "3_1",
+        "6_1"
+      ],
+      [
         "6_1",
         "6_2"
+      ]
+    ]
+  },
+  {
+    "id": "agent_2_2",
+    "path": [
+      [
+        "2_0",
+        "2_1"
       ],
-      "action_at_end": "finish"
-    }
-  ]
+      [
+        "2_1",
+        "2_2"
+      ],
+      [
+        "2_2",
+        "3_0"
+      ],
+      [
+        "3_0",
+        "3_1"
+      ],
+      [
+        "3_1",
+        "4_1"
+      ],
+      [
+        "4_1",
+        "4_2"
+      ]
+    ]
+  },
+  {
+    "id": "agent_2_3",
+    "path": [
+      [
+        "2_0",
+        "2_1"
+      ],
+      [
+        "2_1",
+        "2_2"
+      ],
+      [
+        "2_2",
+        "3_0"
+      ],
+      [
+        "3_0",
+        "3_1"
+      ],
+      [
+        "3_1",
+        "6_1"
+      ],
+      [
+        "6_1",
+        "6_2"
+      ]
+    ]
+  },
+  {
+    "id": "agent_2_4",
+    "path": [
+      [
+        "2_0",
+        "2_1"
+      ],
+      [
+        "2_1",
+        "2_2"
+      ],
+      [
+        "2_2",
+        "3_0"
+      ],
+      [
+        "3_0",
+        "3_1"
+      ],
+      [
+        "3_1",
+        "5_1"
+      ],
+      [
+        "5_1",
+        "5_2"
+      ]
+    ]
+  },
+  {
+    "id": "agent_2_5",
+    "path": [
+      [
+        "2_0",
+        "2_1"
+      ],
+      [
+        "2_1",
+        "2_2"
+      ],
+      [
+        "2_2",
+        "3_0"
+      ],
+      [
+        "3_0",
+        "3_1"
+      ],
+      [
+        "3_1",
+        "6_1"
+      ],
+      [
+        "6_1",
+        "6_2"
+      ]
+    ]
+  },
+  {
+    "id": "agent_2_6",
+    "path": [
+      [
+        "2_0",
+        "2_1"
+      ],
+      [
+        "2_1",
+        "2_2"
+      ],
+      [
+        "2_2",
+        "3_0"
+      ],
+      [
+        "3_0",
+        "3_1"
+      ],
+      [
+        "3_1",
+        "5_1"
+      ],
+      [
+        "5_1",
+        "5_2"
+      ]
+    ]
+  },
+  {
+    "id": "agent_2_7",
+    "path": [
+      [
+        "2_0",
+        "2_1"
+      ],
+      [
+        "2_1",
+        "2_2"
+      ],
+      [
+        "2_2",
+        "3_0"
+      ],
+      [
+        "3_0",
+        "3_1"
+      ],
+      [
+        "3_1",
+        "5_1"
+      ],
+      [
+        "5_1",
+        "5_2"
+      ]
+    ]
+  },
+  {
+    "id": "agent_1_0",
+    "path": [
+      [
+        "1_0",
+        "1_1"
+      ],
+      [
+        "1_1",
+        "1_2"
+      ],
+      [
+        "1_2",
+        "3_0"
+      ],
+      [
+        "3_0",
+        "3_1"
+      ],
+      [
+        "3_1",
+        "4_1"
+      ],
+      [
+        "4_1",
+        "4_2"
+      ]
+    ]
+  },
+  {
+    "id": "agent_1_1",
+    "path": [
+      [
+        "1_0",
+        "1_1"
+      ],
+      [
+        "1_1",
+        "1_2"
+      ],
+      [
+        "1_2",
+        "3_0"
+      ],
+      [
+        "3_0",
+        "3_1"
+      ],
+      [
+        "3_1",
+        "4_1"
+      ],
+      [
+        "4_1",
+        "4_2"
+      ]
+    ]
+  },
+  {
+    "id": "agent_1_2",
+    "path": [
+      [
+        "1_0",
+        "1_1"
+      ],
+      [
+        "1_1",
+        "1_2"
+      ],
+      [
+        "1_2",
+        "3_0"
+      ],
+      [
+        "3_0",
+        "3_1"
+      ],
+      [
+        "3_1",
+        "4_1"
+      ],
+      [
+        "4_1",
+        "4_2"
+      ]
+    ]
+  },
+  {
+    "id": "agent_1_3",
+    "path": [
+      [
+        "1_0",
+        "1_1"
+      ],
+      [
+        "1_1",
+        "1_2"
+      ],
+      [
+        "1_2",
+        "3_0"
+      ],
+      [
+        "3_0",
+        "3_1"
+      ],
+      [
+        "3_1",
+        "4_1"
+      ],
+      [
+        "4_1",
+        "4_2"
+      ]
+    ]
+  },
+  {
+    "id": "agent_1_4",
+    "path": [
+      [
+        "1_0",
+        "1_1"
+      ],
+      [
+        "1_1",
+        "1_2"
+      ],
+      [
+        "1_2",
+        "3_0"
+      ],
+      [
+        "3_0",
+        "3_1"
+      ],
+      [
+        "3_1",
+        "4_1"
+      ],
+      [
+        "4_1",
+        "4_2"
+      ]
+    ]
+  },
+  {
+    "id": "agent_1_5",
+    "path": [
+      [
+        "1_0",
+        "1_1"
+      ],
+      [
+        "1_1",
+        "1_2"
+      ],
+      [
+        "1_2",
+        "3_0"
+      ],
+      [
+        "3_0",
+        "3_1"
+      ],
+      [
+        "3_1",
+        "4_1"
+      ],
+      [
+        "4_1",
+        "4_2"
+      ]
+    ]
+  }
+]
+Edge attributes with assigned UAV IDs:
+{
+  "1_0->1_1": {
+    "count": 6,
+    "uav_ids": [
+      "agent_1_0",
+      "agent_1_1",
+      "agent_1_2",
+      "agent_1_3",
+      "agent_1_4",
+      "agent_1_5"
+    ]
+  },
+  "1_1->1_2": {
+    "count": 6,
+    "uav_ids": [
+      "agent_1_0",
+      "agent_1_1",
+      "agent_1_2",
+      "agent_1_3",
+      "agent_1_4",
+      "agent_1_5"
+    ]
+  },
+  "2_0->2_1": {
+    "count": 8,
+    "uav_ids": [
+      "agent_2_0",
+      "agent_2_1",
+      "agent_2_2",
+      "agent_2_3",
+      "agent_2_4",
+      "agent_2_5",
+      "agent_2_6",
+      "agent_2_7"
+    ]
+  },
+  "2_1->2_2": {
+    "count": 8,
+    "uav_ids": [
+      "agent_2_0",
+      "agent_2_1",
+      "agent_2_2",
+      "agent_2_3",
+      "agent_2_4",
+      "agent_2_5",
+      "agent_2_6",
+      "agent_2_7"
+    ]
+  },
+  "1_2->3_0": {
+    "count": 6,
+    "uav_ids": [
+      "agent_1_0",
+      "agent_1_1",
+      "agent_1_2",
+      "agent_1_3",
+      "agent_1_4",
+      "agent_1_5"
+    ]
+  },
+  "3_0->3_1": {
+    "count": 14,
+    "uav_ids": [
+      "agent_2_0",
+      "agent_2_1",
+      "agent_2_2",
+      "agent_2_3",
+      "agent_2_4",
+      "agent_2_5",
+      "agent_2_6",
+      "agent_2_7",
+      "agent_1_0",
+      "agent_1_1",
+      "agent_1_2",
+      "agent_1_3",
+      "agent_1_4",
+      "agent_1_5"
+    ]
+  },
+  "2_2->3_0": {
+    "count": 8,
+    "uav_ids": [
+      "agent_2_0",
+      "agent_2_1",
+      "agent_2_2",
+      "agent_2_3",
+      "agent_2_4",
+      "agent_2_5",
+      "agent_2_6",
+      "agent_2_7"
+    ]
+  },
+  "3_1->4_1": {
+    "count": 7,
+    "uav_ids": [
+      "agent_2_2",
+      "agent_1_0",
+      "agent_1_1",
+      "agent_1_2",
+      "agent_1_3",
+      "agent_1_4",
+      "agent_1_5"
+    ]
+  },
+  "4_1->4_2": {
+    "count": 7,
+    "uav_ids": [
+      "agent_2_2",
+      "agent_1_0",
+      "agent_1_1",
+      "agent_1_2",
+      "agent_1_3",
+      "agent_1_4",
+      "agent_1_5"
+    ]
+  },
+  "3_1->5_1": {
+    "count": 4,
+    "uav_ids": [
+      "agent_2_0",
+      "agent_2_4",
+      "agent_2_6",
+      "agent_2_7"
+    ]
+  },
+  "5_1->5_2": {
+    "count": 4,
+    "uav_ids": [
+      "agent_2_0",
+      "agent_2_4",
+      "agent_2_6",
+      "agent_2_7"
+    ]
+  },
+  "3_1->6_1": {
+    "count": 3,
+    "uav_ids": [
+      "agent_2_1",
+      "agent_2_3",
+      "agent_2_5"
+    ]
+  },
+  "6_1->6_2": {
+    "count": 3,
+    "uav_ids": [
+      "agent_2_1",
+      "agent_2_3",
+      "agent_2_5"
+    ]
+  }
 }
-Mission Orchestrator Started.
-Spawning agent: agent_1@127.0.0.1 with path len 4
-agent_1@127.0.0.1 initialized at position: [122.10258217246229, 37.56342057758475, 200.0], traj: [[420743.4687200667, 4157755.8427242595, 200.0]]
-Spawning agent: agent_2@127.0.0.1 with path len 4
-agent_2@127.0.0.1 initialized at position: [122.09686551225597, 37.56536338371063, 200.0], traj: [[420240.6557623435, 4157976.2288220283, 200.0]]
-agent_1@127.0.0.1 Mission Start:  2_0  ->  2_1
-agent_1@127.0.0.1 Planning segment:  2_0  ->  2_1
-[agent_1@127.0.0.1] is act_digraph_path_planning from 2_0 to 2_1
-[agent_1@127.0.0.1] cur order_mode:independent,order_type:detour
-[agent_1@127.0.0.1] Default 2d traj: [[420743.4687200667, 4157755.8427242595, 200.0], [427232.5463100972, 4151269.7183398656], [427184.2066414109, 4151205.389923809], [427146.81196235336, 4151134.140315675], [427121.3307754698, 4151057.814842889], [427108.42303011566, 4150978.3902951037]]
-[agent_1@127.0.0.1] Insert end height: -1 (rand: 285)
-agent_1 is detouring antiair_facilities, trajectory:
+Mission Orchestrator Started (Persistent Mode).
+
+Spawning persistent agent: agent_2_0@127.0.0.1 with 6 segments
+No initial position provided, generating random position.
+agent_2_0@127.0.0.1 initialized at position: [122.18085141866842, 37.50871745066822, 200.0]
+
+Spawning persistent agent: agent_2_1@127.0.0.1 with 6 segments
+No initial position provided, generating random position.
+agent_2_1@127.0.0.1 initialized at position: [122.16542641958198, 37.500180077077836, 200.0]
+agent_2_0@127.0.0.1 Mission Start:  2_0  ->  2_1
+agent_2_0@127.0.0.1 Planning segment:  2_0  ->  2_1
+[agent_2_0] Planning path from node 2_0 to node 2_1
+[agent_2_0] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_0] No base reference traj found for segment 2_0->2_1. Now generate it.
+[agent_2_0@127.0.0.1] Default 2d traj: [[427603.17036680796, 4151623.602197375, 200.0], [427586.6687141281, 4151437.751509831], [427506.78883729473, 4151428.0523367664], [427429.4992406615, 4151405.665132088], [427356.8016841828, 4151371.1697126376], [427290.5789963851, 4151325.459491659]]
+[agent_2_0@127.0.0.1] Insert end height: -1 (rand: 346)
+agent_2_0 is detouring antiair_facilities, trajectory:
 []
-[agent_1@127.0.0.1] Generated vshape formation trajectories for 7 members
-[agent_1@127.0.0.1] Initialized Redis for new sub-agent: agent_1_sub_0
-[agent_1@127.0.0.1] Initialized Redis for new sub-agent: agent_1_sub_1
-[agent_1@127.0.0.1] Initialized Redis for new sub-agent: agent_1_sub_2
-[agent_1@127.0.0.1] Initialized Redis for new sub-agent: agent_1_sub_3
-[agent_1@127.0.0.1] Initialized Redis for new sub-agent: agent_1_sub_4
-[agent_1@127.0.0.1] Initialized Redis for new sub-agent: agent_1_sub_5
-[agent_1@127.0.0.1] Initialized Redis for new sub-agent: agent_1_sub_6
-[agent_1@127.0.0.1] cur if_set_ref_traj flag is:true
-agent_2@127.0.0.1 Mission Start:  1_0  ->  1_1
-agent_2@127.0.0.1 Planning segment:  1_0  ->  1_1
-[agent_2@127.0.0.1] is act_digraph_path_planning from 1_0 to 1_1
-[agent_2@127.0.0.1] cur order_mode:independent,order_type:breakthrough
-[agent_2@127.0.0.1] Default 2d traj: [[420240.6557623435, 4157976.2288220283, 200.0], [427579.30925537116, 4150826.3327355217]]
-[agent_2@127.0.0.1] Insert end height: -1 (rand: 82)
-agent_2 is breaking through headquarter, trajectory:
-[[420240.6557623435, 4157976.2288220283, 200.0], [420740.6643234837, 4157441.8248476223, 159.18826739899586], [421198.0753093125, 4156869.1007863525, 132.49176800049906], [421622.8648195466, 4156270.396578267, 115.02857703280156], [422026.3729280049, 4155656.583825601, 103.60524267640864], [422420.8548195934, 4155037.413363782, 96.13280719429515], [422819.0935904521, 4154421.9186986354, 91.244804244167], [423234.0563716749, 4153818.8540401864, 88.04737645805199], [423678.5728664883, 4153237.148657504, 85.95581789073313], [424165.01406539336, 4152686.3609971856, 84.58765024687831], [424704.94867649704, 4152177.1163309594, 83.69267999314509], [425308.75563875487, 4151721.5105949044, 83.10724606721875], [425985.17304415745, 4151333.4606079743, 82.7242915721438], [426740.76705716667, 4151028.977154752, 82.47378653852097], [427579.30925537116, 4150826.3327355217, 82.0]]
-[agent_2@127.0.0.1] Generated arc formation trajectories for 5 members
-[agent_2@127.0.0.1] Initialized Redis for new sub-agent: agent_2_sub_0
-[agent_2@127.0.0.1] Initialized Redis for new sub-agent: agent_2_sub_1
-[agent_2@127.0.0.1] Initialized Redis for new sub-agent: agent_2_sub_2
-[agent_2@127.0.0.1] Initialized Redis for new sub-agent: agent_2_sub_3
-[agent_2@127.0.0.1] Initialized Redis for new sub-agent: agent_2_sub_4
-[agent_2@127.0.0.1] cur if_set_ref_traj flag is:true
-[agent_1] Cluster trajectories synced.
-[agent_2] Cluster trajectories synced.
-[agent_1] Segment completed.
-agent_1@127.0.0.1 Planning segment:  2_1  ->  2_2
-[agent_1@127.0.0.1] is act_digraph_path_planning from 2_1 to 2_2
-[agent_1@127.0.0.1] cur order_mode:independent,order_type:detour
-[agent_1@127.0.0.1] Default 2d traj: [[427108.4230301157, 4150978.390295103, 285.0], [427108.42303011566, 4150978.3902951037], [427121.3307754698, 4151057.814842889], [427146.81196235336, 4151134.140315675], [427184.2066414109, 4151205.389923809], [427232.5463100972, 4151269.7183398656]]
-[agent_1@127.0.0.1] Insert end height: -1 (rand: 328)
-agent_1 is detouring antiair_facilities, trajectory:
-[[420743.4687200667, 4157755.8427242595, 200.0], [424332.8825416813, 4154190.2356909034, 206.07142857142858], [426408.3326086025, 4152111.4805990006, 212.14285714285714], [427347.65753889136, 4151148.607830308, 218.21428571428572], [427528.6959506092, 4150930.647766581, 224.28571428571428], [427329.2864618173, 4151086.6307895756, 230.35714285714286], [427122.1774541472, 4151250.5867209877, 236.42857142857142], [427082.234368032, 4151250.8986101635, 242.5], [427127.26570421294, 4151168.4212234, 248.57142857142856], [427162.1945434545, 4151096.6644827235, 254.64285714285714], [427156.19684434874, 4151066.0252197324, 260.7142857142857], [427127.9105580715, 4151058.3156840345, 266.7857142857143], [427097.2459700132, 4151054.0983610703, 272.85714285714283], [427084.1133655645, 4151033.93573628, 278.92857142857144], [427108.4230301157, 4150978.390295103, 285.0]]
-[agent_1@127.0.0.1] Generated horizontal formation trajectories for 7 members
-[agent_1@127.0.0.1] cur if_set_ref_traj flag is:true
-[agent_1] Cluster trajectories synced.
-[agent_2] Segment completed.
-agent_2@127.0.0.1 Planning segment:  1_1  ->  1_2
-[agent_2@127.0.0.1] is act_digraph_path_planning from 1_1 to 1_2
-[agent_2@127.0.0.1] cur order_mode:independent,order_type:detour
-[agent_2@127.0.0.1] Default 2d traj: [[427579.30925537116, 4150826.3327355217, 82.0], [427506.78883729473, 4150448.261684724], [427586.6687141281, 4150438.5625116597], [427667.07002431044, 4150441.8025736962], [427745.910416141, 4150457.8979549296], [427821.1479648843, 4150486.43179344]]
-[agent_2@127.0.0.1] Insert end height: -1 (rand: 363)
-agent_2 is detouring antiair_facilities, trajectory:
-[[420240.6557623435, 4157976.2288220283, 200.0], [420740.6643234837, 4157441.8248476223, 159.18826739899586], [421198.0753093125, 4156869.1007863525, 132.49176800049906], [421622.8648195466, 4156270.396578267, 115.02857703280156], [422026.3729280049, 4155656.583825601, 103.60524267640864], [422420.8548195934, 4155037.413363782, 96.13280719429515], [422819.0935904521, 4154421.9186986354, 91.244804244167], [423234.0563716749, 4153818.8540401864, 88.04737645805199], [423678.5728664883, 4153237.148657504, 85.95581789073313], [424165.01406539336, 4152686.3609971856, 84.58765024687831], [424704.94867649704, 4152177.1163309594, 83.69267999314509], [425308.75563875487, 4151721.5105949044, 83.10724606721875], [425985.17304415745, 4151333.4606079743, 82.7242915721438], [426740.76705716667, 4151028.977154752, 82.47378653852097], [427579.30925537116, 4150826.3327355217, 82.0]]
-[agent_2@127.0.0.1] Generated circular formation trajectories for 5 members
-[agent_2@127.0.0.1] cur if_set_ref_traj flag is:true
-[agent_2] Cluster trajectories synced.
-[agent_1] Segment completed.
-agent_1@127.0.0.1 Planning segment:  2_2  ->  3_0
-[agent_1@127.0.0.1] is act_digraph_path_planning from 2_2 to 3_0
-[agent_1@127.0.0.1] cur order_mode:aggregate,order_type:breakthrough
-[agent_1] is act aggregating to rendezvous point, merge_peers: ['agent_1', 'agent_2']
-[agent_1@127.0.0.1] Default 2d traj: [[427232.54631009715, 4151269.718339865, 328.0], [427431.19058345654, 4150842.90326816, 281.70965148901576]]
-agent_1 is breaking through aggregate_point, trajectory:
-[[427232.54631009715, 4151269.718339865, 328.0], [427246.8836546176, 4151239.301088367, 324.6935465349297], [427261.47172033525, 4151209.0026484095, 321.3870930698594], [427276.24157979665, 4151178.791769847, 318.0806396047891], [427291.12474147807, 4151148.63627859, 314.7741861397188], [427306.05303317745, 4151118.503335395, 311.46773267464846], [427320.958481366, 4151088.3596927347, 308.1612792095782], [427335.77318785485, 4151058.171950386, 304.8548257445079], [427350.4292051223, 4151027.9068103577, 301.54837227943756], [427364.8584116417, 4150997.5313318186, 298.2419188143673], [427378.9923885494, 4150967.0131866783, 294.935465349297], [427392.7622989953, 4150936.320916465, 291.62901188422666], [427406.0987715259, 4150905.424191131, 288.3225584191564], [427418.93178886315, 4150874.2940703896, 285.0161049540861], [427431.19058345654, 4150842.90326816, 281.70965148901576]]
-[agent_1@127.0.0.1] Generated circular formation trajectories for 7 members
-[agent_1@127.0.0.1] cur if_set_ref_traj flag is:true
-agent_1@127.0.0.1 Reached end of path.
-[agent_1] Cluster trajectories synced.
-[agent_2] Segment completed.
-agent_2@127.0.0.1 Planning segment:  1_2  ->  3_0
-[agent_2@127.0.0.1] is act_digraph_path_planning from 1_2 to 3_0
-[agent_2@127.0.0.1] cur order_mode:aggregate,order_type:breakthrough
-[agent_2] is act aggregating to rendezvous point, merge_peers: ['agent_1', 'agent_2']
-[agent_2@127.0.0.1] Default 2d traj: [[427821.1479648843, 4150486.43179344, 363.00000000000006], [427539.56639103615, 4150814.2326081777, 327.3718322253176]]
-agent_2 is breaking through aggregate_point, trajectory:
-[[427821.1479648843, 4150486.43179344, 363.00000000000006], [427802.41134876164, 4150510.9614135255, 349.473062198664], [427786.10072679725, 4150537.2524908334, 341.08189358530285], [427771.647081377, 4150564.6911694882, 335.8765979203148], [427758.4028460633, 4150592.767388555, 332.64759559556114], [427745.66985895013, 4150621.0502604363, 330.6445477987961], [427732.7219080061, 4150649.159486519, 329.40199667228643], [427718.82348108443, 4150676.7344188383, 328.6312046300376], [427703.2465557134, 4150703.402050879, 328.1530590151662], [427685.2873742028, 4150728.7450340334, 327.8564508297032], [427664.28516783187, 4150752.2707812283, 327.6724558019389], [427639.64472535753, 4150773.38283895, 327.5583181216549], [427610.8645363622, 4150791.355977801, 327.48751506670874], [427577.57195528963, 4150805.316854553, 327.4435937904288], [427539.56639103615, 4150814.2326081777, 327.3718322253176]]
-[agent_2@127.0.0.1] Generated horizontal formation trajectories for 5 members
-[agent_2@127.0.0.1] cur if_set_ref_traj flag is:true
-agent_2@127.0.0.1 Reached end of path.
-[agent_2] Cluster trajectories synced.
-[agent_1] Segment completed.
-Agent agent_1 ready to merge into seg_1. Waiting for others...
-[agent_1] Segment completed.
-[agent_1] Segment completed.
-[agent_1] Segment completed.
-[agent_1] Segment completed.
-[agent_1] Segment completed.
-[agent_2] Segment completed.
-Agent agent_2 ready to merge into seg_1. Waiting for others...
-Merge condition met for seg_1 (2/2). Merging...
-Spawning agent: agent_merged_at_3_0@127.0.0.1 with path len 2
-agent_merged_at_3_0@127.0.0.1 initialized at position: [122.18021159895483, 37.501417825322335, 327.3718322253176], traj: [[427539.5663910365, 4150814.2326081772, 327.3718322253176]]
-agent_merged_at_3_0@127.0.0.1 Mission Start:  3_0  ->  3_1
-agent_merged_at_3_0@127.0.0.1 Planning segment:  3_0  ->  3_1
-[agent_merged_at_3_0@127.0.0.1] is act_digraph_path_planning from 3_0 to 3_1
-[agent_merged_at_3_0@127.0.0.1] cur order_mode:aggregate,order_type:breakthrough
-[agent_merged_at_3_0@127.0.0.1] Default 2d traj: [[427539.5663910365, 4150814.2326081772, 327.3718322253176], [428184.39223929326, 4150775.5956324]]
-[agent_merged_at_3_0@127.0.0.1] Insert end height: -1 (rand: 44)
-agent_merged_at_3_0 is breaking through antiair, trajectory:
-[[427539.5663910365, 4150814.2326081772, 327.3718322253176], [427585.70745463925, 4150814.0109331985, 326.6170306434271], [427631.7690889808, 4150818.0861847694, 326.18093824538], [427677.5498183729, 4150825.277778716, 325.4928901225473], [427723.0270769781, 4150834.4050387912, 324.4073169241757], [427768.3070812976, 4150844.2970202556, 322.6945454916035], [427813.5748290085, 4150853.7934975377, 319.9922072387468], [427859.0446171853, 4150861.7400879688, 315.72857235205015], [427904.9109749992, 4150866.9804606577, 309.001589736961], [427951.2996335065, 4150868.3485499187, 298.3880413665538], [427998.21810589056, 4150864.663684712, 281.64243409260337], [428045.50562460313, 4150854.7315668184, 255.22192389308913], [428092.7825787023, 4150837.354067731, 213.53676146314763], [428139.4002178724, 4150811.3508334537, 147.76767700229732], [428184.39223929326, 4150775.5956324, 44.0]]
-[agent_merged_at_3_0@127.0.0.1] Generated arc formation trajectories for 13 members
-[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_0
-[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_1
-[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_2
-[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_3
-[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_4
-[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_5
-[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_6
-[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_7
-[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_8
-[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_9
-[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_10
-[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_11
-[agent_merged_at_3_0@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_12
-[agent_merged_at_3_0@127.0.0.1] cur if_set_ref_traj flag is:true
-agent_merged_at_3_0@127.0.0.1 Reached end of path.
-[agent_merged_at_3_0] Cluster trajectories synced.
-[agent_merged_at_3_0] Segment completed.
-Agent agent_merged_at_3_0 splitting.
-Spawning agent: agent_merged_at_3_0_sub_seg_3@127.0.0.1 with path len 3
-agent_merged_at_3_0_sub_seg_3@127.0.0.1 initialized at position: [122.18751, 37.50112000000001, 44.0], traj: [[428184.39223929326, 4150775.5956324, 44.0]]
-Spawning agent: agent_merged_at_3_0_sub_seg_4@127.0.0.1 with path len 3
-agent_merged_at_3_0_sub_seg_4@127.0.0.1 initialized at position: [122.18751, 37.50112000000001, 44.0], traj: [[428184.39223929326, 4150775.5956324, 44.0]]
-agent_merged_at_3_0_sub_seg_3@127.0.0.1 Mission Start:  3_1  ->  4_1
-agent_merged_at_3_0_sub_seg_3@127.0.0.1 Planning segment:  3_1  ->  4_1
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] is act_digraph_path_planning from 3_1 to 4_1
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] cur order_mode:disperse,order_type:breakthrough
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Default 2d traj: [[428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324]]
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Insert end height: -1 (rand: 15)
-agent_merged_at_3_0_sub_seg_3 is breaking through antiair, trajectory:
-[[428184.39223929326, 4150775.5956324, 44.0], [428184.1438353716, 4150775.687523404, 42.73967703962529], [428183.93364743784, 4150775.7652773308, 42.3958512803758], [428183.76167549205, 4150775.8288941802, 41.95822721986523], [428183.6279195342, 4150775.8783739517, 41.40121596289658], [428183.53237956436, 4150775.9137166454, 40.69224776761997], [428183.4750555825, 4150775.934922262, 39.789867617083694], [428183.4559475885, 4150775.9419908007, 38.64131124811405], [428183.4750555825, 4150775.934922262, 37.179419902302904], [428183.53237956436, 4150775.9137166454, 35.31871339742782], [428183.6279195342, 4150775.8783739517, 32.95039190267036], [428183.76167549205, 4150775.8288941802, 29.935974159821242], [428183.93364743784, 4150775.7652773308, 26.099200162491073], [428184.1438353716, 4150775.687523404, 21.21572482417405], [428184.39223929326, 4150775.5956324, 15.0]]
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Generated vshape formation trajectories for 6 members
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_3_sub_0
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_3_sub_1
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_3_sub_2
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_3_sub_3
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_3_sub_4
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_3_sub_5
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] cur if_set_ref_traj flag is:true
-Spawning agent: agent_merged_at_3_0_sub_seg_5@127.0.0.1 with path len 3
-agent_merged_at_3_0_sub_seg_5@127.0.0.1 initialized at position: [122.18751, 37.50112000000001, 44.0], traj: [[428184.39223929326, 4150775.5956324, 44.0]]
-agent_merged_at_3_0_sub_seg_4@127.0.0.1 Mission Start:  3_1  ->  5_1
-agent_merged_at_3_0_sub_seg_4@127.0.0.1 Planning segment:  3_1  ->  5_1
-[agent_merged_at_3_0_sub_seg_4@127.0.0.1] is act_digraph_path_planning from 3_1 to 5_1
-[agent_merged_at_3_0_sub_seg_4@127.0.0.1] cur order_mode:disperse,order_type:escape
-_outside_border_traj: [[428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0]]
-[agent_merged_at_3_0_sub_seg_4@127.0.0.1] Default 2d traj: [[428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0]]
-agent_merged_at_3_0_sub_seg_4 is escaping antiair_facilities, trajectory:
-[[428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0]]
-[agent_merged_at_3_0_sub_seg_4@127.0.0.1] Generated circular formation trajectories for 3 members
-[agent_merged_at_3_0_sub_seg_4@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_4_sub_0
-[agent_merged_at_3_0_sub_seg_4@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_4_sub_1
-[agent_merged_at_3_0_sub_seg_4@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_4_sub_2
-[agent_merged_at_3_0_sub_seg_4@127.0.0.1] cur if_set_ref_traj flag is:true
-agent_merged_at_3_0_sub_seg_5@127.0.0.1 Mission Start:  3_1  ->  6_1
-agent_merged_at_3_0_sub_seg_5@127.0.0.1 Planning segment:  3_1  ->  6_1
-[agent_merged_at_3_0_sub_seg_5@127.0.0.1] is act_digraph_path_planning from 3_1 to 6_1
-[agent_merged_at_3_0_sub_seg_5@127.0.0.1] cur order_mode:disperse,order_type:escape
-_outside_border_traj: [[428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0]]
-[agent_merged_at_3_0_sub_seg_5@127.0.0.1] Default 2d traj: [[428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0]]
-agent_merged_at_3_0_sub_seg_5 is escaping antiair_facilities, trajectory:
-[[428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0], [428184.39223929326, 4150775.5956324, 44.0]]
-[agent_merged_at_3_0_sub_seg_5@127.0.0.1] Generated circular formation trajectories for 2 members
-[agent_merged_at_3_0_sub_seg_5@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_5_sub_0
-[agent_merged_at_3_0_sub_seg_5@127.0.0.1] Initialized Redis for new sub-agent: agent_merged_at_3_0_sub_seg_5_sub_1
-[agent_merged_at_3_0_sub_seg_5@127.0.0.1] cur if_set_ref_traj flag is:true
-[agent_merged_at_3_0_sub_seg_3] Cluster trajectories synced.
-[agent_merged_at_3_0_sub_seg_3] Segment completed.
-agent_merged_at_3_0_sub_seg_3@127.0.0.1 Planning segment:  4_1  ->  4_2
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] is act_digraph_path_planning from 4_1 to 4_2
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] cur order_mode:disperse,order_type:escape
-_outside_border_traj: [[428184.39223929326, 4150775.5956324, 15.0], [428184.39223929326, 4150775.5956324, 15.0]]
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Default 2d traj: [[428184.39223929326, 4150775.5956324, 15.0], [428184.39223929326, 4150775.5956324, 15.0]]
-agent_merged_at_3_0_sub_seg_3 is escaping antiair_facilities, trajectory:
-[[428184.39223929326, 4150775.5956324, 15.0], [428184.39223929326, 4150775.5956324, 15.0], [428184.39223929326, 4150775.5956324, 15.0], [428184.39223929326, 4150775.5956324, 15.0], [428184.39223929326, 4150775.5956324, 15.0], [428184.39223929326, 4150775.5956324, 15.0], [428184.39223929326, 4150775.5956324, 15.0], [428184.39223929326, 4150775.5956324, 15.0], [428184.39223929326, 4150775.5956324, 15.0], [428184.39223929326, 4150775.5956324, 15.0], [428184.39223929326, 4150775.5956324, 15.0], [428184.39223929326, 4150775.5956324, 15.0], [428184.39223929326, 4150775.5956324, 15.0], [428184.39223929326, 4150775.5956324, 15.0], [428184.39223929326, 4150775.5956324, 15.0]]
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] Generated vshape formation trajectories for 6 members
-[agent_merged_at_3_0_sub_seg_3@127.0.0.1] cur if_set_ref_traj flag is:true
-agent_merged_at_3_0_sub_seg_3@127.0.0.1 Reached end of path.
-[agent_merged_at_3_0_sub_seg_4] Cluster trajectories synced.
-[agent_merged_at_3_0_sub_seg_4] Segment completed.
-agent_merged_at_3_0_sub_seg_4@127.0.0.1 Planning segment:  5_1  ->  5_2
-[agent_merged_at_3_0_sub_seg_4@127.0.0.1] is act_digraph_path_planning from 5_1 to 5_2
-[agent_merged_at_3_0_sub_seg_4@127.0.0.1] cur order_mode:disperse,order_type:breakthrough
-[agent_merged_at_3_0_sub_seg_4@127.0.0.1] Default 2d traj: [[428184.39223929326, 4150775.5956324, 44.0], [427579.30925537116, 4150826.3327355217]]
-[agent_merged_at_3_0_sub_seg_4@127.0.0.1] Insert end height: -1 (rand: 78)
-agent_merged_at_3_0_sub_seg_4 is breaking through headquarter, trajectory:
-[[428184.39223929326, 4150775.5956324, 44.0], [428141.2364799495, 4150779.9201215263, 47.549998231859846], [428098.20752769767, 4150785.4281585324, 48.223854659989], [428055.2889068836, 4150791.794906995, 49.02562171118715], [428012.44963539747, 4150798.697002433, 49.979579227288426], [427969.64828111493, 4150805.812377665, 51.11461582073059], [427926.8369959948, 4150812.8198771356, 52.46510370589132], [427883.96553221403, 4150819.3987309188, 54.07193958986481], [427840.98524822865, 4150825.227958714, 55.98378314388349], [427797.85311457224, 4150829.9857738772, 58.25853055990716], [427754.5357295538, 4150833.349057482, 60.96506781596539], [427711.01335379126, 4150834.992972581, 64.18535674423514], [427667.28396971966, 4150834.5907891956, 68.01691707407142], [427623.3673678244, 4150831.8139910437, 72.57577961348436], [427579.30925537116, 4150826.3327355217, 78.0]]
-[agent_merged_at_3_0_sub_seg_4@127.0.0.1] Generated vshape formation trajectories for 3 members
-[agent_merged_at_3_0_sub_seg_4@127.0.0.1] cur if_set_ref_traj flag is:true
-agent_merged_at_3_0_sub_seg_4@127.0.0.1 Reached end of path.
-[agent_merged_at_3_0_sub_seg_5] Cluster trajectories synced.
-[agent_merged_at_3_0_sub_seg_5] Segment completed.
-agent_merged_at_3_0_sub_seg_5@127.0.0.1 Planning segment:  6_1  ->  6_2
-[agent_merged_at_3_0_sub_seg_5@127.0.0.1] is act_digraph_path_planning from 6_1 to 6_2
-[agent_merged_at_3_0_sub_seg_5@127.0.0.1] cur order_mode:disperse,order_type:breakthrough
-[agent_merged_at_3_0_sub_seg_5@127.0.0.1] Default 2d traj: [[428184.39223929326, 4150775.5956324, 44.0], [427913.18424617266, 4150591.538926289]]
-[agent_merged_at_3_0_sub_seg_5@127.0.0.1] Insert end height: -1 (rand: 52)
-agent_merged_at_3_0_sub_seg_5 is breaking through headquarter, trajectory:
-[[428184.39223929326, 4150775.5956324, 44.0], [428164.5661773639, 4150763.14401354, 44.57142857142857], [428144.01062344224, 4150751.8935802374, 45.142857142857146], [428122.96507226216, 4150741.540632102, 45.714285714285715], [428101.6370620723, 4150731.761520741, 46.285714285714285], [428080.21037886007, 4150722.2193403477, 46.857142857142854], [428058.8538858286, 4150712.569595015, 47.42857142857143], [428037.73073656455, 4150702.4651649697, 48.0], [428017.00776800705, 4150691.560915887, 48.57142857142857], [427996.86489051353, 4150679.518306706, 49.14285714285714], [427977.5042962408, 4150666.0103532528, 49.714285714285715], [427959.15929351246, 4150650.7272979743, 50.285714285714285], [427942.1025441873, 4150633.3833194254, 50.857142857142854], [427926.65343421174, 4150613.7245872193, 51.42857142857143], [427913.18424617266, 4150591.538926289, 52.0]]
-[agent_merged_at_3_0_sub_seg_5@127.0.0.1] Generated vertical formation trajectories for 2 members
-[agent_merged_at_3_0_sub_seg_5@127.0.0.1] cur if_set_ref_traj flag is:true
-agent_merged_at_3_0_sub_seg_5@127.0.0.1 Reached end of path.
-[agent_merged_at_3_0_sub_seg_3] Cluster trajectories synced.
-[agent_merged_at_3_0_sub_seg_3] Segment completed.
-Agent agent_merged_at_3_0_sub_seg_3 finished mission. Terminating.
-[agent_merged_at_3_0_sub_seg_4] Cluster trajectories synced.
-[agent_merged_at_3_0_sub_seg_5] Cluster trajectories synced.
-[agent_merged_at_3_0_sub_seg_5] Segment completed.
-[agent_merged_at_3_0_sub_seg_4] Segment completed.
-[agent_merged_at_3_0_sub_seg_5] Segment completed.
-Agent agent_merged_at_3_0_sub_seg_4 finished mission. Terminating.
-Agent agent_merged_at_3_0_sub_seg_5 finished mission. Terminating.
-All missions completed.
+[agent_2_0] Generated and saved trajectories for 8 members.
+[agent_2_0] Successfully retrieved my formation trajectory (len=15).
+[agent_2_0] Detect gap (21.92m) between segments. Keeping full trajectory.
+[agent_2_0] Segment planned. Prepared next belief: cur_nodes(2_1, 2_2)
+
+Spawning persistent agent: agent_2_2@127.0.0.1 with 6 segments
+No initial position provided, generating random position.
+agent_2_2@127.0.0.1 initialized at position: [122.17710019576481, 37.51631306100095, 200.0]
+agent_2_1@127.0.0.1 Mission Start:  2_0  ->  2_1
+agent_2_1@127.0.0.1 Planning segment:  2_0  ->  2_1
+[agent_2_1] Planning path from node 2_0 to node 2_1
+[agent_2_1] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_1] Found existing base reference trajectory for segment 2_0 -> 2_1.
+[agent_2_1] Successfully retrieved my formation trajectory (len=15).
+[agent_2_1] Detect gap (1657.96m) between segments. Keeping full trajectory.
+[agent_2_1] Segment planned. Prepared next belief: cur_nodes(2_1, 2_2)
+
+Spawning persistent agent: agent_2_3@127.0.0.1 with 6 segments
+No initial position provided, generating random position.
+agent_2_3@127.0.0.1 initialized at position: [122.16731460857618, 37.51006933750565, 200.0]
+agent_2_2@127.0.0.1 Mission Start:  2_0  ->  2_1
+agent_2_2@127.0.0.1 Planning segment:  2_0  ->  2_1
+[agent_2_2] Planning path from node 2_0 to node 2_1
+[agent_2_2] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_2] Found existing base reference trajectory for segment 2_0 -> 2_1.
+[agent_2_2] Successfully retrieved my formation trajectory (len=15).
+[agent_2_2] Detect gap (927.47m) between segments. Keeping full trajectory.
+[agent_2_2] Segment planned. Prepared next belief: cur_nodes(2_1, 2_2)
+
+Spawning persistent agent: agent_2_4@127.0.0.1 with 6 segments
+No initial position provided, generating random position.
+agent_2_4@127.0.0.1 initialized at position: [122.1765053124526, 37.5055159384474, 200.0]
+agent_2_3@127.0.0.1 Mission Start:  2_0  ->  2_1
+agent_2_3@127.0.0.1 Planning segment:  2_0  ->  2_1
+[agent_2_3] Planning path from node 2_0 to node 2_1
+[agent_2_3] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_3] Found existing base reference trajectory for segment 2_0 -> 2_1.
+[agent_2_3] Successfully retrieved my formation trajectory (len=15).
+[agent_2_3] Detect gap (1212.12m) between segments. Keeping full trajectory.
+[agent_2_3] Segment planned. Prepared next belief: cur_nodes(2_1, 2_2)
+
+Spawning persistent agent: agent_2_5@127.0.0.1 with 6 segments
+No initial position provided, generating random position.
+agent_2_5@127.0.0.1 initialized at position: [122.17810516367486, 37.50709530252881, 200.0]
+agent_2_4@127.0.0.1 Mission Start:  2_0  ->  2_1
+agent_2_4@127.0.0.1 Planning segment:  2_0  ->  2_1
+[agent_2_4] Planning path from node 2_0 to node 2_1
+[agent_2_4] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_4] Found existing base reference trajectory for segment 2_0 -> 2_1.
+[agent_2_4] Successfully retrieved my formation trajectory (len=15).
+[agent_2_4] Detect gap (508.40m) between segments. Keeping full trajectory.
+[agent_2_4] Segment planned. Prepared next belief: cur_nodes(2_1, 2_2)
+
+Spawning persistent agent: agent_2_6@127.0.0.1 with 6 segments
+No initial position provided, generating random position.
+agent_2_6@127.0.0.1 initialized at position: [122.17025187894929, 37.494212333270355, 200.0]
+[agent_2_0] Trajectory synced to Redis.
+agent_2_5@127.0.0.1 Mission Start:  2_0  ->  2_1
+agent_2_5@127.0.0.1 Planning segment:  2_0  ->  2_1
+[agent_2_5] Planning path from node 2_0 to node 2_1
+[agent_2_5] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_5] Found existing base reference trajectory for segment 2_0 -> 2_1.
+[agent_2_5] Successfully retrieved my formation trajectory (len=15).
+[agent_2_5] Detect gap (286.56m) between segments. Keeping full trajectory.
+[agent_2_5] Segment planned. Prepared next belief: cur_nodes(2_1, 2_2)
+
+Spawning persistent agent: agent_2_7@127.0.0.1 with 6 segments
+No initial position provided, generating random position.
+agent_2_7@127.0.0.1 initialized at position: [122.17203576445304, 37.494120186285805, 200.0]
+[agent_2_1] Trajectory synced to Redis.
+agent_2_6@127.0.0.1 Mission Start:  2_0  ->  2_1
+agent_2_6@127.0.0.1 Planning segment:  2_0  ->  2_1
+[agent_2_6] Planning path from node 2_0 to node 2_1
+[agent_2_6] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_6] Found existing base reference trajectory for segment 2_0 -> 2_1.
+[agent_2_6] Successfully retrieved my formation trajectory (len=15).
+[agent_2_6] Detect gap (1840.65m) between segments. Keeping full trajectory.
+[agent_2_6] Segment planned. Prepared next belief: cur_nodes(2_1, 2_2)
+
+Spawning persistent agent: agent_1_0@127.0.0.1 with 6 segments
+No initial position provided, generating random position.
+agent_1_0@127.0.0.1 initialized at position: [122.17507433614827, 37.497505417325414, 200.0]
+[agent_2_2] Trajectory synced to Redis.
+agent_2_7@127.0.0.1 Mission Start:  2_0  ->  2_1
+agent_2_7@127.0.0.1 Planning segment:  2_0  ->  2_1
+[agent_2_7] Planning path from node 2_0 to node 2_1
+[agent_2_7] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_7] Found existing base reference trajectory for segment 2_0 -> 2_1.
+[agent_2_7] Successfully retrieved my formation trajectory (len=15).
+[agent_2_7] Detect gap (1775.42m) between segments. Keeping full trajectory.
+[agent_2_7] Segment planned. Prepared next belief: cur_nodes(2_1, 2_2)
+
+Spawning persistent agent: agent_1_1@127.0.0.1 with 6 segments
+No initial position provided, generating random position.
+agent_1_1@127.0.0.1 initialized at position: [122.16737893894982, 37.495468617127074, 200.0]
+[agent_2_3] Trajectory synced to Redis.
+agent_1_0@127.0.0.1 Mission Start:  1_0  ->  1_1
+agent_1_0@127.0.0.1 Planning segment:  1_0  ->  1_1
+[agent_1_0] Planning path from node 1_0 to node 1_1
+[agent_1_0] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_0] No base reference traj found for segment 1_0->1_1. Now generate it.
+[agent_1_0@127.0.0.1] Default 2d traj: [[427081.67502717575, 4150384.1359694125, 200.0], [427913.18424617266, 4150591.538926289]]
+[agent_1_0@127.0.0.1] Insert end height: -1 (rand: 73)
+agent_1_0 is breaking through headquarter, trajectory:
+[[427081.67502717575, 4150384.1359694125, 200.0], [427141.23056241975, 4150398.2850768464, 199.88229031306622], [427201.04864189186, 4150411.305367402, 199.79857227654225], [427261.04572887527, 4150423.501976909, 199.65531190478652], [427321.1478164253, 4150435.1822965974, 199.41016121841434], [427381.2878044085, 4150446.655240068, 198.99065330919836], [427441.4028541852, 4150458.2306060106, 198.27278101400276], [427501.43172935146, 4150470.2185049704, 197.04434021255872], [427561.31212985504, 4150482.92881821, 194.9422019732758], [427620.97802619473, 4150496.6706565926, 191.34497109991094], [427680.3570002997, 4150511.7517873747, 185.1893007855251], [427739.36760007404, 4150528.4779968997, 174.65556571169964], [427797.91671547253, 4150547.1523573496, 156.62997809271576], [427855.8969853481, 4150568.0743660526, 125.78414736577439], [427913.18424617266, 4150591.538926289, 73.0]]
+[agent_1_0] Generated and saved trajectories for 6 members.
+[agent_1_0] Successfully retrieved my formation trajectory (len=15).
+[agent_1_0] Detect gap (23.00m) between segments. Keeping full trajectory.
+[agent_1_0] Segment planned. Prepared next belief: cur_nodes(1_1, 1_2)
+
+Spawning persistent agent: agent_1_2@127.0.0.1 with 6 segments
+No initial position provided, generating random position.
+agent_1_2@127.0.0.1 initialized at position: [122.17797045869314, 37.50926557628078, 200.0]
+[agent_2_4] Trajectory synced to Redis.
+agent_1_1@127.0.0.1 Mission Start:  1_0  ->  1_1
+agent_1_1@127.0.0.1 Planning segment:  1_0  ->  1_1
+[agent_1_1] Planning path from node 1_0 to node 1_1
+[agent_1_1] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_1] Found existing base reference trajectory for segment 1_0 -> 1_1.
+[agent_1_1] Successfully retrieved my formation trajectory (len=15).
+[agent_1_1] Detect gap (738.70m) between segments. Keeping full trajectory.
+[agent_1_1] Segment planned. Prepared next belief: cur_nodes(1_1, 1_2)
+
+Spawning persistent agent: agent_1_3@127.0.0.1 with 6 segments
+No initial position provided, generating random position.
+agent_1_3@127.0.0.1 initialized at position: [122.1700234162559, 37.513579788622344, 200.0]
+[agent_2_5] Trajectory synced to Redis.
+agent_1_2@127.0.0.1 Mission Start:  1_0  ->  1_1
+agent_1_2@127.0.0.1 Planning segment:  1_0  ->  1_1
+[agent_1_2] Planning path from node 1_0 to node 1_1
+[agent_1_2] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_2] Found existing base reference trajectory for segment 1_0 -> 1_1.
+[agent_1_2] Successfully retrieved my formation trajectory (len=15).
+[agent_1_2] Detect gap (1317.43m) between segments. Keeping full trajectory.
+[agent_1_2] Segment planned. Prepared next belief: cur_nodes(1_1, 1_2)
+
+Spawning persistent agent: agent_1_4@127.0.0.1 with 6 segments
+No initial position provided, generating random position.
+agent_1_4@127.0.0.1 initialized at position: [122.16658405517022, 37.50629597816823, 200.0]
+[agent_2_6] Trajectory synced to Redis.
+agent_1_3@127.0.0.1 Mission Start:  1_0  ->  1_1
+agent_1_3@127.0.0.1 Planning segment:  1_0  ->  1_1
+[agent_1_3] Planning path from node 1_0 to node 1_1
+[agent_1_3] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_3] Found existing base reference trajectory for segment 1_0 -> 1_1.
+[agent_1_3] Successfully retrieved my formation trajectory (len=15).
+[agent_1_3] Detect gap (1841.74m) between segments. Keeping full trajectory.
+[agent_1_3] Segment planned. Prepared next belief: cur_nodes(1_1, 1_2)
+[agent_2_7] Trajectory synced to Redis.
+
+Spawning persistent agent: agent_1_5@127.0.0.1 with 6 segments
+No initial position provided, generating random position.
+agent_1_5@127.0.0.1 initialized at position: [122.17048125181981, 37.50162899228164, 200.0]
+agent_1_4@127.0.0.1 Mission Start:  1_0  ->  1_1
+agent_1_4@127.0.0.1 Planning segment:  1_0  ->  1_1
+[agent_1_4] Planning path from node 1_0 to node 1_1
+[agent_1_4] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_4] Found existing base reference trajectory for segment 1_0 -> 1_1.
+[agent_1_4] Successfully retrieved my formation trajectory (len=15).
+[agent_1_4] Detect gap (1247.42m) between segments. Keeping full trajectory.
+[agent_1_4] Segment planned. Prepared next belief: cur_nodes(1_1, 1_2)
+[agent_1_0] Trajectory synced to Redis.
+agent_1_5@127.0.0.1 Mission Start:  1_0  ->  1_1
+agent_1_5@127.0.0.1 Planning segment:  1_0  ->  1_1
+[agent_1_5] Planning path from node 1_0 to node 1_1
+[agent_1_5] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_5] Found existing base reference trajectory for segment 1_0 -> 1_1.
+[agent_1_5] Successfully retrieved my formation trajectory (len=15).
+[agent_1_5] Detect gap (632.72m) between segments. Keeping full trajectory.
+[agent_1_5] Segment planned. Prepared next belief: cur_nodes(1_1, 1_2)
+[agent_1_1] Trajectory synced to Redis.
+[agent_1_2] Trajectory synced to Redis.
+[agent_1_3] Trajectory synced to Redis.
+[agent_1_4] Trajectory synced to Redis.
+[agent_1_5] Trajectory synced to Redis.
+[agent_2_7] All siblings synced at start of 2_0_2_1. Starting!
+[agent_2_2] All siblings synced at start of 2_0_2_1. Starting!
+[agent_2_3] All siblings synced at start of 2_0_2_1. Starting!
+[agent_2_4] All siblings synced at start of 2_0_2_1. Starting!
+[agent_2_5] All siblings synced at start of 2_0_2_1. Starting!
+[agent_2_0] All siblings synced at start of 2_0_2_1. Starting!
+[agent_1_3] All siblings synced at start of 1_0_1_1. Starting!
+[agent_2_6] All siblings synced at start of 2_0_2_1. Starting!
+[agent_2_1] All siblings synced at start of 2_0_2_1. Starting!
+[agent_1_4] All siblings synced at start of 1_0_1_1. Starting!
+[agent_1_0] All siblings synced at start of 1_0_1_1. Starting!
+[agent_1_5] All siblings synced at start of 1_0_1_1. Starting!
+[agent_1_1] All siblings synced at start of 1_0_1_1. Starting!
+[agent_1_2] All siblings synced at start of 1_0_1_1. Starting!
+[agent_2_7] Segment completed (reached end).
+agent_2_7@127.0.0.1 Planning segment:  2_1  ->  2_2
+[agent_2_7] Planning path from node 2_1 to node 2_2
+[agent_2_7] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_7] No base reference traj found for segment 2_1->2_2. Now generate it.
+[agent_2_7@127.0.0.1] Default 2d traj: [[427269.49986979185, 4151324.157387072, 352.1626686103748], [427290.5789963851, 4151325.459491659], [427356.8016841828, 4151371.1697126376], [427429.4992406615, 4151405.665132088], [427506.78883729473, 4151428.0523367664], [427586.6687141281, 4151437.751509831]]
+[agent_2_7@127.0.0.1] Insert end height: -1 (rand: 369)
+agent_2_7 is detouring antiair_facilities, trajectory:
+[[427592.06987352634, 4151604.69912497, 201.857656764787], [427595.108783088, 4151505.8575441376, 213.5455720354928], [427581.47351189895, 4151454.9518657993, 226.15425632645895], [427562.168835089, 4151440.8891302766, 237.66770906010964], [427538.6580569522, 4151439.0187955373, 247.64964693614007], [427507.8255775202, 4151439.5645876904, 258.1160958202757], [427475.52343875327, 4151435.3863937133, 268.7748791336302], [427446.4478596841, 4151426.012061987, 279.211262745405], [427419.4031769422, 4151414.622113949, 289.62721817909414], [427392.9690873192, 4151402.67531762, 300.07141314748225], [427366.6946657861, 4151390.021043382, 310.5194518342895], [427340.8782555851, 4151376.125840733, 320.9592466696177], [427315.86440299655, 4151360.4549939143, 331.3722784969329], [427292.02315383026, 4151342.5022358396, 341.73412717584256], [427269.49986979185, 4151324.157387072, 352.1626686103748]]
+[agent_2_7] Generated and saved trajectories for 8 members.
+[agent_2_7] Successfully retrieved my formation trajectory (len=15).
+[agent_2_7] Detect gap (34.46m) between segments. Keeping full trajectory.
+[agent_2_7] Segment planned. Prepared next belief: cur_nodes(2_2, 3_0)
+[agent_2_7] Trajectory synced to Redis.
+[agent_2_4] Segment completed (reached end).
+agent_2_4@127.0.0.1 Planning segment:  2_1  ->  2_2
+[agent_2_4] Planning path from node 2_1 to node 2_2
+[agent_2_4] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_4] Found existing base reference trajectory for segment 2_1 -> 2_2.
+[agent_2_4] Successfully retrieved my formation trajectory (len=15).
+[agent_2_4] Detect gap (11.00m) between segments. Keeping full trajectory.
+[agent_2_4] Segment planned. Prepared next belief: cur_nodes(2_2, 3_0)
+[agent_2_5] Segment completed (reached end).
+agent_2_5@127.0.0.1 Planning segment:  2_1  ->  2_2
+[agent_2_5] Planning path from node 2_1 to node 2_2
+[agent_2_5] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_5] Found existing base reference trajectory for segment 2_1 -> 2_2.
+[agent_2_5] Successfully retrieved my formation trajectory (len=15).
+[agent_2_5] Detect gap (14.74m) between segments. Keeping full trajectory.
+[agent_2_5] Segment planned. Prepared next belief: cur_nodes(2_2, 3_0)
+[agent_2_0] Segment completed (reached end).
+agent_2_0@127.0.0.1 Planning segment:  2_1  ->  2_2
+[agent_2_0] Planning path from node 2_1 to node 2_2
+[agent_2_0] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_0] Found existing base reference trajectory for segment 2_1 -> 2_2.
+[agent_2_0] Successfully retrieved my formation trajectory (len=15).
+[agent_2_0] Detect gap (70.01m) between segments. Keeping full trajectory.
+[agent_2_0] Segment planned. Prepared next belief: cur_nodes(2_2, 3_0)
+[agent_2_6] Segment completed (reached end).
+agent_2_6@127.0.0.1 Planning segment:  2_1  ->  2_2
+[agent_2_6] Planning path from node 2_1 to node 2_2
+[agent_2_6] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_6] Found existing base reference trajectory for segment 2_1 -> 2_2.
+[agent_2_6] Successfully retrieved my formation trajectory (len=15).
+[agent_2_6] Detect gap (24.23m) between segments. Keeping full trajectory.
+[agent_2_6] Segment planned. Prepared next belief: cur_nodes(2_2, 3_0)
+[agent_2_2] Segment completed (reached end).
+agent_2_2@127.0.0.1 Planning segment:  2_1  ->  2_2
+[agent_2_2] Planning path from node 2_1 to node 2_2
+[agent_2_2] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_2] Found existing base reference trajectory for segment 2_1 -> 2_2.
+[agent_2_2] Successfully retrieved my formation trajectory (len=15).
+[agent_2_2] Detect gap (40.09m) between segments. Keeping full trajectory.
+[agent_2_2] Segment planned. Prepared next belief: cur_nodes(2_2, 3_0)
+[agent_2_3] Segment completed (reached end).
+agent_2_3@127.0.0.1 Planning segment:  2_1  ->  2_2
+[agent_2_3] Planning path from node 2_1 to node 2_2
+[agent_2_3] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_3] Found existing base reference trajectory for segment 2_1 -> 2_2.
+[agent_2_3] Successfully retrieved my formation trajectory (len=15).
+[agent_2_3] Detect gap (25.22m) between segments. Keeping full trajectory.
+[agent_2_3] Segment planned. Prepared next belief: cur_nodes(2_2, 3_0)
+[agent_2_4] Trajectory synced to Redis.
+[agent_2_5] Trajectory synced to Redis.
+[agent_2_0] Trajectory synced to Redis.
+[agent_1_3] Segment completed (reached end).
+agent_1_3@127.0.0.1 Planning segment:  1_1  ->  1_2
+[agent_2_6] Trajectory synced to Redis.
+[agent_1_3] Planning path from node 1_1 to node 1_2
+[agent_1_3] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_3] No base reference traj found for segment 1_1->1_2. Now generate it.
+[agent_1_3@127.0.0.1] Default 2d traj: [[427930.3907500167, 4150595.2994706165, 58.208280852428004], [427953.1638609376, 4150577.5557870734], [427890.8340575484, 4150526.6650777985], [427821.1479648843, 4150486.43179344], [427745.910416141, 4150457.8979549296], [427667.07002431044, 4150441.8025736962]]
+[agent_1_3@127.0.0.1] Insert end height: -1 (rand: 346)
+agent_1_3 is detouring antiair_facilities, trajectory:
+[[427104.55873049126, 4150386.44608788, 199.95618980350076], [427164.15385748574, 4150400.1615772257, 199.85118511339547], [427223.9956007178, 4150412.866026064, 199.74524179754698], [427284.00512812374, 4150424.865085854, 199.56401333938035], [427344.11139131844, 4150436.4663512525, 199.2539525671659], [427404.2481454132, 4150447.978549058, 198.72340427883847], [427464.35058087995, 4150459.7113544075, 197.81537127671612], [427524.3512806922, 4150471.973856008, 196.26196719307254], [427584.17290624627, 4150485.072440158, 193.60508521779803], [427643.71250087826, 4150499.306355059, 189.06575207014188], [427702.8039593711, 4150514.952490937, 181.33044699059056], [427761.1338382011, 4150532.227487708, 168.2389428814073], [427818.1265459299, 4150551.21113639, 146.42748367851166], [427873.1035571687, 4150571.834889219, 110.9923978622862], [427930.3907500167, 4150595.2994706165, 58.208280852428004]]
+[agent_1_3] Generated and saved trajectories for 6 members.
+[agent_1_3] Successfully retrieved my formation trajectory (len=15).
+[agent_1_3] Detect gap (17.71m) between segments. Keeping full trajectory.
+[agent_1_3] Segment planned. Prepared next belief: cur_nodes(1_2, 3_0)
+[agent_2_1] Segment completed (reached end).
+agent_2_1@127.0.0.1 Planning segment:  2_1  ->  2_2
+[agent_2_1] Planning path from node 2_1 to node 2_2
+[agent_2_1] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_1] Found existing base reference trajectory for segment 2_1 -> 2_2.
+[agent_2_1] Successfully retrieved my formation trajectory (len=15).
+[agent_2_1] Detect gap (55.14m) between segments. Keeping full trajectory.
+[agent_2_1] Segment planned. Prepared next belief: cur_nodes(2_2, 3_0)
+[agent_1_4] Segment completed (reached end).
+agent_1_4@127.0.0.1 Planning segment:  1_1  ->  1_2
+[agent_1_4] Planning path from node 1_1 to node 1_2
+[agent_1_4] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_4] Found existing base reference trajectory for segment 1_1 -> 1_2.
+[agent_1_4] Successfully retrieved my formation trajectory (len=15).
+[agent_1_4] Detect gap (15.30m) between segments. Keeping full trajectory.
+[agent_1_4] Segment planned. Prepared next belief: cur_nodes(1_2, 3_0)
+[agent_2_2] Trajectory synced to Redis.
+[agent_1_0] Segment completed (reached end).
+agent_1_0@127.0.0.1 Planning segment:  1_1  ->  1_2
+[agent_1_0] Planning path from node 1_1 to node 1_2
+[agent_1_0] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_0] Found existing base reference trajectory for segment 1_1 -> 1_2.
+[agent_1_0] Successfully retrieved my formation trajectory (len=15).
+[agent_1_0] Detect gap (20.06m) between segments. Keeping full trajectory.
+[agent_1_0] Segment planned. Prepared next belief: cur_nodes(1_2, 3_0)
+[agent_1_5] Segment completed (reached end).
+agent_1_5@127.0.0.1 Planning segment:  1_1  ->  1_2
+[agent_1_5] Planning path from node 1_1 to node 1_2
+[agent_1_5] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_5] Found existing base reference trajectory for segment 1_1 -> 1_2.
+[agent_1_5] Successfully retrieved my formation trajectory (len=15).
+[agent_1_5] Detect gap (12.09m) between segments. Keeping full trajectory.
+[agent_1_5] Segment planned. Prepared next belief: cur_nodes(1_2, 3_0)
+[agent_2_3] Trajectory synced to Redis.
+[agent_1_1] Segment completed (reached end).
+agent_1_1@127.0.0.1 Planning segment:  1_1  ->  1_2
+[agent_1_1] Planning path from node 1_1 to node 1_2
+[agent_1_1] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_1] Found existing base reference trajectory for segment 1_1 -> 1_2.
+[agent_1_1] Successfully retrieved my formation trajectory (len=15).
+[agent_1_1] Detect gap (20.15m) between segments. Keeping full trajectory.
+[agent_1_1] Segment planned. Prepared next belief: cur_nodes(1_2, 3_0)
+[agent_1_2] Segment completed (reached end).
+agent_1_2@127.0.0.1 Planning segment:  1_1  ->  1_2
+[agent_1_2] Planning path from node 1_1 to node 1_2
+[agent_1_2] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_2] Found existing base reference trajectory for segment 1_1 -> 1_2.
+[agent_1_2] Successfully retrieved my formation trajectory (len=15).
+[agent_1_2] Detect gap (19.34m) between segments. Keeping full trajectory.
+[agent_1_2] Segment planned. Prepared next belief: cur_nodes(1_2, 3_0)
+[agent_1_3] Trajectory synced to Redis.
+[agent_2_1] Trajectory synced to Redis.
+[agent_1_4] Trajectory synced to Redis.
+[agent_1_0] Trajectory synced to Redis.
+[agent_1_5] Trajectory synced to Redis.
+[agent_1_1] Trajectory synced to Redis.
+[agent_1_2] Trajectory synced to Redis.
+[agent_1_2] All siblings synced at start of 1_1_1_2. Starting!
+[agent_1_3] All siblings synced at start of 1_1_1_2. Starting!
+[agent_2_1] All siblings synced at start of 2_1_2_2. Starting!
+[agent_2_7] All siblings synced at start of 2_1_2_2. Starting!
+[agent_1_4] All siblings synced at start of 1_1_1_2. Starting!
+[agent_2_2] All siblings synced at start of 2_1_2_2. Starting!
+[agent_1_0] All siblings synced at start of 1_1_1_2. Starting!
+[agent_1_5] All siblings synced at start of 1_1_1_2. Starting!
+[agent_2_3] All siblings synced at start of 2_1_2_2. Starting!
+[agent_1_1] All siblings synced at start of 1_1_1_2. Starting!
+[agent_2_4] All siblings synced at start of 2_1_2_2. Starting!
+[agent_2_5] All siblings synced at start of 2_1_2_2. Starting!
+[agent_2_0] All siblings synced at start of 2_1_2_2. Starting!
+[agent_2_6] All siblings synced at start of 2_1_2_2. Starting!
+[agent_2_1] Segment completed (reached end).
+agent_2_1@127.0.0.1 Planning segment:  2_2  ->  3_0
+[agent_2_1] Planning path from node 2_2 to node 3_0
+[agent_2_1] Merge peers for aggregation: ['agent_2_5', 'agent_1_4', 'agent_2_3', 'agent_1_1', 'agent_2_2', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_0', 'agent_2_4', 'agent_1_2', 'agent_1_0']
+[agent_2_1] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_1] No base reference traj found for segment 2_2->3_0. Now generate it.
+[agent_2_1] is act aggregating to rendezvous point, merge_peers: ['agent_2_5', 'agent_1_4', 'agent_2_3', 'agent_1_1', 'agent_2_2', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_0', 'agent_2_4', 'agent_1_2', 'agent_1_0']
+[agent_2_1@127.0.0.1] Default 2d traj: [[427570.1687978429, 4151407.418550167, 368.2294022276172], [427631.6260813624, 4150981.2365645347, 336.1257510050991]]
+agent_2_1 is breaking through aggregate_point, trajectory:
+[[427570.1687978429, 4151407.418550167, 368.2294022276172], [427573.36282173503, 4151376.8283913517, 365.9362842831516], [427574.5254084651, 4151346.0601085005, 363.64316633868606], [427574.2050931866, 4151315.237506754, 361.35004839422044], [427572.9564998349, 4151284.424312915, 359.0569304497549], [427571.3362977334, 4151253.6407004343, 356.7638125052893], [427569.9012727149, 4151222.8800062, 354.47069456082374], [427569.20781217294, 4151192.1255006967, 352.1775766163581], [427569.8120976722, 4151161.3671582113, 349.88445867189256], [427572.2702976458, 4151130.6184206484, 347.591340727427], [427577.1380528229, 4151099.932957037, 345.29822278296143], [427584.9685474363, 4151069.421390987, 343.00510483849587], [427596.3084615762, 4151039.2679001656, 340.71198689403025], [427611.69110844017, 4151009.7464855667, 338.4188689495647], [427631.6260813624, 4150981.2365645347, 336.1257510050991]]
+[agent_2_1] Generated and saved trajectories for 8 members.
+[agent_2_1] Successfully retrieved my formation trajectory (len=15).
+[agent_2_1] Detect gap (31.28m) between segments. Keeping full trajectory.
+[agent_2_1] Segment planned. Prepared next belief: cur_nodes(3_0, 3_1)
+[agent_2_2] Segment completed (reached end).
+agent_2_2@127.0.0.1 Planning segment:  2_2  ->  3_0
+[agent_2_2] Planning path from node 2_2 to node 3_0
+[agent_2_2] Merge peers for aggregation: ['agent_2_5', 'agent_1_4', 'agent_2_3', 'agent_1_1', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_0', 'agent_2_1', 'agent_2_4', 'agent_1_2', 'agent_1_0']
+[agent_2_2] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_2] Found existing base reference trajectory for segment 2_2 -> 3_0.
+[agent_2_2] Successfully retrieved my formation trajectory (len=15).
+[agent_2_2] Detect gap (27.30m) between segments. Keeping full trajectory.
+[agent_2_2] Segment planned. Prepared next belief: cur_nodes(3_0, 3_1)
+[agent_2_3] Segment completed (reached end).
+agent_2_3@127.0.0.1 Planning segment:  2_2  ->  3_0
+[agent_2_3] Planning path from node 2_2 to node 3_0
+[agent_2_3] Merge peers for aggregation: ['agent_2_5', 'agent_1_4', 'agent_1_1', 'agent_2_2', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_0', 'agent_2_1', 'agent_2_4', 'agent_1_2', 'agent_1_0']
+[agent_2_3] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_3] Found existing base reference trajectory for segment 2_2 -> 3_0.
+[agent_2_3] Successfully retrieved my formation trajectory (len=15).
+[agent_2_3] Detect gap (27.11m) between segments. Keeping full trajectory.
+[agent_2_3] Segment planned. Prepared next belief: cur_nodes(3_0, 3_1)
+[agent_2_4] Segment completed (reached end).
+agent_2_4@127.0.0.1 Planning segment:  2_2  ->  3_0
+[agent_2_4] Planning path from node 2_2 to node 3_0
+[agent_2_4] Merge peers for aggregation: ['agent_2_5', 'agent_1_4', 'agent_2_3', 'agent_1_1', 'agent_2_2', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_0', 'agent_2_1', 'agent_1_2', 'agent_1_0']
+[agent_2_4] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_4] Found existing base reference trajectory for segment 2_2 -> 3_0.
+[agent_2_4] Successfully retrieved my formation trajectory (len=15).
+[agent_2_4] Detect gap (31.41m) between segments. Keeping full trajectory.
+[agent_2_4] Segment planned. Prepared next belief: cur_nodes(3_0, 3_1)
+[agent_2_0] Segment completed (reached end).
+agent_2_0@127.0.0.1 Planning segment:  2_2  ->  3_0
+[agent_2_0] Planning path from node 2_2 to node 3_0
+[agent_2_0] Merge peers for aggregation: ['agent_2_5', 'agent_1_4', 'agent_2_3', 'agent_1_1', 'agent_2_2', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_1', 'agent_2_4', 'agent_1_2', 'agent_1_0']
+[agent_2_0] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_0] Found existing base reference trajectory for segment 2_2 -> 3_0.
+[agent_2_0] Successfully retrieved my formation trajectory (len=15).
+[agent_2_0] Detect gap (38.68m) between segments. Keeping full trajectory.
+[agent_2_0] Segment planned. Prepared next belief: cur_nodes(3_0, 3_1)
+[agent_2_1] Trajectory synced to Redis.
+[agent_2_2] Trajectory synced to Redis.
+[agent_2_3] Trajectory synced to Redis.
+[agent_2_4] Trajectory synced to Redis.
+[agent_2_5] Segment completed (reached end).
+agent_2_5@127.0.0.1 Planning segment:  2_2  ->  3_0
+[agent_2_5] Planning path from node 2_2 to node 3_0
+[agent_2_5] Merge peers for aggregation: ['agent_1_4', 'agent_2_3', 'agent_1_1', 'agent_2_2', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_0', 'agent_2_1', 'agent_2_4', 'agent_1_2', 'agent_1_0']
+[agent_2_5] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_5] Found existing base reference trajectory for segment 2_2 -> 3_0.
+[agent_2_5] Successfully retrieved my formation trajectory (len=15).
+[agent_2_5] Detect gap (38.82m) between segments. Keeping full trajectory.
+[agent_2_5] Segment planned. Prepared next belief: cur_nodes(3_0, 3_1)
+[agent_2_0] Trajectory synced to Redis.
+[agent_2_5] Trajectory synced to Redis.
+[agent_2_7] Segment completed (reached end).
+agent_2_7@127.0.0.1 Planning segment:  2_2  ->  3_0
+[agent_2_7] Planning path from node 2_2 to node 3_0
+[agent_2_7] Merge peers for aggregation: ['agent_2_5', 'agent_1_4', 'agent_2_3', 'agent_1_1', 'agent_2_2', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_0', 'agent_2_1', 'agent_2_4', 'agent_1_2', 'agent_1_0']
+[agent_2_7] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_7] Found existing base reference trajectory for segment 2_2 -> 3_0.
+[agent_2_7] Successfully retrieved my formation trajectory (len=15).
+[agent_2_7] Detect gap (71.52m) between segments. Keeping full trajectory.
+[agent_2_7] Segment planned. Prepared next belief: cur_nodes(3_0, 3_1)
+[agent_2_6] Segment completed (reached end).
+agent_2_6@127.0.0.1 Planning segment:  2_2  ->  3_0
+[agent_2_6] Planning path from node 2_2 to node 3_0
+[agent_2_6] Merge peers for aggregation: ['agent_2_5', 'agent_1_4', 'agent_2_3', 'agent_1_1', 'agent_2_2', 'agent_2_7', 'agent_1_3', 'agent_1_5', 'agent_2_0', 'agent_2_1', 'agent_2_4', 'agent_1_2', 'agent_1_0']
+[agent_2_6] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7']
+[agent_2_6] Found existing base reference trajectory for segment 2_2 -> 3_0.
+[agent_2_6] Successfully retrieved my formation trajectory (len=15).
+[agent_2_6] Detect gap (53.69m) between segments. Keeping full trajectory.
+[agent_2_6] Segment planned. Prepared next belief: cur_nodes(3_0, 3_1)
+[agent_2_7] Trajectory synced to Redis.
+[agent_1_4] Segment completed (reached end).
+agent_1_4@127.0.0.1 Planning segment:  1_2  ->  3_0
+[agent_1_4] Planning path from node 1_2 to node 3_0
+[agent_1_4] Merge peers for aggregation: ['agent_2_5', 'agent_2_3', 'agent_1_1', 'agent_2_2', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_0', 'agent_2_1', 'agent_2_4', 'agent_1_2', 'agent_1_0']
+[agent_1_4] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_4] No base reference traj found for segment 1_2->3_0. Now generate it.
+[agent_1_4] is act aggregating to rendezvous point, merge_peers: ['agent_2_5', 'agent_2_3', 'agent_1_1', 'agent_2_2', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_0', 'agent_2_1', 'agent_2_4', 'agent_1_2', 'agent_1_0']
+[agent_1_4@127.0.0.1] Default 2d traj: [[427649.6479892894, 4150451.5112240645, 357.4549651694561], [427609.4457630367, 4151044.9667963786, 356.58850636011215]]
+agent_1_4 is breaking through aggregate_point, trajectory:
+[[427649.6479892894, 4150451.5112240645, 357.4549651694561], [427646.44678794604, 4150493.8772908226, 357.3745661536307], [427642.688079636, 4150536.1993865664, 357.35843266067116], [427638.5242464205, 4150578.4854106847, 357.3390616953072], [427634.10742087493, 4150620.746538271, 357.31580360110075], [427629.5895299985, 4150662.996308114, 357.28787835649103], [427625.1223619844, 4150705.24971247, 357.25434941471315], [427620.85764821793, 4150747.522288195, 357.2140922942311], [427616.94715288276, 4150789.829208605, 357.1657568662821], [427613.5427625657, 4150832.1843753536, 357.10772207474633], [427610.79656825314, 4150874.5995095815, 357.038041569752], [427608.8609321032, 4150917.0832416713, 356.9543784316968], [427607.8885313689, 4150959.640199076, 356.8539267964823], [427608.03237182554, 4151002.2700919183, 356.73331775345787], [427609.4457630367, 4151044.9667963786, 356.58850636011215]]
+[agent_1_4] Generated and saved trajectories for 6 members.
+[agent_1_4] Successfully retrieved my formation trajectory (len=15).
+[agent_1_4] Detect gap (21.45m) between segments. Keeping full trajectory.
+[agent_1_4] Segment planned. Prepared next belief: cur_nodes(3_0, 3_1)
+[agent_1_5] Segment completed (reached end).
+agent_1_5@127.0.0.1 Planning segment:  1_2  ->  3_0
+[agent_1_5] Planning path from node 1_2 to node 3_0
+[agent_1_5] Merge peers for aggregation: ['agent_2_5', 'agent_1_4', 'agent_2_3', 'agent_1_1', 'agent_2_2', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_2_0', 'agent_2_1', 'agent_2_4', 'agent_1_2', 'agent_1_0']
+[agent_1_5] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_5] Found existing base reference trajectory for segment 1_2 -> 3_0.
+[agent_1_5] Successfully retrieved my formation trajectory (len=15).
+[agent_1_5] Detect gap (29.49m) between segments. Keeping full trajectory.
+[agent_1_5] Segment planned. Prepared next belief: cur_nodes(3_0, 3_1)
+[agent_1_3] Segment completed (reached end).
+[agent_2_6] Trajectory synced to Redis.
+agent_1_3@127.0.0.1 Planning segment:  1_2  ->  3_0
+[agent_1_3] Planning path from node 1_2 to node 3_0
+[agent_1_3] Merge peers for aggregation: ['agent_2_5', 'agent_1_4', 'agent_2_3', 'agent_1_1', 'agent_2_2', 'agent_2_7', 'agent_2_6', 'agent_1_5', 'agent_2_0', 'agent_2_1', 'agent_2_4', 'agent_1_2', 'agent_1_0']
+[agent_1_3] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_3] Found existing base reference trajectory for segment 1_2 -> 3_0.
+[agent_1_3] Successfully retrieved my formation trajectory (len=15).
+[agent_1_3] Detect gap (15.31m) between segments. Keeping full trajectory.
+[agent_1_3] Segment planned. Prepared next belief: cur_nodes(3_0, 3_1)
+[agent_1_4] Trajectory synced to Redis.
+[agent_1_5] Trajectory synced to Redis.
+[agent_1_2] Segment completed (reached end).
+agent_1_2@127.0.0.1 Planning segment:  1_2  ->  3_0
+[agent_1_2] Planning path from node 1_2 to node 3_0
+[agent_1_2] Merge peers for aggregation: ['agent_2_5', 'agent_1_4', 'agent_2_3', 'agent_1_1', 'agent_2_2', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_1', 'agent_2_4', 'agent_2_0', 'agent_1_0']
+[agent_1_2] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_2] Found existing base reference trajectory for segment 1_2 -> 3_0.
+[agent_1_2] Successfully retrieved my formation trajectory (len=15).
+[agent_1_2] Detect gap (9.43m) between segments. Keeping full trajectory.
+[agent_1_2] Segment planned. Prepared next belief: cur_nodes(3_0, 3_1)
+[agent_1_3] Trajectory synced to Redis.
+[agent_2_6] All siblings synced at start of 2_2_3_0. Starting!
+[agent_2_1] All siblings synced at start of 2_2_3_0. Starting!
+[agent_2_7] All siblings synced at start of 2_2_3_0. Starting!
+[agent_2_2] All siblings synced at start of 2_2_3_0. Starting!
+[agent_2_3] All siblings synced at start of 2_2_3_0. Starting!
+[agent_1_1] Segment completed (reached end).
+agent_1_1@127.0.0.1 Planning segment:  1_2  ->  3_0
+[agent_1_1] Planning path from node 1_2 to node 3_0
+[agent_1_1] Merge peers for aggregation: ['agent_2_5', 'agent_1_4', 'agent_2_3', 'agent_2_2', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_0', 'agent_2_1', 'agent_2_4', 'agent_1_2', 'agent_1_0']
+[agent_1_1] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_1] Found existing base reference trajectory for segment 1_2 -> 3_0.
+[agent_1_1] Successfully retrieved my formation trajectory (len=15).
+[agent_1_1] Detect gap (3.21m) between segments. Keeping full trajectory.
+[agent_1_1] Segment planned. Prepared next belief: cur_nodes(3_0, 3_1)
+[agent_2_4] All siblings synced at start of 2_2_3_0. Starting!
+[agent_1_2] Trajectory synced to Redis.
+[agent_2_5] All siblings synced at start of 2_2_3_0. Starting!
+[agent_2_0] All siblings synced at start of 2_2_3_0. Starting!
+[agent_1_0] Segment completed (reached end).
+agent_1_0@127.0.0.1 Planning segment:  1_2  ->  3_0
+[agent_1_0] Planning path from node 1_2 to node 3_0
+[agent_1_0] Merge peers for aggregation: ['agent_2_5', 'agent_1_4', 'agent_2_3', 'agent_1_1', 'agent_2_2', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_0', 'agent_2_1', 'agent_2_4', 'agent_1_2']
+[agent_1_0] Current segment siblings: ['agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_0] Found existing base reference trajectory for segment 1_2 -> 3_0.
+[agent_1_0] Successfully retrieved my formation trajectory (len=15).
+[agent_1_0] Detect gap (8.79m) between segments. Keeping full trajectory.
+[agent_1_0] Segment planned. Prepared next belief: cur_nodes(3_0, 3_1)
+[agent_1_1] Trajectory synced to Redis.
+[agent_1_0] Trajectory synced to Redis.
+[agent_1_0] All siblings synced at start of 1_2_3_0. Starting!
+[agent_1_5] All siblings synced at start of 1_2_3_0. Starting!
+[agent_1_1] All siblings synced at start of 1_2_3_0. Starting!
+[agent_1_2] All siblings synced at start of 1_2_3_0. Starting!
+[agent_1_3] All siblings synced at start of 1_2_3_0. Starting!
+[agent_1_4] All siblings synced at start of 1_2_3_0. Starting!
+[agent_2_7] Segment completed (reached end).
+[agent_2_6] Segment completed (reached end).
+[agent_2_1] Segment completed (reached end).
+[agent_2_0] Segment completed (reached end).
+[agent_2_2] Segment completed (reached end).
+[agent_2_3] Segment completed (reached end).
+[agent_2_4] Segment completed (reached end).
+[agent_2_5] Segment completed (reached end).
+[agent_1_0] Segment completed (reached end).
+[agent_1_5] Segment completed (reached end).
+[agent_1_1] Segment completed (reached end).
+[agent_1_2] Segment completed (reached end).
+[agent_1_3] Segment completed (reached end).
+[agent_1_4] Segment completed (reached end).
+[agent_1_4] All merge peers are READY! Proceeding.
+agent_1_4@127.0.0.1 Planning segment:  3_0  ->  3_1
+[agent_1_4] Planning path from node 3_0 to node 3_1
+[agent_1_4] Merge peers for aggregation: ['agent_2_5', 'agent_2_3', 'agent_2_2', 'agent_1_1', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_1', 'agent_2_4', 'agent_2_0', 'agent_1_0', 'agent_1_2']
+[agent_1_4] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_4] No base reference traj found for segment 3_0->3_1. Now generate it.
+[agent_1_4@127.0.0.1] Default 2d traj: [[427610.155522305, 4151066.4049817068, 356.5157589813373], [428184.39223929326, 4150775.5956324]]
+[agent_1_4@127.0.0.1] Insert end height: -1 (rand: 85)
+agent_1_4 is breaking through antiair, trajectory:
+[[427610.155522305, 4151066.4049817068, 356.5157589813373], [427649.98305103043, 4151043.4346809965, 255.73841695181048], [427687.61362692364, 4151016.849870313, 192.36616958286402], [427723.46322777553, 4150987.7528061946, 152.51552800299095], [427758.0981206162, 4150957.158216307, 127.45607847641966], [427792.18802298093, 4150926.009690921, 111.69783756287967], [427826.46364126937, 4150895.2033432876, 101.7885154755823], [427861.67747112416, 4150865.616086452, 95.55719405026844], [427898.5663475908, 4150838.1361304815, 91.63872552502488], [427937.81402352167, 4150813.6934582917, 89.17465818917066], [427980.01201808307, 4150793.2880682065, 87.62516817884926], [428025.61710903025, 4150778.013671495, 86.6507957430191], [428074.90415001684, 4150769.074313344, 86.03807695336474], [428127.9133957354, 4150767.7910724743, 85.65277837410474], [428184.39223929326, 4150775.5956324, 85.0]]
+[agent_1_4] Generated and saved trajectories for 14 members.
+[agent_1_4] Successfully retrieved my formation trajectory (len=15).
+[agent_1_4] Detect gap (34.48m) between segments. Keeping full trajectory.
+[agent_1_4] Segment planned. Prepared next belief: cur_nodes(3_1, 4_1)
+[agent_2_2] All merge peers are READY! Proceeding.
+agent_2_2@127.0.0.1 Planning segment:  3_0  ->  3_1
+[agent_2_2] Planning path from node 3_0 to node 3_1
+[agent_2_2] Merge peers for aggregation: ['agent_2_5', 'agent_2_3', 'agent_1_4', 'agent_1_1', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_1', 'agent_2_4', 'agent_2_0', 'agent_1_0', 'agent_1_2']
+[agent_2_2] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_2_2] Found existing base reference trajectory for segment 3_0 -> 3_1.
+[agent_2_2] Successfully retrieved my formation trajectory (len=15).
+[agent_2_2] Detect gap (74.28m) between segments. Keeping full trajectory.
+[agent_2_2] Segment planned. Prepared next belief: cur_nodes(3_1, 4_1)
+[agent_1_0] All merge peers are READY! Proceeding.
+agent_1_0@127.0.0.1 Planning segment:  3_0  ->  3_1
+[agent_1_0] Planning path from node 3_0 to node 3_1
+[agent_1_0] Merge peers for aggregation: ['agent_2_5', 'agent_2_3', 'agent_1_4', 'agent_2_2', 'agent_1_1', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_1', 'agent_2_4', 'agent_2_0', 'agent_1_2']
+[agent_1_0] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_0] Found existing base reference trajectory for segment 3_0 -> 3_1.
+[agent_1_0] Successfully retrieved my formation trajectory (len=15).
+[agent_1_0] Detect gap (65.65m) between segments. Keeping full trajectory.
+[agent_1_0] Segment planned. Prepared next belief: cur_nodes(3_1, 4_1)
+[agent_1_5] All merge peers are READY! Proceeding.
+agent_1_5@127.0.0.1 Planning segment:  3_0  ->  3_1
+[agent_1_5] Planning path from node 3_0 to node 3_1
+[agent_1_5] Merge peers for aggregation: ['agent_2_5', 'agent_2_3', 'agent_1_4', 'agent_2_2', 'agent_1_1', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_2_1', 'agent_2_4', 'agent_2_0', 'agent_1_0', 'agent_1_2']
+[agent_1_5] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_5] Found existing base reference trajectory for segment 3_0 -> 3_1.
+[agent_1_5] Successfully retrieved my formation trajectory (len=15).
+[agent_1_5] Detect gap (28.93m) between segments. Keeping full trajectory.
+[agent_1_5] Segment planned. Prepared next belief: cur_nodes(3_1, 4_1)
+[agent_2_3] All merge peers are READY! Proceeding.
+agent_2_3@127.0.0.1 Planning segment:  3_0  ->  3_1
+[agent_2_3] Planning path from node 3_0 to node 3_1
+[agent_2_3] Merge peers for aggregation: ['agent_2_5', 'agent_1_4', 'agent_2_2', 'agent_1_1', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_1', 'agent_2_4', 'agent_2_0', 'agent_1_0', 'agent_1_2']
+[agent_2_3] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_2_3] Found existing base reference trajectory for segment 3_0 -> 3_1.
+[agent_2_3] Successfully retrieved my formation trajectory (len=15).
+[agent_2_3] Detect gap (74.90m) between segments. Keeping full trajectory.
+[agent_2_3] Segment planned. Prepared next belief: cur_nodes(3_1, 6_1)
+[agent_1_1] All merge peers are READY! Proceeding.
+agent_1_1@127.0.0.1 Planning segment:  3_0  ->  3_1
+[agent_1_1] Planning path from node 3_0 to node 3_1
+[agent_1_1] Merge peers for aggregation: ['agent_2_5', 'agent_2_3', 'agent_1_4', 'agent_2_2', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_1', 'agent_2_4', 'agent_2_0', 'agent_1_0', 'agent_1_2']
+[agent_1_1] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_1] Found existing base reference trajectory for segment 3_0 -> 3_1.
+[agent_1_1] Successfully retrieved my formation trajectory (len=15).
+[agent_1_1] Detect gap (57.21m) between segments. Keeping full trajectory.
+[agent_1_1] Segment planned. Prepared next belief: cur_nodes(3_1, 4_1)
+[agent_2_4] All merge peers are READY! Proceeding.
+agent_2_4@127.0.0.1 Planning segment:  3_0  ->  3_1
+[agent_2_4] Planning path from node 3_0 to node 3_1
+[agent_2_4] Merge peers for aggregation: ['agent_2_5', 'agent_2_3', 'agent_1_4', 'agent_2_2', 'agent_1_1', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_1', 'agent_2_0', 'agent_1_0', 'agent_1_2']
+[agent_2_4] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_2_4] Found existing base reference trajectory for segment 3_0 -> 3_1.
+[agent_2_4] Successfully retrieved my formation trajectory (len=15).
+[agent_2_4] Detect gap (76.22m) between segments. Keeping full trajectory.
+[agent_2_4] Segment planned. Prepared next belief: cur_nodes(3_1, 5_1)
+[agent_1_2] All merge peers are READY! Proceeding.
+agent_1_2@127.0.0.1 Planning segment:  3_0  ->  3_1
+[agent_1_2] Planning path from node 3_0 to node 3_1
+[agent_1_2] Merge peers for aggregation: ['agent_2_5', 'agent_2_3', 'agent_1_4', 'agent_2_2', 'agent_1_1', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_1', 'agent_2_4', 'agent_2_0', 'agent_1_0']
+[agent_1_2] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_2] Found existing base reference trajectory for segment 3_0 -> 3_1.
+[agent_1_2] Successfully retrieved my formation trajectory (len=15).
+[agent_1_2] Detect gap (49.06m) between segments. Keeping full trajectory.
+[agent_1_2] Segment planned. Prepared next belief: cur_nodes(3_1, 4_1)
+[agent_2_5] All merge peers are READY! Proceeding.
+agent_2_5@127.0.0.1 Planning segment:  3_0  ->  3_1
+[agent_2_5] Planning path from node 3_0 to node 3_1
+[agent_2_5] Merge peers for aggregation: ['agent_2_3', 'agent_1_4', 'agent_2_2', 'agent_1_1', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_1', 'agent_2_4', 'agent_2_0', 'agent_1_0', 'agent_1_2']
+[agent_2_5] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_2_5] Found existing base reference trajectory for segment 3_0 -> 3_1.
+[agent_2_5] Successfully retrieved my formation trajectory (len=15).
+[agent_2_5] Detect gap (78.22m) between segments. Keeping full trajectory.
+[agent_2_5] Segment planned. Prepared next belief: cur_nodes(3_1, 6_1)
+[agent_2_0] All merge peers are READY! Proceeding.
+agent_2_0@127.0.0.1 Planning segment:  3_0  ->  3_1
+[agent_2_0] Planning path from node 3_0 to node 3_1
+[agent_2_0] Merge peers for aggregation: ['agent_2_5', 'agent_2_3', 'agent_1_4', 'agent_2_2', 'agent_1_1', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_1', 'agent_2_4', 'agent_1_2', 'agent_1_0']
+[agent_2_0] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_2_0] Found existing base reference trajectory for segment 3_0 -> 3_1.
+[agent_2_0] Successfully retrieved my formation trajectory (len=15).
+[agent_2_0] Detect gap (75.20m) between segments. Keeping full trajectory.
+[agent_2_0] Segment planned. Prepared next belief: cur_nodes(3_1, 5_1)
+[agent_1_3] All merge peers are READY! Proceeding.
+agent_1_3@127.0.0.1 Planning segment:  3_0  ->  3_1
+[agent_1_3] Planning path from node 3_0 to node 3_1
+[agent_1_3] Merge peers for aggregation: ['agent_2_5', 'agent_2_3', 'agent_1_4', 'agent_2_2', 'agent_1_1', 'agent_2_7', 'agent_2_6', 'agent_1_5', 'agent_2_1', 'agent_2_4', 'agent_2_0', 'agent_1_0', 'agent_1_2']
+[agent_1_3] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_3] Found existing base reference trajectory for segment 3_0 -> 3_1.
+[agent_1_3] Successfully retrieved my formation trajectory (len=15).
+[agent_1_3] Detect gap (41.38m) between segments. Keeping full trajectory.
+[agent_1_3] Segment planned. Prepared next belief: cur_nodes(3_1, 4_1)
+[agent_2_6] All merge peers are READY! Proceeding.
+agent_2_6@127.0.0.1 Planning segment:  3_0  ->  3_1
+[agent_2_6] Planning path from node 3_0 to node 3_1
+[agent_2_6] Merge peers for aggregation: ['agent_2_5', 'agent_2_3', 'agent_1_4', 'agent_2_2', 'agent_1_1', 'agent_2_7', 'agent_1_3', 'agent_1_5', 'agent_2_1', 'agent_2_4', 'agent_2_0', 'agent_1_0', 'agent_1_2']
+[agent_2_6] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_2_6] Found existing base reference trajectory for segment 3_0 -> 3_1.
+[agent_2_6] Successfully retrieved my formation trajectory (len=15).
+[agent_2_6] Detect gap (80.83m) between segments. Keeping full trajectory.
+[agent_2_6] Segment planned. Prepared next belief: cur_nodes(3_1, 5_1)
+[agent_2_1] All merge peers are READY! Proceeding.
+agent_2_1@127.0.0.1 Planning segment:  3_0  ->  3_1
+[agent_2_1] Planning path from node 3_0 to node 3_1
+[agent_2_1] Merge peers for aggregation: ['agent_2_5', 'agent_2_3', 'agent_1_4', 'agent_2_2', 'agent_1_1', 'agent_2_7', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_4', 'agent_2_0', 'agent_1_0', 'agent_1_2']
+[agent_2_1] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_2_1] Found existing base reference trajectory for segment 3_0 -> 3_1.
+[agent_2_1] Successfully retrieved my formation trajectory (len=15).
+[agent_2_1] Detect gap (74.38m) between segments. Keeping full trajectory.
+[agent_2_1] Segment planned. Prepared next belief: cur_nodes(3_1, 6_1)
+[agent_2_7] All merge peers are READY! Proceeding.
+agent_2_7@127.0.0.1 Planning segment:  3_0  ->  3_1
+[agent_2_7] Planning path from node 3_0 to node 3_1
+[agent_2_7] Merge peers for aggregation: ['agent_2_5', 'agent_2_3', 'agent_1_4', 'agent_2_2', 'agent_1_1', 'agent_2_6', 'agent_1_3', 'agent_1_5', 'agent_2_1', 'agent_2_4', 'agent_2_0', 'agent_1_0', 'agent_1_2']
+[agent_2_7] Current segment siblings: ['agent_2_0', 'agent_2_1', 'agent_2_2', 'agent_2_3', 'agent_2_4', 'agent_2_5', 'agent_2_6', 'agent_2_7', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_2_7] Found existing base reference trajectory for segment 3_0 -> 3_1.
+[agent_2_7] Successfully retrieved my formation trajectory (len=15).
+[agent_2_7] Detect gap (84.00m) between segments. Keeping full trajectory.
+[agent_2_7] Segment planned. Prepared next belief: cur_nodes(3_1, 5_1)
+[agent_1_4] Trajectory synced to Redis.
+[agent_2_2] Trajectory synced to Redis.
+[agent_1_0] Trajectory synced to Redis.
+[agent_1_5] Trajectory synced to Redis.
+[agent_2_3] Trajectory synced to Redis.
+[agent_1_1] Trajectory synced to Redis.
+[agent_2_4] Trajectory synced to Redis.
+[agent_1_2] Trajectory synced to Redis.
+[agent_2_5] Trajectory synced to Redis.
+[agent_2_0] Trajectory synced to Redis.
+[agent_1_3] Trajectory synced to Redis.
+[agent_2_6] Trajectory synced to Redis.
+[agent_2_1] Trajectory synced to Redis.
+[agent_2_7] Trajectory synced to Redis.
+[agent_2_7] All siblings synced at start of 3_0_3_1. Starting!
+[agent_1_4] All siblings synced at start of 3_0_3_1. Starting!
+[agent_2_2] All siblings synced at start of 3_0_3_1. Starting!
+[agent_1_0] All siblings synced at start of 3_0_3_1. Starting!
+[agent_1_5] All siblings synced at start of 3_0_3_1. Starting!
+[agent_2_3] All siblings synced at start of 3_0_3_1. Starting!
+[agent_1_1] All siblings synced at start of 3_0_3_1. Starting!
+[agent_2_4] All siblings synced at start of 3_0_3_1. Starting!
+[agent_1_2] All siblings synced at start of 3_0_3_1. Starting!
+[agent_2_5] All siblings synced at start of 3_0_3_1. Starting!
+[agent_2_0] All siblings synced at start of 3_0_3_1. Starting!
+[agent_1_3] All siblings synced at start of 3_0_3_1. Starting!
+[agent_2_6] All siblings synced at start of 3_0_3_1. Starting!
+[agent_2_1] All siblings synced at start of 3_0_3_1. Starting!
+[agent_2_7] Segment completed (reached end).
+[agent_1_4] Segment completed (reached end).
+[agent_2_2] Segment completed (reached end).
+[agent_1_0] Segment completed (reached end).
+[agent_1_5] Segment completed (reached end).
+[agent_2_3] Segment completed (reached end).
+[agent_1_1] Segment completed (reached end).
+[agent_2_4] Segment completed (reached end).
+[agent_1_2] Segment completed (reached end).
+[agent_2_5] Segment completed (reached end).
+[agent_2_0] Segment completed (reached end).
+[agent_1_3] Segment completed (reached end).
+[agent_2_6] Segment completed (reached end).
+[agent_2_1] Segment completed (reached end).
+[agent_2_1] All merge peers are READY! Proceeding.
+agent_2_1@127.0.0.1 Planning segment:  3_1  ->  6_1
+[agent_2_1] Planning path from node 3_1 to node 6_1
+[agent_2_1] Current segment siblings: ['agent_2_1', 'agent_2_3', 'agent_2_5']
+[agent_2_1] No base reference traj found for segment 3_1->6_1. Now generate it.
+_outside_border_traj: [[428189.1120111447, 4150741.440371117, 84.99994154610793], [428189.1120111447, 4150741.440371117, 84.99994154610793]]
+[agent_2_1@127.0.0.1] Default 2d traj: [[428189.1120111447, 4150741.440371117, 84.99994154610793], [428189.1120111447, 4150741.440371117, 84.99994154610793]]
+agent_2_1 is escaping antiair_facilities, trajectory:
+[[428189.1120111447, 4150741.440371117, 84.99994154610793], [428189.1120111447, 4150741.440371117, 84.99994154610793], [428189.1120111447, 4150741.440371117, 84.99994154610793], [428189.1120111447, 4150741.440371117, 84.99994154610793], [428189.1120111447, 4150741.440371117, 84.99994154610793], [428189.1120111447, 4150741.440371117, 84.99994154610793], [428189.1120111447, 4150741.440371117, 84.99994154610793], [428189.1120111447, 4150741.440371117, 84.99994154610793], [428189.1120111447, 4150741.440371117, 84.99994154610793], [428189.1120111447, 4150741.440371117, 84.99994154610793], [428189.1120111447, 4150741.440371117, 84.99994154610793], [428189.1120111447, 4150741.440371117, 84.99994154610793], [428189.1120111447, 4150741.440371117, 84.99994154610793], [428189.1120111447, 4150741.440371117, 84.99994154610793], [428189.1120111447, 4150741.440371117, 84.99994154610793]]
+[agent_2_1] Generated and saved trajectories for 3 members.
+[agent_2_1] Successfully retrieved my formation trajectory (len=15).
+[agent_2_1] Detect gap (40.49m) between segments. Keeping full trajectory.
+[agent_2_1] Segment planned. Prepared next belief: cur_nodes(6_1, 6_2)
+[agent_2_7] All merge peers are READY! Proceeding.
+agent_2_7@127.0.0.1 Planning segment:  3_1  ->  5_1
+[agent_2_7] Planning path from node 3_1 to node 5_1
+[agent_2_7] Current segment siblings: ['agent_2_0', 'agent_2_4', 'agent_2_6', 'agent_2_7']
+[agent_2_7] No base reference traj found for segment 3_1->5_1. Now generate it.
+_outside_border_traj: [[428183.9631778264, 4150778.7006846713, 85.0000233344407], [428183.9631778264, 4150778.7006846713, 85.0000233344407]]
+[agent_2_7@127.0.0.1] Default 2d traj: [[428183.9631778264, 4150778.7006846713, 85.0000233344407], [428183.9631778264, 4150778.7006846713, 85.0000233344407]]
+agent_2_7 is escaping antiair_facilities, trajectory:
+[[428183.9631778264, 4150778.7006846713, 85.0000233344407], [428183.9631778264, 4150778.7006846713, 85.0000233344407], [428183.9631778264, 4150778.7006846713, 85.0000233344407], [428183.9631778264, 4150778.7006846713, 85.0000233344407], [428183.9631778264, 4150778.7006846713, 85.0000233344407], [428183.9631778264, 4150778.7006846713, 85.0000233344407], [428183.9631778264, 4150778.7006846713, 85.0000233344407], [428183.9631778264, 4150778.7006846713, 85.0000233344407], [428183.9631778264, 4150778.7006846713, 85.0000233344407], [428183.9631778264, 4150778.7006846713, 85.0000233344407], [428183.9631778264, 4150778.7006846713, 85.0000233344407], [428183.9631778264, 4150778.7006846713, 85.0000233344407], [428183.9631778264, 4150778.7006846713, 85.0000233344407], [428183.9631778264, 4150778.7006846713, 85.0000233344407], [428183.9631778264, 4150778.7006846713, 85.0000233344407]]
+[agent_2_7] Generated and saved trajectories for 4 members.
+[agent_2_7] Successfully retrieved my formation trajectory (len=15).
+[agent_2_7] Segment planned. Prepared next belief: cur_nodes(5_1, 5_2)
+[agent_1_4] All merge peers are READY! Proceeding.
+agent_1_4@127.0.0.1 Planning segment:  3_1  ->  4_1
+[agent_1_4] Planning path from node 3_1 to node 4_1
+[agent_1_4] Current segment siblings: ['agent_2_2', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_4] No base reference traj found for segment 3_1->4_1. Now generate it.
+[agent_1_4@127.0.0.1] Default 2d traj: [[428179.67248763243, 4150809.750807687, 84.99999750109517], [428184.39223929326, 4150775.5956324]]
+[agent_1_4@127.0.0.1] Insert end height: -1 (rand: 16)
+agent_1_4 is breaking through antiair, trajectory:
+[[428179.67248763243, 4150809.750807687, 84.99999750109517], [428180.11819363636, 4150807.328635549, 80.07142625101694], [428180.74628075084, 4150804.94359902, 75.14285500093871], [428181.5053156173, 4150802.593232194, 70.21428375086049], [428182.34502343426, 4150800.268893339, 65.28571250078227], [428183.21623889735, 4150797.9575418266, 60.35714125070403], [428184.0706102107, 4150795.6434656535, 55.42857000062581], [428184.86014083313, 4150793.3099662266, 50.49999875054758], [428185.5366510702, 4150790.941018309, 45.571427500469355], [428186.0512399093, 4150788.522929138, 40.64285625039113], [428186.35382713703, 4150786.046021817, 35.7142850003129], [428186.39285691024, 4150783.5063642114, 30.785713750234677], [428186.11524634296, 4150780.907555685, 25.85714250015645], [428185.46666568355, 4150778.262569895, 20.92857125007822], [428184.39223929326, 4150775.5956324, 16.0]]
+[agent_1_4] Generated and saved trajectories for 7 members.
+[agent_1_4] Successfully retrieved my formation trajectory (len=15).
+[agent_1_4] Detect gap (14.21m) between segments. Keeping full trajectory.
+[agent_1_4] Segment planned. Prepared next belief: cur_nodes(4_1, 4_2)
+[agent_2_2] All merge peers are READY! Proceeding.
+agent_2_2@127.0.0.1 Planning segment:  3_1  ->  4_1
+[agent_2_2] Planning path from node 3_1 to node 4_1
+[agent_2_2] Current segment siblings: ['agent_2_2', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_2_2] Found existing base reference trajectory for segment 3_1 -> 4_1.
+[agent_2_2] Successfully retrieved my formation trajectory (len=15).
+[agent_2_2] Detect gap (83.99m) between segments. Keeping full trajectory.
+[agent_2_2] Segment planned. Prepared next belief: cur_nodes(4_1, 4_2)
+[agent_1_0] All merge peers are READY! Proceeding.
+agent_1_0@127.0.0.1 Planning segment:  3_1  ->  4_1
+[agent_1_0] Planning path from node 3_1 to node 4_1
+[agent_1_0] Current segment siblings: ['agent_2_2', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_0] Found existing base reference trajectory for segment 3_1 -> 4_1.
+[agent_1_0] Successfully retrieved my formation trajectory (len=15).
+[agent_1_0] Detect gap (39.28m) between segments. Keeping full trajectory.
+[agent_1_0] Segment planned. Prepared next belief: cur_nodes(4_1, 4_2)
+[agent_1_5] All merge peers are READY! Proceeding.
+agent_1_5@127.0.0.1 Planning segment:  3_1  ->  4_1
+[agent_1_5] Planning path from node 3_1 to node 4_1
+[agent_1_5] Current segment siblings: ['agent_2_2', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_5] Found existing base reference trajectory for segment 3_1 -> 4_1.
+[agent_1_5] Successfully retrieved my formation trajectory (len=15).
+[agent_1_5] Detect gap (27.58m) between segments. Keeping full trajectory.
+[agent_1_5] Segment planned. Prepared next belief: cur_nodes(4_1, 4_2)
+[agent_2_3] All merge peers are READY! Proceeding.
+agent_2_3@127.0.0.1 Planning segment:  3_1  ->  6_1
+[agent_2_3] Planning path from node 3_1 to node 6_1
+[agent_2_3] Current segment siblings: ['agent_2_1', 'agent_2_3', 'agent_2_5']
+[agent_2_3] Found existing base reference trajectory for segment 3_1 -> 6_1.
+[agent_2_3] Successfully retrieved my formation trajectory (len=15).
+[agent_2_3] Detect gap (12.54m) between segments. Keeping full trajectory.
+[agent_2_3] Segment planned. Prepared next belief: cur_nodes(6_1, 6_2)
+[agent_1_1] All merge peers are READY! Proceeding.
+agent_1_1@127.0.0.1 Planning segment:  3_1  ->  4_1
+[agent_1_1] Planning path from node 3_1 to node 4_1
+[agent_1_1] Current segment siblings: ['agent_2_2', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_1] Found existing base reference trajectory for segment 3_1 -> 4_1.
+[agent_1_1] Successfully retrieved my formation trajectory (len=15).
+[agent_1_1] Detect gap (25.91m) between segments. Keeping full trajectory.
+[agent_1_1] Segment planned. Prepared next belief: cur_nodes(4_1, 4_2)
+[agent_2_4] All merge peers are READY! Proceeding.
+agent_2_4@127.0.0.1 Planning segment:  3_1  ->  5_1
+[agent_2_4] Planning path from node 3_1 to node 5_1
+[agent_2_4] Current segment siblings: ['agent_2_0', 'agent_2_4', 'agent_2_6', 'agent_2_7']
+[agent_2_4] Found existing base reference trajectory for segment 3_1 -> 5_1.
+[agent_2_4] Successfully retrieved my formation trajectory (len=15).
+[agent_2_4] Detect gap (18.81m) between segments. Keeping full trajectory.
+[agent_2_4] Segment planned. Prepared next belief: cur_nodes(5_1, 5_2)
+[agent_1_2] All merge peers are READY! Proceeding.
+agent_1_2@127.0.0.1 Planning segment:  3_1  ->  4_1
+[agent_1_2] Planning path from node 3_1 to node 4_1
+[agent_1_2] Current segment siblings: ['agent_2_2', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_2] Found existing base reference trajectory for segment 3_1 -> 4_1.
+[agent_1_2] Successfully retrieved my formation trajectory (len=15).
+[agent_1_2] Detect gap (12.54m) between segments. Keeping full trajectory.
+[agent_1_2] Segment planned. Prepared next belief: cur_nodes(4_1, 4_2)
+[agent_2_5] All merge peers are READY! Proceeding.
+agent_2_5@127.0.0.1 Planning segment:  3_1  ->  6_1
+[agent_2_5] Planning path from node 3_1 to node 6_1
+[agent_2_5] Current segment siblings: ['agent_2_1', 'agent_2_3', 'agent_2_5']
+[agent_2_5] Found existing base reference trajectory for segment 3_1 -> 6_1.
+[agent_2_5] Successfully retrieved my formation trajectory (len=15).
+[agent_2_5] Detect gap (50.46m) between segments. Keeping full trajectory.
+[agent_2_5] Segment planned. Prepared next belief: cur_nodes(6_1, 6_2)
+[agent_2_0] All merge peers are READY! Proceeding.
+agent_2_0@127.0.0.1 Planning segment:  3_1  ->  5_1
+[agent_2_0] Planning path from node 3_1 to node 5_1
+[agent_2_0] Current segment siblings: ['agent_2_0', 'agent_2_4', 'agent_2_6', 'agent_2_7']
+[agent_2_0] Found existing base reference trajectory for segment 3_1 -> 5_1.
+[agent_2_0] Successfully retrieved my formation trajectory (len=15).
+[agent_2_0] Detect gap (47.05m) between segments. Keeping full trajectory.
+[agent_2_0] Segment planned. Prepared next belief: cur_nodes(5_1, 5_2)
+[agent_1_3] All merge peers are READY! Proceeding.
+agent_1_3@127.0.0.1 Planning segment:  3_1  ->  4_1
+[agent_1_3] Planning path from node 3_1 to node 4_1
+[agent_1_3] Current segment siblings: ['agent_2_2', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_3] Found existing base reference trajectory for segment 3_1 -> 4_1.
+[agent_1_3] Successfully retrieved my formation trajectory (len=15).
+[agent_1_3] Segment planned. Prepared next belief: cur_nodes(4_1, 4_2)
+[agent_2_6] All merge peers are READY! Proceeding.
+agent_2_6@127.0.0.1 Planning segment:  3_1  ->  5_1
+[agent_2_6] Planning path from node 3_1 to node 5_1
+[agent_2_6] Current segment siblings: ['agent_2_0', 'agent_2_4', 'agent_2_6', 'agent_2_7']
+[agent_2_6] Found existing base reference trajectory for segment 3_1 -> 5_1.
+[agent_2_6] Successfully retrieved my formation trajectory (len=15).
+[agent_2_6] Detect gap (25.62m) between segments. Keeping full trajectory.
+[agent_2_6] Segment planned. Prepared next belief: cur_nodes(5_1, 5_2)
+[agent_2_1] Trajectory synced to Redis.
+[agent_2_7] Trajectory synced to Redis.
+[agent_1_4] Trajectory synced to Redis.
+[agent_2_2] Trajectory synced to Redis.
+[agent_1_0] Trajectory synced to Redis.
+[agent_1_5] Trajectory synced to Redis.
+[agent_2_3] Trajectory synced to Redis.
+[agent_1_1] Trajectory synced to Redis.
+[agent_2_4] Trajectory synced to Redis.
+[agent_1_2] Trajectory synced to Redis.
+[agent_2_5] Trajectory synced to Redis.
+[agent_2_0] Trajectory synced to Redis.
+[agent_1_3] Trajectory synced to Redis.
+[agent_2_6] Trajectory synced to Redis.
+[agent_1_1] All siblings synced at start of 3_1_4_1. Starting!
+[agent_1_2] All siblings synced at start of 3_1_4_1. Starting!
+[agent_2_5] All siblings synced at start of 3_1_6_1. Starting!
+[agent_2_0] All siblings synced at start of 3_1_5_1. Starting!
+[agent_1_3] All siblings synced at start of 3_1_4_1. Starting!
+[agent_2_6] All siblings synced at start of 3_1_5_1. Starting!
+[agent_2_1] All siblings synced at start of 3_1_6_1. Starting!
+[agent_2_7] All siblings synced at start of 3_1_5_1. Starting!
+[agent_1_4] All siblings synced at start of 3_1_4_1. Starting!
+[agent_2_2] All siblings synced at start of 3_1_4_1. Starting!
+[agent_1_0] All siblings synced at start of 3_1_4_1. Starting!
+[agent_1_5] All siblings synced at start of 3_1_4_1. Starting!
+[agent_2_3] All siblings synced at start of 3_1_6_1. Starting!
+[agent_2_4] All siblings synced at start of 3_1_5_1. Starting!
+[agent_1_1] Segment completed (reached end).
+agent_1_1@127.0.0.1 Planning segment:  4_1  ->  4_2
+[agent_1_1] Planning path from node 4_1 to node 4_2
+[agent_1_1] Current segment siblings: ['agent_2_2', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_1] No base reference traj found for segment 4_1->4_2. Now generate it.
+_outside_border_traj: [[428187.3851589032, 4150783.0246404344, 29.72910837269139], [428187.3851589032, 4150783.0246404344, 29.72910837269139]]
+[agent_1_1@127.0.0.1] Default 2d traj: [[428187.3851589032, 4150783.0246404344, 29.72910837269139], [428187.3851589032, 4150783.0246404344, 29.72910837269139]]
+agent_1_1 is escaping antiair_facilities, trajectory:
+[[428187.3851589032, 4150783.0246404344, 29.72910837269139], [428187.3851589032, 4150783.0246404344, 29.72910837269139], [428187.3851589032, 4150783.0246404344, 29.72910837269139], [428187.3851589032, 4150783.0246404344, 29.72910837269139], [428187.3851589032, 4150783.0246404344, 29.72910837269139], [428187.3851589032, 4150783.0246404344, 29.72910837269139], [428187.3851589032, 4150783.0246404344, 29.72910837269139], [428187.3851589032, 4150783.0246404344, 29.72910837269139], [428187.3851589032, 4150783.0246404344, 29.72910837269139], [428187.3851589032, 4150783.0246404344, 29.72910837269139], [428187.3851589032, 4150783.0246404344, 29.72910837269139], [428187.3851589032, 4150783.0246404344, 29.72910837269139], [428187.3851589032, 4150783.0246404344, 29.72910837269139], [428187.3851589032, 4150783.0246404344, 29.72910837269139], [428187.3851589032, 4150783.0246404344, 29.72910837269139]]
+[agent_1_1] Generated and saved trajectories for 7 members.
+[agent_1_1] Successfully retrieved my formation trajectory (len=15).
+[agent_1_1] Detect gap (8.34m) between segments. Keeping full trajectory.
+[agent_1_1] All segments in flight plan are planned. Marking as final task.
+[agent_1_2] Segment completed (reached end).
+agent_1_2@127.0.0.1 Planning segment:  4_1  ->  4_2
+[agent_1_2] Planning path from node 4_1 to node 4_2
+[agent_1_2] Current segment siblings: ['agent_2_2', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_2] Found existing base reference trajectory for segment 4_1 -> 4_2.
+[agent_1_2] Successfully retrieved my formation trajectory (len=15).
+[agent_1_2] Detect gap (8.01m) between segments. Keeping full trajectory.
+[agent_1_2] All segments in flight plan are planned. Marking as final task.
+[agent_2_5] Segment completed (reached end).
+agent_2_5@127.0.0.1 Planning segment:  6_1  ->  6_2
+[agent_2_5] Planning path from node 6_1 to node 6_2
+[agent_2_5] Current segment siblings: ['agent_2_1', 'agent_2_3', 'agent_2_5']
+[agent_2_5] No base reference traj found for segment 6_1->6_2. Now generate it.
+[agent_2_5@127.0.0.1] Default 2d traj: [[428229.6027706906, 4150741.4403457013, 84.99994687301933], [427579.30925537116, 4150826.3327355217]]
+[agent_2_5@127.0.0.1] Insert end height: -1 (rand: 97)
+agent_2_5 is breaking through headquarter, trajectory:
+[[428229.6027706906, 4150741.4403457013, 84.99994687301933], [428182.86248743604, 4150744.550708965, 85.11024210371662], [428135.92316588823, 4150742.642592543, 85.158151909556], [428089.1394589326, 4150737.0798417046, 85.22687267413815], [428042.62567747576, 4150729.241098737, 85.32544421710347], [427996.32239431667, 4150720.50050431, 85.4668330555665], [427950.0636562258, 4150712.2220763355, 85.66963807454607], [427903.6438242994, 4150705.763199704, 85.96053710285983], [427856.88395140425, 4150702.4826532137, 86.37779622741043], [427809.69809321756, 4150703.748631196, 86.97630347588752], [427762.16003765364, 4150710.9422282907, 87.83478901976974], [427714.57062757807, 4150725.4518310474, 89.06618167362655], [427667.5251418767, 4150748.653826751, 90.83246402838277], [427621.97908838175, 4150781.875068131, 93.36598032552163], [427579.30925537116, 4150826.3327355217, 97.0]]
+[agent_2_5] Generated and saved trajectories for 3 members.
+[agent_2_5] Successfully retrieved my formation trajectory (len=15).
+[agent_2_5] Detect gap (21.00m) between segments. Keeping full trajectory.
+[agent_2_5] All segments in flight plan are planned. Marking as final task.
+[agent_2_0] Segment completed (reached end).
+agent_2_0@127.0.0.1 Planning segment:  5_1  ->  5_2
+[agent_2_0] Planning path from node 5_1 to node 5_2
+[agent_2_0] Current segment siblings: ['agent_2_0', 'agent_2_4', 'agent_2_6', 'agent_2_7']
+[agent_2_0] No base reference traj found for segment 5_1->5_2. Now generate it.
+[agent_2_0@127.0.0.1] Default 2d traj: [[428207.96312607115, 4150778.7006442477, 85.00001953367115], [427579.30925537116, 4150826.3327355217]]
+[agent_2_0@127.0.0.1] Insert end height: -1 (rand: 77)
+agent_2_0 is breaking through headquarter, trajectory:
+[[428207.96312607115, 4150778.7006442477, 85.00001953367115], [428163.3239318181, 4150784.6397928186, 84.9441814847726], [428119.35641092976, 4150794.842968402, 84.91821285538224], [428076.10459027847, 4150808.106543017, 84.88016698250439], [428033.42926979903, 4150823.2520909556, 84.82442709645655], [427991.0608112536, 4150839.129648539, 84.74276423366452], [427948.65050408064, 4150854.611680676, 84.62312238233987], [427905.8205148615, 4150868.580946916, 84.44783863524857], [427862.2129634171, 4150879.9153594854, 84.19103558803562], [427817.53895939956, 4150887.4728519716, 83.81480101893146], [427771.62848539086, 4150890.079261018, 83.26359085018449], [427724.4818281647, 4150886.5222730683, 82.45602909196138], [427676.3228352229, 4150875.5545891738, 81.2728941820469], [427627.6536007813, 4150855.909575672, 79.53951812652593], [427579.30925537116, 4150826.3327355217, 77.0]]
+[agent_2_0] Generated and saved trajectories for 4 members.
+[agent_2_0] Successfully retrieved my formation trajectory (len=15).
+[agent_2_0] Detect gap (21.00m) between segments. Keeping full trajectory.
+[agent_2_0] All segments in flight plan are planned. Marking as final task.
+[agent_1_3] Segment completed (reached end).
+agent_1_3@127.0.0.1 Planning segment:  4_1  ->  4_2
+[agent_2_6] Segment completed (reached end).
+[agent_1_3] Planning path from node 4_1 to node 4_2
+[agent_1_3] Current segment siblings: ['agent_2_2', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_3] Found existing base reference trajectory for segment 4_1 -> 4_2.
+[agent_1_3] Successfully retrieved my formation trajectory (len=15).
+[agent_1_3] Detect gap (15.04m) between segments. Keeping full trajectory.
+[agent_1_3] All segments in flight plan are planned. Marking as final task.
+agent_2_6@127.0.0.1 Planning segment:  5_1  ->  5_2
+[agent_2_6] Planning path from node 5_1 to node 5_2
+[agent_2_6] Current segment siblings: ['agent_2_0', 'agent_2_4', 'agent_2_6', 'agent_2_7']
+[agent_2_6] Found existing base reference trajectory for segment 5_1 -> 5_2.
+[agent_2_6] Successfully retrieved my formation trajectory (len=15).
+[agent_2_6] Detect gap (29.96m) between segments. Keeping full trajectory.
+[agent_2_6] All segments in flight plan are planned. Marking as final task.
+[agent_2_1] Segment completed (reached end).
+agent_2_1@127.0.0.1 Planning segment:  6_1  ->  6_2
+[agent_2_1] Planning path from node 6_1 to node 6_2
+[agent_2_1] Current segment siblings: ['agent_2_1', 'agent_2_3', 'agent_2_5']
+[agent_2_1] Found existing base reference trajectory for segment 6_1 -> 6_2.
+[agent_2_1] Successfully retrieved my formation trajectory (len=15).
+[agent_2_1] Detect gap (82.30m) between segments. Keeping full trajectory.
+[agent_2_1] All segments in flight plan are planned. Marking as final task.
+[agent_2_7] Segment completed (reached end).
+agent_2_7@127.0.0.1 Planning segment:  5_1  ->  5_2
+[agent_2_7] Planning path from node 5_1 to node 5_2
+[agent_2_7] Current segment siblings: ['agent_2_0', 'agent_2_4', 'agent_2_6', 'agent_2_7']
+[agent_2_7] Found existing base reference trajectory for segment 5_1 -> 5_2.
+[agent_2_7] Successfully retrieved my formation trajectory (len=15).
+[agent_2_7] Detect gap (21.15m) between segments. Keeping full trajectory.
+[agent_2_7] All segments in flight plan are planned. Marking as final task.
+[agent_1_4] Segment completed (reached end).
+agent_1_4@127.0.0.1 Planning segment:  4_1  ->  4_2
+[agent_1_4] Planning path from node 4_1 to node 4_2
+[agent_1_4] Current segment siblings: ['agent_2_2', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_4] Found existing base reference trajectory for segment 4_1 -> 4_2.
+[agent_1_4] Successfully retrieved my formation trajectory (len=15).
+[agent_1_4] Detect gap (23.34m) between segments. Keeping full trajectory.
+[agent_1_4] All segments in flight plan are planned. Marking as final task.
+[agent_2_2] Segment completed (reached end).
+agent_2_2@127.0.0.1 Planning segment:  4_1  ->  4_2
+[agent_2_2] Planning path from node 4_1 to node 4_2
+[agent_2_2] Current segment siblings: ['agent_2_2', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_2_2] Found existing base reference trajectory for segment 4_1 -> 4_2.
+[agent_2_2] Successfully retrieved my formation trajectory (len=15).
+[agent_2_2] Detect gap (21.89m) between segments. Keeping full trajectory.
+[agent_2_2] All segments in flight plan are planned. Marking as final task.
+[agent_1_0] Segment completed (reached end).
+agent_1_0@127.0.0.1 Planning segment:  4_1  ->  4_2
+[agent_1_0] Planning path from node 4_1 to node 4_2
+[agent_1_0] Current segment siblings: ['agent_2_2', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_0] Found existing base reference trajectory for segment 4_1 -> 4_2.
+[agent_1_0] Successfully retrieved my formation trajectory (len=15).
+[agent_1_0] Detect gap (14.92m) between segments. Keeping full trajectory.
+[agent_1_0] All segments in flight plan are planned. Marking as final task.
+[agent_1_5] Segment completed (reached end).
+agent_1_5@127.0.0.1 Planning segment:  4_1  ->  4_2
+[agent_1_5] Planning path from node 4_1 to node 4_2
+[agent_1_5] Current segment siblings: ['agent_2_2', 'agent_1_0', 'agent_1_1', 'agent_1_2', 'agent_1_3', 'agent_1_4', 'agent_1_5']
+[agent_1_5] Found existing base reference trajectory for segment 4_1 -> 4_2.
+[agent_1_5] Successfully retrieved my formation trajectory (len=15).
+[agent_1_5] Detect gap (31.38m) between segments. Keeping full trajectory.
+[agent_1_5] All segments in flight plan are planned. Marking as final task.
+[agent_2_3] Segment completed (reached end).
+agent_2_3@127.0.0.1 Planning segment:  6_1  ->  6_2
+[agent_2_3] Planning path from node 6_1 to node 6_2
+[agent_2_3] Current segment siblings: ['agent_2_1', 'agent_2_3', 'agent_2_5']
+[agent_2_3] Found existing base reference trajectory for segment 6_1 -> 6_2.
+[agent_2_3] Successfully retrieved my formation trajectory (len=15).
+[agent_2_3] Detect gap (25.83m) between segments. Keeping full trajectory.
+[agent_2_3] All segments in flight plan are planned. Marking as final task.
+[agent_1_1] Trajectory synced to Redis.
+[agent_2_4] Segment completed (reached end).
+agent_2_4@127.0.0.1 Planning segment:  5_1  ->  5_2
+[agent_2_4] Planning path from node 5_1 to node 5_2
+[agent_2_4] Current segment siblings: ['agent_2_0', 'agent_2_4', 'agent_2_6', 'agent_2_7']
+[agent_2_4] Found existing base reference trajectory for segment 5_1 -> 5_2.
+[agent_2_4] Successfully retrieved my formation trajectory (len=15).
+[agent_2_4] Detect gap (4.46m) between segments. Keeping full trajectory.
+[agent_2_4] All segments in flight plan are planned. Marking as final task.
+[agent_1_2] Trajectory synced to Redis.
+[agent_2_5] Trajectory synced to Redis.
+[agent_2_0] Trajectory synced to Redis.
+[agent_1_3] Trajectory synced to Redis.
+[agent_2_6] Trajectory synced to Redis.
+[agent_2_1] Trajectory synced to Redis.
+[agent_2_7] Trajectory synced to Redis.
+[agent_1_4] Trajectory synced to Redis.
+[agent_2_2] Trajectory synced to Redis.
+[agent_1_0] Trajectory synced to Redis.
+[agent_1_5] Trajectory synced to Redis.
+[agent_2_3] Trajectory synced to Redis.
+[agent_2_4] Trajectory synced to Redis.
+[agent_2_1] All siblings synced at start of 6_1_6_2. Starting!
+[agent_2_7] All siblings synced at start of 5_1_5_2. Starting!
+[agent_1_5] All siblings synced at start of 4_1_4_2. Starting!
+[agent_2_3] All siblings synced at start of 6_1_6_2. Starting!
+[agent_1_1] All siblings synced at start of 4_1_4_2. Starting!
+[agent_2_4] All siblings synced at start of 5_1_5_2. Starting!
+[agent_1_2] All siblings synced at start of 4_1_4_2. Starting!
+[agent_2_5] All siblings synced at start of 6_1_6_2. Starting!
+[agent_2_0] All siblings synced at start of 5_1_5_2. Starting!
+[agent_1_3] All siblings synced at start of 4_1_4_2. Starting!
+[agent_2_6] All siblings synced at start of 5_1_5_2. Starting!
+[agent_1_4] All siblings synced at start of 4_1_4_2. Starting!
+[agent_2_2] All siblings synced at start of 4_1_4_2. Starting!
+[agent_1_0] All siblings synced at start of 4_1_4_2. Starting!
+All persistent missions completed.
+Collecting trajectories and facility info...
+All data saved to uav_trajectories_persistent.json

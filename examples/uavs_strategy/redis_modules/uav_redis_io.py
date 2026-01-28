@@ -198,75 +198,78 @@ class UavRedisIO:
     def get_ref_traj(self, uid: str) -> List[List[float]]:
         """获取参考轨迹"""
         key = f"uav:{uid}:ref_traj"
-        raw = self.r.get(key)
-        if not raw:
-            return []
-        else:
-            return json.loads(raw)
-    
-    def get_nodes_pair_base_ref_traj(self, uid_from: str, uid_to: str) -> List[List[float]]:
-        '''获取digraph_attrs的一对节点定义的基准参考轨迹'''
-        master_uid = f"{uid_from}_to_{uid_to}_base"
-        raw = self.r.get(master_uid)
-        if not raw:
-            return []
-        else:
-            return json.loads(raw)
-
-    def set_nodes_pair_member_traj(self, uid_from: str, uid_to: str, member_uid: str, traj: List[List[float]]) -> None:
-        """保存航段中特定成员的轨迹"""
-        key = f"nodes_pair_traj:{uid_from}:{uid_to}:{member_uid}"
-        self.r.set(key, json.dumps(traj))
-
-    def get_nodes_pair_member_traj(self, uid_from: str, uid_to: str, member_uid: str) -> List[List[float]]:
-        """获取航段中特定成员的轨迹"""
-        key = f"nodes_pair_traj:{uid_from}:{uid_to}:{member_uid}"
-        raw = self.r.get(key)
-        return json.loads(raw) if raw else []
-
-
-    # ---------- 蓝方：预瞄点 ----------
-    def set_lookahead(self, uid: str, idx: int) -> None:
-        """
-        当前在预设轨迹上走到第几个点（索引）
-        """
-        key = f"uav:{uid}:lookahead"
-        self.r.set(key, str(int(idx)))
-
-    def get_lookahead(self, uid: str) -> Optional[int]:
-        key = f"uav:{uid}:lookahead"
-        raw = self.r.get(key)
-        if raw is None:
-            return None
-
-        # 兼容 decode_responses=True/False 两种情况
-        if isinstance(raw, bytes):
-            raw = raw.decode("utf-8")
-
+        js = self.r.get(key)
+        # return json.loads(js) if js else []
+        # 改为使用 json.loads 的容错
         try:
-            return int(raw)
-        except ValueError:
-            return None
+           return json.loads(js) if js else []
+        except:
+           return []
 
-    def get_dist_2d(self, uid: str, blue: bool = True):
-        """获取当前位置，距离当前参考轨迹终点的距离"""
-        pos = self.get_pos(uid, blue=blue)
-        ref_traj = self.get_ref_traj(uid)
+    def get_nodes_pair_base_ref_traj(self, uid_from: str, uid_to: str) -> List[List[float]]:
+        '''获取digraph_attrs的一对节点定义基准参考轨迹'''
+        master_uid = f"{uid_from}_to_{uid_to}_base"
+        js = self.r.get(master_uid)
+        return json.loads(js) if js else []
+    
+    def set_nodes_pair_member_traj(self, uid_from: str, uid_to: str, Member_Id: str, traj: List[List[float]]) -> None:
+        '''为digraph_attrs的一对节点定义成员参考轨迹，无人机agent基于这个参考轨迹计算集群内的各个从机轨迹'''
+        # 定义唯一的 master_uid
+        master_uid = f"{uid_from}_to_{uid_to}_{Member_Id}"
+        self.r.set(master_uid, json.dumps(traj))
+    
+    def get_nodes_pair_member_traj(self, uid_from: str, uid_to: str, Member_Id: str) -> List[List[float]]:
+        '''获取digraph_attrs的一对节点定义成员参考轨迹'''
+        master_uid = f"{uid_from}_to_{uid_to}_{Member_Id}"
+        js = self.r.get(master_uid)
+        return json.loads(js) if js else []
 
-        if not pos or not ref_traj:
-            print("Warning: no valid pos or ref_traj for uav", pos, ref_traj)
-            return None
+    def set_lookahead(self, uid: str, idx: int) -> None:
+        key = f"uav:{uid}:lookahead"
+        self.r.set(key, str(idx))
 
-        # 当前位置 (x, y)
-        x1, y1 = pos["x"], pos["y"]
+    def get_lookahead(self, uid: str) -> int:
+        key = f"uav:{uid}:lookahead"
+        v = self.r.get(key)
+        return int(v) if v else 0
 
-        # 参考轨迹终点 (x, y)
-        x2, y2 = ref_traj[-1][0], ref_traj[-1][1]
-
-        # 平面距离 √((x1-x2)^2 + (y1-y2)^2)
-        dist = np.hypot(x1 - x2, y1 - y2)
-
+    def get_dist_2d(self, uid: str) -> float:
+        '''获取当前位置到终点的距离'''
+        # 1. 获取当前位置
+        pos = self.get_pos(uid)
+        if not pos:
+             return None
+        # 2. 获取当前轨迹
+        traj = self.get_traj(uid)
+        if not traj:
+             return None
+        # 3. 计算距离 
+        # 终点
+        end_pt = traj[-1]
+        dist = ((pos['x'] - end_pt[0])**2 + (pos['y'] - end_pt[1])**2)**0.5
         return dist
+    
+    # ---------- 扩展：轨迹附加信息读写 ----------
+    def set_traj_extra(self, uid: str, extra_list: List[Dict[str, Any]]) -> None:
+        """覆盖写入轨迹的附加信息"""
+        key = f"uav:{uid}:traj_extra"
+        self.r.set(key, json.dumps(extra_list))
+
+    def append_traj_extra(self, uid: str, extra_info: Dict[str, Any]) -> None:
+        """追加轨迹附加信息"""
+        key = f"uav:{uid}:traj_extra"
+        cur = self.r.get(key)
+        cur_list = json.loads(cur) if cur else []
+        cur_list.append(extra_info) 
+        self.r.set(key, json.dumps(cur_list))
+
+    def get_traj_extra(self, uid: str) -> List[Dict[str, Any]]:
+        """获取轨迹附加信息"""
+        key = f"uav:{uid}:traj_extra"
+        js = self.r.get(key)
+        return json.loads(js) if js else []
+
+
 
     def get_rendezvous_point(self, ids: List[str], blue: bool = True) -> Optional[List[float]]:
         """

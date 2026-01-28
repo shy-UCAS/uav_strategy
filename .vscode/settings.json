@@ -34,5 +34,11 @@
             "includeAllSymbols": true
         }
     ],
-    "python.analysis.autoImportCompletions": true
+    "python.analysis.autoImportCompletions": true,
+    "chat.tools.terminal.autoApprove": {
+        "/^python -m py_compile \"examples/uavs_strategy/behaviors_modules/uav_periodic_behaviours\\.py\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
 }
