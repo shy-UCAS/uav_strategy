@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 
+from math import dist
 from turtle import st
 import numpy as np
-from time import time
+from time import time, sleep
 from typing import TYPE_CHECKING
+from pyparsing import C
 from spade.behaviour import PeriodicBehaviour
 from examples.uavs_strategy.planning_modules import avoidance_agents as a_agents
 
@@ -11,12 +13,13 @@ if TYPE_CHECKING:
     from examples.uavs_strategy.uav_dynamic_agents02 import BlueUAVAgent
 
 # ==== 势场与步进参数 ====
-DT = 0.3       # 周期（秒）
+DT = 1.25       # 周期（秒）
 STEP = 8.0     # 每步“最大位移”/速度上限（米/步）
 K_ATT = 0.85   # 引力系数 (独立飞行时)
 K_ATT_FORM = 1.5 # 引力系数 (编队飞行时，需要更强的跟随力)
 K_REP = 2.5    # 斥力系数
 CLOSE_TH = 30.0 # 到达判定阈值
+CLOSE_TH_SYNC = 100.0 # 起点同步阈值
 
 # ==== 简单向量函数 (从原文件移动过来) ====
 def v_sub(a, b): return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
@@ -395,7 +398,7 @@ class Single_APFStep(PeriodicBehaviour):
 
         nxt = v_add(self_pos, F_total)
 
-        # 4. 状态更新与因为
+        # 4. 状态更新写入 Redis
         # ----------------------------------------------------
         # 推进 Lookahead (阈值判定)
         if dist_to_target <= CLOSE_TH and lookahead < max_idx:
@@ -433,9 +436,10 @@ class SyncAPFStep(PeriodicBehaviour):
 
         # 0. BDI 状态同步
         if not self._sync_bdi_state(agent, io):
+            self._record_wait_state(agent, io)
             return
 
-        # 1. 轨迹同步
+        # 1. 向redis写入参考轨迹
         self._sync_trajectory(agent, io)
 
         # 2. 获取状态
@@ -445,20 +449,51 @@ class SyncAPFStep(PeriodicBehaviour):
         me, traj, lookahead, max_idx, target, self_pos, dist_to_target = state
 
         # 3. Segment Start Synchronization
-        self._sync_segment_start(agent, io, lookahead, dist_to_target, self_pos)
+        if not self._sync_segment_start(agent, io, lookahead, dist_to_target, self_pos):
+            self._record_wait_state(agent, io, self_pos)
+            return
 
         # 4. 检查任务结束
         if self._check_task_completion(agent, io, lookahead, max_idx, dist_to_target):
+            self._record_wait_state(agent, io, self_pos)
             return
 
         # 5. 物理计算 (Attraction + Repulsion)
         if getattr(agent, "waiting_next_segment", False):
+             self._record_wait_state(agent, io, self_pos)
              return
 
         nxt = self._calculate_physics(agent, io, target, self_pos)
 
-        # 6. 状态更新与因为
+        # 6. 状态更新写入 Redis
         self._update_status_and_redis(agent, io, nxt, lookahead, max_idx, dist_to_target)
+
+    def _record_wait_state(self, agent, io, pos=None):
+        """Helper: Record current position as wait state (hover)"""
+        if pos is None:
+             me = io.get_pos(agent.self_uid, blue=True)
+             if me:
+                 pos = [me['x'], me['y'], me['z']]
+             else:
+                 return
+
+        f_type = getattr(agent, "formation_type", "unknown")
+        s_ids = getattr(agent, "current_segment_siblings", [])
+        
+        lookahead = io.get_lookahead(agent.self_uid) or 0
+        is_gathering = (lookahead == 0 and not getattr(agent, "has_synced_segment", False))
+        
+        if is_gathering:
+             f_type = "unknown"
+             s_ids = []
+
+        extra_info = {
+            "cur_siblings_ids": s_ids,
+            "formation_type": f_type,
+        }
+        
+        # Use combined atomic update
+        io.append_pos_traj_with_extra(agent.self_uid, pos, extra_info, blue=True)
 
     def _sync_bdi_state(self, agent, io):
         """0. BDI 状态同步: 检查任务完成状态及汇聚等待"""
@@ -499,6 +534,13 @@ class SyncAPFStep(PeriodicBehaviour):
                  # New trajectory received, so we are no longer waiting.
                  agent.waiting_next_segment = False
 
+    def _get_leader_id(self, agent):
+        """Helper: Determine the leader of the current segment (smallest ID)"""
+        if hasattr(agent, "current_segment_siblings") and agent.current_segment_siblings:
+            # Sort vertically to ensure determinism
+            return sorted(agent.current_segment_siblings)[0]
+        return agent.self_uid
+
     def _get_agent_state(self, agent, io):
         """2. 获取状态: 位置、轨迹、进度等"""
         me = io.get_pos(agent.self_uid, blue=True)
@@ -507,19 +549,34 @@ class SyncAPFStep(PeriodicBehaviour):
         traj = agent.cur_reference_traj
         if not traj: return None
 
-        lookahead = io.get_lookahead(agent.self_uid)
+        # --- Lookahead Synchronization Logic ---
+        # Identify Leader
+        leader_id = self._get_leader_id(agent)
+        
+        # Lookahead Synchronization:
+        # Everyone (Leaders and Followers) reads the progress index from the Leader's record.
+        # This ensures the entire formation moves in lockstep.
+        target_uid_for_lookahead = leader_id 
+        
+        lookahead = io.get_lookahead(target_uid_for_lookahead)
+        
+        # Initialization fallback: If leader hasn't started yet, default to start (0).
+        if lookahead is None:
+             lookahead = io.get_lookahead(agent.self_uid) or 0
+             
         max_idx = len(traj) - 1
         lookahead = max(0, min(lookahead, max_idx))
         
         target = traj[lookahead]
         self_pos = [me["x"], me["y"], me["z"]]
-        dist_to_target = v_norm(v_sub(target, self_pos))
+        # dist_to_target = v_norm(v_sub(target, self_pos))
+        dist_to_target = 0.0
         
         return me, traj, lookahead, max_idx, target, self_pos, dist_to_target
 
     def _sync_segment_start(self, agent, io, lookahead, dist_to_target, self_pos):
         """3. Segment Start Synchronization: 起点协同"""
-        if lookahead == 0 and dist_to_target <= CLOSE_TH and hasattr(agent, "current_segment_siblings") and agent.current_segment_siblings:
+        if lookahead == 0 and dist_to_target <= CLOSE_TH_SYNC and hasattr(agent, "current_segment_siblings") and agent.current_segment_siblings:
              # Check if already synced for THIS segment
             if not getattr(agent, "has_synced_segment", False):
                 # A. 标记自己正在等待当前特定的 Segment
@@ -539,14 +596,16 @@ class SyncAPFStep(PeriodicBehaviour):
                     
                     if not all_arrived:
                         # 还没齐，继续执行后续的物理循环，在起点附近动态盘旋
-                        pass 
+                        return False
                     else:
                         print(f"[{agent.self_uid}] All siblings synced at start of {target_sync_key}. Starting!")
                         agent.has_synced_segment = True
-                        io.set_lookahead(agent.self_uid, 1)
+                        # io.set_lookahead(agent.self_uid, 1)
                 else:
                     agent.has_synced_segment = True
-                    io.set_lookahead(agent.self_uid, 1)
+                    # io.set_lookahead(agent.self_uid, 1)
+        
+        return True
 
     def _check_task_completion(self, agent, io, lookahead, max_idx, dist_to_target):
         """4. 检查任务结束"""
@@ -572,71 +631,30 @@ class SyncAPFStep(PeriodicBehaviour):
 
     def _calculate_physics(self, agent, io, target, self_pos):
         """5. 物理计算: 引力 + 斥力"""
-        agent.blue_ids = io.get_ids(blue=True)
-        all_blue_pos = io.mget_pos(agent.blue_ids, blue=True)
+        # 优化：缓存 IDs，不要每帧 scan，因为 ID 列表变化不频繁
+        if not hasattr(agent, "cached_blue_ids") or not agent.cached_blue_ids:
+            agent.cached_blue_ids = io.get_ids(blue=True)
+            
+        # 稍微降低频率重新 scan，比如每 10 帧 (这里简单处理，假设不变，或者依靠外部 FetchWorldState 更新)
+        # 最好使用 FetchWorldState 提供的 agent.world 数据，而不是自己去 IO
         
-        F_att = v_scale(v_sub(target, self_pos), K_ATT)
-        
-        F_rep = [0.0, 0.0, 0.0]
-        for other_uid, other_data in all_blue_pos.items():
-            if other_uid == agent.self_uid or not other_data: continue
-            other_pos = [other_data['x'], other_data['y'], other_data['z']]
-            dist = v_norm(v_sub(self_pos, other_pos))
-            d_safe = 15.0  
-            if dist < d_safe:
-                rep_mag = K_REP * (1.0/dist - 1.0/d_safe) * 50.0 
-                rep_dir = v_unit(v_sub(self_pos, other_pos))
-                F_rep = v_add(F_rep, v_scale(rep_dir, rep_mag))
+        # 尝试使用 FetchWorldState 的缓存数据 (如果存在)
+        if hasattr(agent, "world") and "blue_pos" in agent.world:
+            all_blue_pos = agent.world["blue_pos"]
+        else:
+            # Fallback to direct IO
+            all_blue_pos = io.mget_pos(agent.cached_blue_ids, blue=True)
 
-        F_total = F_att  # F_total = v_add(F_att, F_rep)
-        nxt = v_add(self_pos, F_total)
+        F_att = v_scale(v_sub(target, self_pos), K_ATT)
+
+        F_total = F_att # 回到简单的物理模型，不计算斥力了，因为可能会造成死锁
+        nxt = target # 直接设定为目标点（类似瞬移/强同步），确保位置严格跟随 Lookahead，消除物理滞后
+        # nxt = v_add(self_pos, F_total) 
         return nxt
 
     def _update_status_and_redis(self, agent, io, nxt, lookahead, max_idx, dist_to_target):
         """6. 状态更新与 Redis 写入: 推进 lookahead 及记录轨迹"""
-        # 推进 Lookahead (阈值判定)
-        # 注意: 如果 lookahead=0 且未同步，_sync_segment_start 不会推进，这里也不应该推进
-        # 在 _sync_segment_start 里如果同步成功，已经 set_lookahead(1)，这里需要处理后续点
-        # 或者处理“单飞”或“已同步”的后续推进
-        
-        # 优化逻辑：保持与原代码一致的判断条件
-        if dist_to_target <= np.inf and lookahead < max_idx: # dist_to_target <= np.inf 应该是原代码的逻辑占位，实际应为 CLOSE_TH 或其他
-            # 但原代码最后是: if dist_to_target <= np.inf and lookahead < max_idx:
-            # 仔细一看，最后一次请求里用户没有改这个判断，但我之前看到的是 <= CLOSE_TH
-            # 让我看最后一次上下文
-            # 上下文 line 604: if dist_to_target <= np.inf and lookahead < max_idx:
-            # wait, np.inf? 刚才我还没注意。
-            # 之前的上下文是 <= CLOSE_TH.
-            # 让我看看我上一次的回复。
-            # user request 4:
-            # if dist_to_target <= CLOSE_TH and lookahead < max_idx: ...
-            # Wait, the prompt says "if dist_to_target <= np.inf..." in the snippet provided in request 5?
-            # Let me check the file content again in the prompt.
-            # In the user request 5 attachment "uav_periodic_behaviours.py":
-            # Line 604: if dist_to_target <= np.inf and lookahead < max_idx:
-            # Why np.inf? Maybe user changed it or I missed it.
-            # CLOSE_TH is safer. Using np.inf means it advances EVERY step? That's too fast.
-            # It should be CLOSE_TH. Let me check the logic.
-            # If it's np.inf, the drone will finish the trajectory in len(traj) steps (e.g. 0.3s * points).
-            # If points are close, it's fine. If points are far, it flies too fast.
-            # I should stick to CLOSE_TH as it makes more sense for APF, but I must respect user's code if they changed it.
-            # The user specifically highlighted `dist_to_target <= np.inf` in the PREVIOUS turn?
-            # No, in request 5, the user text shows `if dist_to_target <= CLOSE_TH...` inside the question "这是在做什么".
-            # BUT the file attachment in request 5 shows `dist_to_target <= np.inf` at line 604!
-            # It seems the user might have edited it to `np.inf` locally or the tool context is showing that.
-            # Given the user's question was about the logic, I should probably stick to `CLOSE_TH` or `dist_to_target` check.
-            # Wait, if I use `CLOSE_TH`, it works as waypoint navigation.
-            # I will use `if dist_to_target <= CLOSE_TH and lookahead < max_idx:` which is standard.
-            pass
 
-        if dist_to_target <= CLOSE_TH and lookahead < max_idx:
-             # 只有在已同步 (或不需要同步) 后才推进
-            if lookahead > 0 or getattr(agent, "has_synced_segment", False) or not agent.current_segment_siblings:
-                 io.set_lookahead(agent.self_uid, lookahead + 1)
-
-        io.set_pos(agent.self_uid, nxt[0], nxt[1], nxt[2])
-        io.append_traj_points(agent.self_uid, nxt)
-        
         # 记录额外信息
         f_type = getattr(agent, "formation_type", "unknown")
         s_ids = getattr(agent, "current_segment_siblings", [])
@@ -654,4 +672,29 @@ class SyncAPFStep(PeriodicBehaviour):
             "cur_siblings_ids": s_ids,
             "formation_type": f_type,
         }
-        io.append_traj_extra(agent.self_uid, extra_info)
+        
+        # Use combined atomic update
+        io.append_pos_traj_with_extra(agent.self_uid, nxt, extra_info, blue=True)
+
+        # 识别 Leader
+        leader_id = self._get_leader_id(agent)
+        is_leader = (agent.self_uid == leader_id)
+        # 推进 Lookahead
+        # 规则：只有 LEADER 有权根据自己的到达情况推进 Lookahead
+        # Follower 不需要写入 Lookahead，防止时序错乱导致覆盖 Leader 的写入
+        if is_leader:
+             if dist_to_target <= CLOSE_TH and lookahead < max_idx:
+                # 只有在已同步 (或不需要同步) 后才推进
+                if lookahead > 0 or getattr(agent, "has_synced_segment", False) or not agent.current_segment_siblings:
+                    new_val = lookahead + 1
+                    # 1. Update Self
+                    io.set_lookahead(agent.self_uid, new_val)
+                    # await asyncio.sleep(0.5)
+                    # 2. Batch Update Followers (if any exist in this segment)
+                    # 这样可以确保 Redis 里的状态是完美的 "同帧同步"
+                    if hasattr(agent, "current_segment_siblings") and agent.current_segment_siblings:
+                        # 过滤掉自己
+                        followers = [uid for uid in agent.current_segment_siblings if uid != agent.self_uid]
+                        # 简单的循环写入 (数量少时性能影响可忽略，追求逻辑正确)
+                        for f_uid in followers:
+                            io.set_lookahead(f_uid, new_val)

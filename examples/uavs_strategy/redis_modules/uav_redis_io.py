@@ -269,6 +269,40 @@ class UavRedisIO:
         js = self.r.get(key)
         return json.loads(js) if js else []
 
+    def append_pos_traj_with_extra(self, uid: str, pos: List[float], extra_info: Dict[str, Any], blue: bool = True) -> None:
+        """
+        原子化更新: 1.当前位置 2.追加轨迹点 3.追加额外信息
+        防止因网络延迟或中断导致 traj 和 traj_extra 长度不一致
+        """
+        key_pos = f"{'uav' if blue else 'red'}:{uid}:pos"
+        key_traj = f"{'uav' if blue else 'red'}:{uid}:traj"
+        key_extra = f"{'uav' if blue else 'red'}:{uid}:traj_extra"
+
+        # 1. 准备位置数据
+        js_pos = json.dumps({"x": pos[0], "y": pos[1], "z": pos[2], "ts": _now_ms()})
+
+        # 2. 获取旧数据 (Read)
+        # 注意：在高并发下最好用 Watch 或 Lua，但此处单Agent写单Key，Pipeline 主要是提高效率和减少中间失败概率
+        with self.r.pipeline() as pipe:
+            pipe.get(key_traj)
+            pipe.get(key_extra)
+            traj_json, extra_json = pipe.execute()
+
+        cur_traj = json.loads(traj_json) if traj_json else []
+        cur_extra = json.loads(extra_json) if extra_json else []
+
+        # 3. 追加数据 (Modify)
+        cur_traj.append(pos)
+        cur_extra.append(extra_info)
+
+        # 4. 回写数据 (Write in batch)
+        with self.r.pipeline() as pipe:
+            pipe.set(key_pos, js_pos)
+            pipe.set(key_traj, json.dumps(cur_traj))
+            pipe.set(key_extra, json.dumps(cur_extra))
+            pipe.execute()
+
+
 
 
     def get_rendezvous_point(self, ids: List[str], blue: bool = True) -> Optional[List[float]]:

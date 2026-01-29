@@ -214,7 +214,8 @@ class BlueUAVAgent(BDIAgent):
             for digraph_attr in digraph_attrs:
                 if str(digraph_attr["from"]) == cur_start_node and str(digraph_attr["to"]) == cur_end_node:
                     _order_mode = digraph_attr['attrs']['order_mode']
-                    if _order_mode == 'aggregate':
+                    _order_target = digraph_attr['attrs']['target']
+                    if _order_mode == 'aggregate' and _order_target == 'aggregate_point':
                         self._merge_ready_flag = False
                         # 先清空或初始化一个临时列表
                         all_merge_peers = []
@@ -515,20 +516,12 @@ class MissionOrchestrator:
                     lats = ll[:, 1].tolist()
                     lngs = ll[:, 0].tolist()
                     
-                    # Generate Timesteps
+                    # Extra Info (now synced via atomic write)
+                    aligned_extras = traj_extra
+                    
+                    # 3. Generate Timesteps
                     # Assuming DT seconds per step
                     ts = [i  for i in range(len(lats))]
-                    
-                    # 对齐 Extra Info
-                    aligned_extras = []
-                    # 初始点可能没有 extra info, 用第一个记录补齐或空
-                    diff = len(lats) - len(traj_extra)
-                    if diff > 0:
-                        # 前面的点补空
-                        aligned_extras.extend([{"cur_siblings_ids":[], "formation_type":"unknown"}] * diff)
-                        aligned_extras.extend(traj_extra)
-                    else:
-                        aligned_extras = traj_extra[:len(lats)]
 
                     uavs_coords[name] = {
                         "lats": lats,
