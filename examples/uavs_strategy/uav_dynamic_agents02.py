@@ -502,26 +502,78 @@ class MissionOrchestrator:
         
         # 2. Collect UAV Trajectories
         uavs_coords = {}
-        
+
+        raw_trajs = {}
+        segment_agents = collections.defaultdict(set)
+        segment_frames = collections.defaultdict(lambda: collections.defaultdict(set))
+
         for name, agent in self.active_agents.items():
-            # Get trajectory from Redis
             traj_utm = agent.io.get_traj(agent.self_uid)
             traj_extra = agent.io.get_traj_extra(agent.self_uid)
-            
+            raw_trajs[name] = (traj_utm, traj_extra)
+
+            for extra in traj_extra or []:
+                if extra.get("is_waiting"):
+                    continue
+                seg_key = extra.get("segment_key")
+                frame_id = extra.get("frame_id")
+                if seg_key is None or frame_id is None:
+                    continue
+                segment_agents[seg_key].add(name)
+                segment_frames[seg_key][name].add(frame_id)
+
+        segment_common_frames = {}
+        for seg_key, agents in segment_agents.items():
+            frame_sets = [segment_frames[seg_key].get(a, set()) for a in agents]
+            segment_common_frames[seg_key] = set.intersection(*frame_sets) if frame_sets else set()
+
+        for name, agent in self.active_agents.items():
+            traj_utm, traj_extra = raw_trajs.get(name, ([], []))
             if traj_utm:
+                if segment_common_frames:
+                    synced_traj = []
+                    synced_extra = []
+                    last_idx = {}
+                    for idx, extra in enumerate(traj_extra or []):
+                        if extra.get("is_waiting"):
+                            continue
+                        seg_key = extra.get("segment_key")
+                        frame_id = extra.get("frame_id")
+                        if seg_key is None or frame_id is None:
+                            continue
+                        last_idx[(seg_key, frame_id)] = idx
+
+                    for idx, extra in enumerate(traj_extra or []):
+                        if extra.get("is_waiting"):
+                            continue
+                        seg_key = extra.get("segment_key")
+                        frame_id = extra.get("frame_id")
+                        if seg_key is None or frame_id is None:
+                            continue
+                        if last_idx.get((seg_key, frame_id)) != idx:
+                            continue
+                        if frame_id in segment_common_frames.get(seg_key, set()):
+                            synced_traj.append(traj_utm[idx])
+                            synced_extra.append(extra)
+
+                    traj_utm = synced_traj
+                    traj_extra = synced_extra
+                    if not traj_utm:
+                        print(f"[save_trajectories] Warning: no synced frames for {name}")
+                        continue
+
                 traj_np = np.array(traj_utm)
                 if traj_np.shape[0] > 0:
                     # Convert to Lat/Lon
                     ll = self._lnglat2utm_convertor.utm_to_lng_lat_array(traj_np)
                     lats = ll[:, 1].tolist()
                     lngs = ll[:, 0].tolist()
-                    
-                    # Extra Info (now synced via atomic write)
+
+                    # Extra Info (now synced via frame_id/segment_key)
                     aligned_extras = traj_extra
-                    
+
                     # 3. Generate Timesteps
-                    # Assuming DT seconds per step
-                    ts = [i  for i in range(len(lats))]
+                    ts = [i for i in range(len(lats))]
 
                     uavs_coords[name] = {
                         "lats": lats,
@@ -529,8 +581,9 @@ class MissionOrchestrator:
                         "ts": ts,
                         "extras": aligned_extras
                     }
-        
-        # 3. Construct Final Data Structure
+
+
+# 3. Construct Final Data Structure
         final_data = {
             "uavs_coords_str": uavs_coords,
             "facilities_str": facilities_str,

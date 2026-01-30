@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from examples.uavs_strategy.uav_dynamic_agents02 import BlueUAVAgent
 
 # ==== 势场与步进参数 ====
-DT = 1.25       # 周期（秒）
+DT = 0.25       # 周期（秒）
 STEP = 8.0     # 每步“最大位移”/速度上限（米/步）
 K_ATT = 0.85   # 引力系数 (独立飞行时)
 K_ATT_FORM = 1.5 # 引力系数 (编队飞行时，需要更强的跟随力)
@@ -487,9 +487,17 @@ class SyncAPFStep(PeriodicBehaviour):
              f_type = "unknown"
              s_ids = []
 
+        # Waiting state should not participate in frame-level sync
+        leader_id = self._get_leader_id(agent)
+        frame_id = None
+        segment_key = getattr(agent, "current_segment_key", None)
+
         extra_info = {
             "cur_siblings_ids": s_ids,
             "formation_type": f_type,
+            "frame_id": frame_id,
+            "segment_key": segment_key,
+            "is_waiting": True,
         }
         
         # Use combined atomic update
@@ -671,6 +679,9 @@ class SyncAPFStep(PeriodicBehaviour):
         extra_info = {
             "cur_siblings_ids": s_ids,
             "formation_type": f_type,
+            "frame_id": lookahead,
+            "segment_key": getattr(agent, "current_segment_key", None),
+            "is_waiting": False,
         }
         
         # Use combined atomic update
