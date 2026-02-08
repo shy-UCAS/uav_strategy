@@ -39,6 +39,10 @@
         "/^python -m py_compile \"examples/uavs_strategy/behaviors_modules/uav_periodic_behaviours\\.py\"$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^type \"f:\\\\CASIA\\\\Drone Swarm Situational Awareness Algorithm\\\\uav_strategy\\\\examples\\\\uavs_strategy\\\\behaviors_modules\\\\uav_periodic_behaviours\\.py\" \\| find /c /v \"\"$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }

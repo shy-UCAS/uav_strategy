@@ -6,20 +6,22 @@ import numpy as np
 from time import time, sleep
 from typing import TYPE_CHECKING
 from pyparsing import C
+from ray import state
 from spade.behaviour import PeriodicBehaviour
 from examples.uavs_strategy.planning_modules import avoidance_agents as a_agents
 
 if TYPE_CHECKING:
     from examples.uavs_strategy.uav_dynamic_agents02 import BlueUAVAgent
+    from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
 
 # ==== 势场与步进参数 ====
-DT = 0.25       # 周期（秒）
+DT = 1.0       # 周期（秒）
 STEP = 8.0     # 每步“最大位移”/速度上限（米/步）
 K_ATT = 0.85   # 引力系数 (独立飞行时)
 K_ATT_FORM = 1.5 # 引力系数 (编队飞行时，需要更强的跟随力)
 K_REP = 2.5    # 斥力系数
-CLOSE_TH = 30.0 # 到达判定阈值
-CLOSE_TH_SYNC = 100.0 # 起点同步阈值
+CLOSE_TH = 3.0 # 到达判定阈值
+CLOSE_TH_SYNC = 3.0 # 起点同步阈值
 
 # ==== 简单向量函数 (从原文件移动过来) ====
 def v_sub(a, b): return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
@@ -31,6 +33,13 @@ def v_norm(a):
 def v_unit(a):
     n = v_norm(a)
     return [a[0] / n, a[1] / n, a[2] / n]
+
+def v_sub_2d(a, b):
+    return [a[0] - b[0], a[1] - b[1]]
+def v_norm_2d(a):
+    n = (a[0] ** 2 + a[1] ** 2) ** 0.5
+    return n if n > 1e-9 else 1e-9
+
 
 class FormationAPFStep(PeriodicBehaviour):
     """
@@ -430,46 +439,48 @@ class FetchWorldState(PeriodicBehaviour):
         agent.world["red_pos"] = {k: v for k, v in red_all.items() if v}
 
 class SyncAPFStep(PeriodicBehaviour):
+
     async def run(self):
         agent: "BlueUAVAgent" = self.agent
         io = agent.io
-
-        # 0. BDI 状态同步
-        if not self._sync_bdi_state(agent, io):
-            self._record_wait_state(agent, io)
-            return
-
-        # 1. 向redis写入参考轨迹
+        # 向redis写入参考轨迹
         self._sync_trajectory(agent, io)
 
-        # 2. 获取状态
+        # 获取状态
         state = self._get_agent_state(agent, io)
         if not state:
             return
-        me, traj, lookahead, max_idx, target, self_pos, dist_to_target = state
+        me, traj, lookahead, max_idx, target, self_pos, _ = state
 
-        # 3. Segment Start Synchronization
-        if not self._sync_segment_start(agent, io, lookahead, dist_to_target, self_pos):
-            self._record_wait_state(agent, io, self_pos)
+        # 检查同步检查点，返回True表示需要等待
+        if self._sync_state_checkpoint(agent, io):
+            print(f"[{agent.self_uid}] Waiting at sync checkpoint.")
+            self._record_wait_state(agent, io)
             return
 
-        # 4. 检查任务结束
-        if self._check_task_completion(agent, io, lookahead, max_idx, dist_to_target):
-            self._record_wait_state(agent, io, self_pos)
-            return
-
-        # 5. 物理计算 (Attraction + Repulsion)
+        # 等待下一段任务
         if getattr(agent, "waiting_next_segment", False):
+             print(f"[{agent.self_uid}] Waiting for next segment.")
              self._record_wait_state(agent, io, self_pos)
              return
 
+        # 物理计算
         nxt = self._calculate_physics(agent, io, target, self_pos)
+        # 计算移动后的真实误差 (决定是否到达/同步)
+        dist_after_move = v_norm_2d(v_sub_2d(target, nxt))
 
-        # 6. 状态更新写入 Redis
-        self._update_status_and_redis(agent, io, nxt, lookahead, max_idx, dist_to_target)
+        # 状态更新写入 Redis, 包括Lookahead推进 logic
+        self._update_status_and_redis(agent, io, nxt, lookahead, max_idx, dist_after_move)
+        
+        # 检查当前任务是否结束
+        self._check_task_completion(agent, io, lookahead, max_idx, dist_after_move)
 
-    def _record_wait_state(self, agent, io, pos=None):
-        """Helper: Record current position as wait state (hover)"""
+
+
+
+
+    def _record_wait_state(self, agent: "BlueUAVAgent", io: "UavRedisIO", pos=None):
+        """辅助函数：记录当前位置为等待状态（悬停）"""
         if pos is None:
              me = io.get_pos(agent.self_uid, blue=True)
              if me:
@@ -484,10 +495,10 @@ class SyncAPFStep(PeriodicBehaviour):
         is_gathering = (lookahead == 0 and not getattr(agent, "has_synced_segment", False))
         
         if is_gathering:
-             f_type = "unknown"
+             f_type = "is_gathering"
              s_ids = []
 
-        # Waiting state should not participate in frame-level sync
+        # 等待状态不应参与帧级同步
         leader_id = self._get_leader_id(agent)
         frame_id = None
         segment_key = getattr(agent, "current_segment_key", None)
@@ -499,11 +510,58 @@ class SyncAPFStep(PeriodicBehaviour):
             "segment_key": segment_key,
             "is_waiting": True,
         }
-        
-        # Use combined atomic update
+
+        # 使用组合原子更新
         io.append_pos_traj_with_extra(agent.self_uid, pos, extra_info, blue=True)
 
-    def _sync_bdi_state(self, agent, io):
+    def _sync_state_checkpoint(self, agent: "BlueUAVAgent", io: "UavRedisIO"):
+        """ 起始同步状态检查,False表示可以继续运行,True表示需要等待 """
+        my_can_start = agent.bdi.get_belief("can_task_start", "false")
+        state_val = "true" if "true" in str(my_can_start) else "false"
+        io.set_uav_state(agent.self_uid, "can_task_start", state_val)
+
+        _self_lookahead = io.get_lookahead(agent.self_uid)
+        if _self_lookahead == 0:
+            # 还未开始，判断当前位置是否在可以开始航迹的位置
+            state = self._get_agent_state(agent, io)
+            if not state:
+                raise ValueError("Cannot get agent state for checkpoint sync.")
+            me, traj, lookahead, max_idx, target, self_pos, dist2target = state
+            if dist2target <= CLOSE_TH_SYNC:
+                agent.has_synced_segment = True
+                target_sync_key = getattr(agent, "current_segment_key", "unknown")
+                io.set_uav_state(agent.self_uid, "current_segment_sync", target_sync_key)
+                if agent.current_segment_siblings:
+                    _leader_id = self._get_leader_id(agent)
+                    print(f"[{agent.self_uid}] Checking sync with siblings: {agent.current_segment_siblings}")
+                    peer_states = io.mget_uav_states(agent.current_segment_siblings, "current_segment_sync")
+                    # target_sync_key = getattr(agent, "current_segment_key", "unknown")
+                    all_synced = True
+                    for pid, seg_key in peer_states.items():
+                        if seg_key != target_sync_key:
+                            all_synced = False
+                            print(f"[{agent.self_uid}] Peer {pid} at segment {seg_key} not synced, waiting for {target_sync_key}.")
+                            break
+                    if all_synced:
+                        print(f"[{agent.self_uid}] All siblings are SYNCED for segment start.")
+                        for pid in agent.current_segment_siblings:
+                            io.set_lookahead(pid, 1)
+                        return True
+
+                    else:
+                        print(f"[{agent.self_uid}] Waiting for peers to sync for segment start.")
+                        return True
+            else:
+                # 推进自身位置去往航迹段的start位置附近,利用has_synced_segment为false不推进lookahead
+                return False   
+        else:
+            # 已经开始飞行，不需要等待
+            print(f"[{agent.self_uid}] Already started flight, no checkpoint wait needed.")
+            return False   
+                      
+
+
+    def _sync_bdi_state(self, agent: "BlueUAVAgent", io: "UavRedisIO"):
         """0. BDI 状态同步: 检查任务完成状态及汇聚等待"""
         my_can_start = agent.bdi.get_belief("can_task_start", "false")
         state_val = "true" if "true" in str(my_can_start) else "false"
@@ -521,35 +579,39 @@ class SyncAPFStep(PeriodicBehaviour):
                  if not hasattr(agent, "_merge_ready_flag") or not agent._merge_ready_flag:
                      print(f"[{agent.self_uid}] All merge peers are READY! Proceeding.")
                      agent._merge_ready_flag = True
-                     if hasattr(agent, "add_achievement_goal"):
-                        agent.add_achievement_goal("task_digraph")
+                     # 触发下一个BDI规划
+                     agent.add_achievement_goal("task_digraph")
             
             # 如果处于 merge_peers 且完成状态，无论是否 ready 都 return
             return False
             
         return True
 
-    def _sync_trajectory(self, agent, io):
+    def _sync_trajectory(self, agent: "BlueUAVAgent", io: "UavRedisIO"):
         """1. 轨迹同步: 检查并更新新轨迹"""
         if_set_ref = agent.bdi.get_belief("if_set_ref_traj")
         if if_set_ref:
              val_str = if_set_ref[len("if_set_ref_traj("):-1]
              if val_str == "true" and agent.cur_reference_traj:
                  io.set_ref_traj(agent.self_uid, agent.cur_reference_traj)
+                 io.set_lookahead(agent.self_uid, 0)  # 新轨迹，重置预瞄点
                  agent.bdi.set_belief("if_set_ref_traj", "false")
+                 
+                 # === 修复：重置任务完成状态，防止误判为已到达汇聚点 ===
+                 io.set_uav_state(agent.self_uid, "can_task_start", "false")
                  print(f"[{agent.self_uid}] Trajectory synced to Redis.")
                  
-                 # New trajectory received, so we are no longer waiting.
+                 # 收到新轨迹，不再等待
                  agent.waiting_next_segment = False
 
-    def _get_leader_id(self, agent):
-        """Helper: Determine the leader of the current segment (smallest ID)"""
+    def _get_leader_id(self, agent: "BlueUAVAgent"):
+        """辅助函数：确定当前段的领队（最小ID）"""
         if hasattr(agent, "current_segment_siblings") and agent.current_segment_siblings:
-            # Sort vertically to ensure determinism
+            # 垂直排序以确保确定性
             return sorted(agent.current_segment_siblings)[0]
         return agent.self_uid
 
-    def _get_agent_state(self, agent, io):
+    def _get_agent_state(self, agent: "BlueUAVAgent", io: "UavRedisIO"):
         """2. 获取状态: 位置、轨迹、进度等"""
         me = io.get_pos(agent.self_uid, blue=True)
         if not me: return None
@@ -557,19 +619,21 @@ class SyncAPFStep(PeriodicBehaviour):
         traj = agent.cur_reference_traj
         if not traj: return None
 
-        # --- Lookahead Synchronization Logic ---
-        # Identify Leader
-        leader_id = self._get_leader_id(agent)
+        # --- 预瞄同步逻辑 ---
+        # 识别领队
+        # leader_id = self._get_leader_id(agent)
         
-        # Lookahead Synchronization:
-        # Everyone (Leaders and Followers) reads the progress index from the Leader's record.
-        # This ensures the entire formation moves in lockstep.
-        target_uid_for_lookahead = leader_id 
+        # 预瞄同步：
+        # 所有人（领队和跟随者）都从领队的记录中读取进度索引。
+        # 这确保整个编队步伐一致。
+        # target_uid_for_lookahead = leader_id 
         
-        lookahead = io.get_lookahead(target_uid_for_lookahead)
+        # lookahead = io.get_lookahead(target_uid_for_lookahead)
+        lookahead = io.get_lookahead(agent.self_uid)
         
-        # Initialization fallback: If leader hasn't started yet, default to start (0).
+        # 初始化回退：如果领队尚未开始，默认为开始 (0)。
         if lookahead is None:
+             print(f"[{agent.self_uid}] Leader lookahead not set, defaulting to 0.")
              lookahead = io.get_lookahead(agent.self_uid) or 0
              
         max_idx = len(traj) - 1
@@ -577,15 +641,15 @@ class SyncAPFStep(PeriodicBehaviour):
         
         target = traj[lookahead]
         self_pos = [me["x"], me["y"], me["z"]]
-        # dist_to_target = v_norm(v_sub(target, self_pos))
-        dist_to_target = 0.0
+        dist_to_target = v_norm_2d(v_sub_2d(target, self_pos)) # 暂时只计算2D距离
+        print(f"[{agent.self_uid}] lookahead: {lookahead}, target: {target}, dist_to_target: {dist_to_target}")
         
         return me, traj, lookahead, max_idx, target, self_pos, dist_to_target
 
-    def _sync_segment_start(self, agent, io, lookahead, dist_to_target, self_pos):
-        """3. Segment Start Synchronization: 起点协同"""
-        if lookahead == 0 and dist_to_target <= CLOSE_TH_SYNC and hasattr(agent, "current_segment_siblings") and agent.current_segment_siblings:
-             # Check if already synced for THIS segment
+    def _sync_segment_start(self, agent: "BlueUAVAgent", io: "UavRedisIO", lookahead, dist_to_target, self_pos):
+        """ 3. 段起点同步：起点协同 """
+        if lookahead == 0 and dist_to_target <= CLOSE_TH_SYNC and agent.current_segment_siblings:
+             # 检查是否已为当前段同步
             if not getattr(agent, "has_synced_segment", False):
                 # A. 标记自己正在等待当前特定的 Segment
                 target_sync_key = getattr(agent, "current_segment_key", "unknown")
@@ -615,43 +679,36 @@ class SyncAPFStep(PeriodicBehaviour):
         
         return True
 
-    def _check_task_completion(self, agent, io, lookahead, max_idx, dist_to_target):
+    def _check_task_completion(self, agent: "BlueUAVAgent", io: "UavRedisIO", lookahead, max_idx, dist_to_target):
         """4. 检查任务结束"""
-        if lookahead >= max_idx and dist_to_target <= CLOSE_TH:
-            # Mark that we are done with this path and waiting for the next
-            if not agent.is_final_task:
-                agent.waiting_next_segment = True
-                io.set_lookahead(agent.self_uid, 0)
-            
-            # 清理状态：标记已完成
+        if lookahead >= max_idx:
+            # 清理状态与重置
             io.set_uav_state(agent.self_uid, "current_segment_sync", "finished")
-
-            agent.bdi.set_belief("can_task_start", True)
+            agent.has_synced_segment = False
+            io.set_uav_sync_state(agent.self_uid, agent.has_synced_segment)
+            # 是否所有任务彻底结束
             if agent.is_final_task:
                 agent.is_finished = True
+                print(f"[{agent.self_uid}] Final task completed.")
             else:
-                if not agent.is_finished: 
-                    if hasattr(agent, "add_achievement_goal") and not agent.merge_peers:
-                        agent.add_achievement_goal("task_digraph")
-                    print(f"[{agent.self_uid}] Segment completed (reached end).")
+                # 准备下一段：重置Lookahead并等待新指令
+                agent.waiting_next_segment = True
+                # io.set_lookahead(agent.self_uid, 0)
+                # 触发下一个BDI规划
+                agent.add_achievement_goal("task_digraph")
+                print(f"[{agent.self_uid}] Segment completed. Waiting next.")
+
+            # 通用信号：通知ASL层任务完成（触发can_task_start -> !task_digraph）
+            agent.bdi.set_belief("can_task_start", True)
             return True
         return False
 
-    def _calculate_physics(self, agent, io, target, self_pos):
+    def _calculate_physics(self, agent: "BlueUAVAgent", io: "UavRedisIO", target, self_pos):
         """5. 物理计算: 引力 + 斥力"""
         # 优化：缓存 IDs，不要每帧 scan，因为 ID 列表变化不频繁
         if not hasattr(agent, "cached_blue_ids") or not agent.cached_blue_ids:
             agent.cached_blue_ids = io.get_ids(blue=True)
-            
-        # 稍微降低频率重新 scan，比如每 10 帧 (这里简单处理，假设不变，或者依靠外部 FetchWorldState 更新)
-        # 最好使用 FetchWorldState 提供的 agent.world 数据，而不是自己去 IO
-        
-        # 尝试使用 FetchWorldState 的缓存数据 (如果存在)
-        if hasattr(agent, "world") and "blue_pos" in agent.world:
-            all_blue_pos = agent.world["blue_pos"]
-        else:
-            # Fallback to direct IO
-            all_blue_pos = io.mget_pos(agent.cached_blue_ids, blue=True)
+        all_blue_pos = io.mget_pos(agent.cached_blue_ids, blue=True)
 
         F_att = v_scale(v_sub(target, self_pos), K_ATT)
 
@@ -660,9 +717,8 @@ class SyncAPFStep(PeriodicBehaviour):
         # nxt = v_add(self_pos, F_total) 
         return nxt
 
-    def _update_status_and_redis(self, agent, io, nxt, lookahead, max_idx, dist_to_target):
+    def _update_status_and_redis(self, agent: "BlueUAVAgent", io: "UavRedisIO", nxt, lookahead, max_idx, dist_to_target):
         """6. 状态更新与 Redis 写入: 推进 lookahead 及记录轨迹"""
-
         # 记录额外信息
         f_type = getattr(agent, "formation_type", "unknown")
         s_ids = getattr(agent, "current_segment_siblings", [])
@@ -684,28 +740,16 @@ class SyncAPFStep(PeriodicBehaviour):
             "is_waiting": False,
         }
         
-        # Use combined atomic update
+        # [DEBUG PRINT]
+        # print(f"[{agent.self_uid}] [DEBUG_WRITE] Writing Frame {lookahead}. NewPoS: {[round(x,2) for x in nxt]}. Dist(New): {dist_to_target:.2f}")
+
+        # 使用组合原子更新
         io.append_pos_traj_with_extra(agent.self_uid, nxt, extra_info, blue=True)
 
-        # 识别 Leader
-        leader_id = self._get_leader_id(agent)
-        is_leader = (agent.self_uid == leader_id)
-        # 推进 Lookahead
-        # 规则：只有 LEADER 有权根据自己的到达情况推进 Lookahead
-        # Follower 不需要写入 Lookahead，防止时序错乱导致覆盖 Leader 的写入
-        if is_leader:
-             if dist_to_target <= CLOSE_TH and lookahead < max_idx:
-                # 只有在已同步 (或不需要同步) 后才推进
-                if lookahead > 0 or getattr(agent, "has_synced_segment", False) or not agent.current_segment_siblings:
-                    new_val = lookahead + 1
-                    # 1. Update Self
-                    io.set_lookahead(agent.self_uid, new_val)
-                    # await asyncio.sleep(0.5)
-                    # 2. Batch Update Followers (if any exist in this segment)
-                    # 这样可以确保 Redis 里的状态是完美的 "同帧同步"
-                    if hasattr(agent, "current_segment_siblings") and agent.current_segment_siblings:
-                        # 过滤掉自己
-                        followers = [uid for uid in agent.current_segment_siblings if uid != agent.self_uid]
-                        # 简单的循环写入 (数量少时性能影响可忽略，追求逻辑正确)
-                        for f_uid in followers:
-                            io.set_lookahead(f_uid, new_val)
+        if dist_to_target <= CLOSE_TH and lookahead <= max_idx:
+
+
+            if getattr(agent, "has_synced_segment", False):
+                print(f"[{agent.self_uid}] move forward {dist_to_target} meters [DEBUG_ADVANCE] Increasing lookahead {lookahead} -> {lookahead + 1}")
+                # 只有在已经同步了当前段的情况下才推进lookahead,否则说明agent还在飞往起点，不能推进lookahead
+                io.set_lookahead(agent.self_uid, lookahead + 1)

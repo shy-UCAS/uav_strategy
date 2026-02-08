@@ -11,9 +11,9 @@
 # 使用一个固定通用的asl文件处理uav_key_path.asl
 
 import asyncio
-import argparse
 import getpass
 import os, os.path as osp
+import argparse
 import sys
 import redis
 import json
@@ -93,7 +93,7 @@ bdi_instructions = key_path_instructions["bdi_instructions"]
 facilities_file = os.path.join(current_dir,"data" ,"test_facilities_locations.json")
 
 # =============================
-# 1. Blue UAV Agent
+# 1. 蓝方无人机智能体
 # =============================
 class BlueUAVAgent(BDIAgent):
     def __init__(self, jid, password, asl_file, flight_plan, siblings_ref ,orchestrator, init_pos=None, facilities=None, **kwargs):
@@ -106,6 +106,7 @@ class BlueUAVAgent(BDIAgent):
         self._need_wait_siblings = False
         self._is_alive = True
         self.is_final_task = False
+        self.waiting_next_segment = True
         
         # 确定起始节点
         if self.flight_plan:
@@ -142,10 +143,11 @@ class BlueUAVAgent(BDIAgent):
         self.io.set_traj(self.self_uid, [[self.traj[0][0], self.traj[0][1], self.position[2]]])
         self.io.set_lookahead(self.self_uid, 0)
         
-        # Sync attributes
+        # 同步属性
         self.current_segment_siblings = []
         self.current_segment_key = None
         self.has_synced_segment = False
+        self.io.set_uav_sync_state(self.self_uid, False)
 
         self.APFStep = SyncAPFStep
         self.FetchWorldState = FetchWorldState
@@ -206,7 +208,7 @@ class BlueUAVAgent(BDIAgent):
             cur_start_node = str(agentspeak.grounded(term.args[0], intention.scope))
             cur_end_node = str(agentspeak.grounded(term.args[1], intention.scope))
             
-            # Reset Sync Flag for new segment
+            # 为新航段重置同步标志位
             self.has_synced_segment = False
             self.current_segment_key = f"{cur_start_node}_{cur_end_node}"
             
@@ -301,16 +303,16 @@ class BlueUAVAgent(BDIAgent):
                          if not self.traj:
                              self.traj.extend(my_traj)
                          else:
-                             last_pt = np.array(self.traj[-1][:2]) # xy only
+                             last_pt = np.array(self.traj[-1][:2]) # 仅 xy
                              first_pt = np.array(my_traj[0][:2])
                              dist = np.linalg.norm(last_pt - first_pt)
                              
-
-                             if dist < 1.0:
-                                 self.traj.extend(my_traj[1:])
-                             else:
-                                 print(f"[{self.self_uid}] Detect gap ({dist:.2f}m) between segments. Keeping full trajectory.")
-                                 self.traj.extend(my_traj)
+                             self.traj.extend(my_traj[1:])
+                            #  if dist < 1.0:
+                            #      self.traj.extend(my_traj[1:])
+                            #  else:
+                            #      print(f"[{self.self_uid}] Detect gap ({dist:.2f}m) between segments. Keeping full trajectory.")
+                            #      self.traj.extend(my_traj)
 
                          self.bdi.set_belief("if_set_ref_traj", "true")
                     else:
@@ -369,7 +371,7 @@ class MissionOrchestrator:
         # 从 json_data 预填充需求
         for item in json_data:
              u, v = str(item["from"]), str(item["to"])
-             # members_num + 1 Leader
+             # members_num + 1 (包含主机)
              self.edge_requirements[(u, v)] = item["members_num"] + 1
 
     def _init_DAG_structure(self):
@@ -469,6 +471,9 @@ class MissionOrchestrator:
                     pass 
             
             if all_done:
+                print("Stopping all agents...")
+                for agent in self.active_agents.values():
+                    await agent.stop()
                 break
             await asyncio.sleep(1.0)
             
@@ -485,7 +490,7 @@ class MissionOrchestrator:
     def save_trajectories(self):
         print("Collecting trajectories and facility info...")
         
-        # 1. Load Facilities Info
+        # 1. 加载设施信息
         facilities_data = {}
         if os.path.exists(facilities_file):
             with open(facilities_file, 'r', encoding='utf-8') as f:
@@ -500,7 +505,7 @@ class MissionOrchestrator:
                 flat.extend([_lng, _lat])
             facilities_str[_ring_name.upper()] = flat
         
-        # 2. Collect UAV Trajectories
+        # 2. 收集无人机轨迹
         uavs_coords = {}
 
         raw_trajs = {}
@@ -521,7 +526,7 @@ class MissionOrchestrator:
                     continue
                 segment_agents[seg_key].add(name)
                 segment_frames[seg_key][name].add(frame_id)
-
+        print(f"segment_frames: {json.dumps({k: {ak: list(av) for ak, av in v.items()} for k, v in segment_frames.items()}, indent=2)}")
         segment_common_frames = {}
         for seg_key, agents in segment_agents.items():
             frame_sets = [segment_frames[seg_key].get(a, set()) for a in agents]
@@ -569,10 +574,10 @@ class MissionOrchestrator:
                     lats = ll[:, 1].tolist()
                     lngs = ll[:, 0].tolist()
 
-                    # Extra Info (now synced via frame_id/segment_key)
+                    # 额外信息 (现在通过 frame_id/segment_key 同步)
                     aligned_extras = traj_extra
 
-                    # 3. Generate Timesteps
+                    # 3. 生成时间步
                     ts = [i for i in range(len(lats))]
 
                     uavs_coords[name] = {
@@ -583,15 +588,36 @@ class MissionOrchestrator:
                     }
 
 
-# 3. Construct Final Data Structure
+        # 3. 采集原始轨迹（不做同步过滤）
+        uavs_coords_raw = {}
+        for name, (traj_utm, traj_extra) in raw_trajs.items():
+            if traj_utm:
+                traj_np = np.array(traj_utm)
+                if traj_np.shape[0] > 0:
+                    ll = self._lnglat2utm_convertor.utm_to_lng_lat_array(traj_np)
+                    lats = ll[:, 1].tolist()
+                    lngs = ll[:, 0].tolist()
+                    ts = [i for i in range(len(lats))]
+                    uavs_coords_raw[name] = {
+                        "lats": lats,
+                        "lngs": lngs,
+                        "ts": ts,
+                        "extras": traj_extra
+                    }
+
+        # 4. 构建最终数据结构
         final_data = {
             "uavs_coords_str": uavs_coords,
+            "uavs_coords_raw": uavs_coords_raw,
             "facilities_str": facilities_str,
             "defence_rings": defence_rings
         }
         
-        # 4. Save to File
-        output_file = "uav_trajectories_persistent.json"
+        # 5. 保存到文件
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_dir = os.path.join(current_dir, "data", "raw_data")
+        os.makedirs(output_dir, exist_ok=True)
+        output_file = os.path.join(output_dir, f"uav_trajectories_persistent_{timestamp}.json")
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(final_data, f, indent=4)
             

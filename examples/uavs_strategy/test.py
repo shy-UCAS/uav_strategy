@@ -32,7 +32,11 @@ from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import For
 from examples.uavs_strategy.key_path_analyzer import KeyPathAnalyzer
 
 if __name__ == "__main__":
-    _lnglat2utm_convertor = bfunc.LngLat2UTM()
-    coord_utm = [425833.8106528529315, 4150365.2198808141984]
-    coord_ll = _lnglat2utm_convertor.utm_to_lng_lat(coord_utm[0], coord_utm[1])
-    print(f"UTM:{coord_utm} -> LngLat:{coord_ll}")
+    # python -m examples.uavs_strategy.test
+    # _lnglat2utm_convertor = bfunc.LngLat2UTM()
+    # coord_utm = [425833.8106528529315, 4150365.2198808141984]
+    # coord_ll = _lnglat2utm_convertor.utm_to_lng_lat(coord_utm[0], coord_utm[1])
+    # print(f"UTM:{coord_utm} -> LngLat:{coord_ll}")
+    l1 = (427606.7066766558564, 4150939.1583661297336)
+    l2 = (427578.9034112867084, 4150825.0039629098028)
+    print(f"Distance is: {math.sqrt((l1[0]-l2[0])**2 + (l1[1]-l2[1])**2)} meters")

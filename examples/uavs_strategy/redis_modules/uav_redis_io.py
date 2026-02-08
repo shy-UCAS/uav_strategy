@@ -172,6 +172,30 @@ class UavRedisIO:
         for uid, val in zip(uids, vals):
             result[uid] = val if val else None
         return result
+    
+    def set_uav_sync_state(self, uid: str, is_synced: bool) -> None:
+        """设置无人机的同步状态 (用于多机协同)"""
+        key = f"uav:{uid}:state:sync"
+        self.r.set(key, str(is_synced))
+    
+    def get_uav_sync_state(self, uid: str) -> bool:
+        """获取无人机的同步状态"""
+        key = f"uav:{uid}:state:sync"
+        v = self.r.get(key)
+        return v == 'True'  # Redis 存储的布尔值为字符串形式
+    
+    def mget_uav_sync_states(self, uids: List[str]) -> Dict[str, bool]:
+        """批量获取多个无人机的同步状态"""
+        p = self.r.pipeline()
+        keys = [f"uav:{uid}:state:sync" for uid in uids]
+        for k in keys:
+            p.get(k)
+        vals = p.execute()
+        
+        result = {}
+        for uid, val in zip(uids, vals):
+            result[uid] = val == 'True'  # Redis 存储的布尔值为字符串形式
+        return result
 
     def set_members_ref_traj(self, master_uid: str, members_traj: List[List[List[float]]]) -> None:
         """

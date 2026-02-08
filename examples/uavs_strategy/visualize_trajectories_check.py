@@ -117,7 +117,7 @@ class TrajectoryPlayer:
              # 2. search in parent/parent (root)
              
              possible_paths = [
-                 os.path.join(current_dir, 'uav_trajectories.json'),
+                 os.path.join(current_dir,'data','raw_data' ,'uav_trajectories_persistent_20260204_143159.json'),
                  os.path.join(os.path.dirname(os.path.dirname(current_dir)), 'uav_trajectories_persistent.json'),
                  os.path.join(os.path.dirname(os.path.dirname(current_dir)), 'uav_trajectories.json'),
                  r'f:\CASIA\Drone Swarm Situational Awareness Algorithm\uav_strategy\uav_trajectories.json',
@@ -139,7 +139,7 @@ class TrajectoryPlayer:
                 content = json.load(f)
                 # 兼容不同的 json 结构
                 if 'uavs_coords_str' in content:
-                    return content.get('uavs_coords_str', {})
+                    return content.get('uavs_coords_raw', {})
                 else:
                     return content # 假设就是 {agent: {coord...}}
         except Exception as e:

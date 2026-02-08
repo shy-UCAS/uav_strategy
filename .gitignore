@@ -100,3 +100,6 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# datasets
+examples/uavs_strategy/data/raw_data/
