@@ -82,21 +82,22 @@ direction_range_set = {
 }
 
 current_dir = os.path.dirname(__file__)
-digraph_attrs_reference_path = os.path.join(current_dir, "data", "digraph_with_attrs.json")
+# digraph_attrs_reference_path = os.path.join(current_dir, "data", "digraph_with_attrs.json")
+digraph_attrs_reference_path = os.path.join(current_dir, "data", "digraph_with_attrs02.json")
 key_path_instructions_path = os.path.join(current_dir,"data" ,"key-path-analyzer02.json")
 asl_file = os.path.join(current_dir, "uav_key_path.asl")
 
 digraph_attrs = json.load(open(digraph_attrs_reference_path, "r"))
 key_path_instructions = json.load(open(key_path_instructions_path, "r"))
 bdi_instructions = key_path_instructions["bdi_instructions"]
-# facilities_file = os.path.join(current_dir,"data" ,"facilities.json")
-facilities_file = os.path.join(current_dir,"data" ,"test_facilities_locations.json")
+facilities_file = os.path.join(current_dir,"data" ,"facilities.json")
+# facilities_file = os.path.join(current_dir,"data" ,"test_facilities_locations.json")
 
 # =============================
 # 1. 蓝方无人机智能体
 # =============================
 class BlueUAVAgent(BDIAgent):
-    def __init__(self, jid, password, asl_file, flight_plan, siblings_ref ,orchestrator, init_pos=None, facilities=None, **kwargs):
+    def __init__(self, jid, password, asl_file, flight_plan, siblings_ref ,orchestrator, init_pos=None, facilities=facilities_file, **kwargs):
         super().__init__(jid, password, asl_file)
         self.flight_plan = flight_plan  # 航段列表: [{'segment': (u, v), 'coords': []}, ...]
         self.siblings_ref = siblings_ref
@@ -164,6 +165,7 @@ class BlueUAVAgent(BDIAgent):
         self.bdi.set_belief('my_id', self.self_uid)
         
         self.formation_type = "unknown" # 初始化队形类型
+        self.global_step_id = 0 # 全局步数ID，不随航段清零
 
     def _default_facilities(self, default_json_path=None):
         if default_json_path is None:
@@ -404,7 +406,7 @@ class MissionOrchestrator:
         # 找到所有的起点 (这里根据 key_paths 的第一个元素确定)
         # key_paths 的项类似于 "1_0" (节点名称)
         # 我们需要起始节点。
-        starts = set(path[0] for path in key_paths)
+        starts = set(str(path[0]) for path in key_paths)
         
         for start_node in starts:
             # 查找从该起点出发的总流量
@@ -638,17 +640,17 @@ async def start_agent(server, password):
         print(f"[System] Warning: Failed to flush Redis: {e}")
 
     # 从key_paths解析bdi指令
-    # key_paths = [
-    #     [0, 1, 4, 5, 2, 14],
-    #     [3, 4, 5, 2, 14],
-    #     [6, 7, 8, 9, 10, 14],
-    #     [11, 12, 13, 14]        
-    # ]
     key_paths = [
-        ["1_0","1_1","1_2","3_0","3_1","4_1","4_2"],
-        ["2_0","2_1","2_2","3_0","3_1","5_1","5_2"],
-        ["1_0","1_1","1_2","3_0","3_1","6_1","6_2"]
+        [0, 1, 4, 5, 2, 14],
+        [3, 4, 5, 2, 14],
+        [6, 7, 8, 9, 10, 14],
+        [11, 12, 13, 14]        
     ]
+    # key_paths = [
+    #     ["1_0","1_1","1_2","3_0","3_1","4_1","4_2"],
+    #     ["2_0","2_1","2_2","3_0","3_1","5_1","5_2"],
+    #     ["1_0","1_1","1_2","3_0","3_1","6_1","6_2"]
+    # ]
     # bdi_instructions = KeyPathAnalyzer(key_paths).generate_bdi_instructions()
     # print(f"BDI instructions: {json.dumps(bdi_instructions, indent=2)}")
     orchestrator = MissionOrchestrator(

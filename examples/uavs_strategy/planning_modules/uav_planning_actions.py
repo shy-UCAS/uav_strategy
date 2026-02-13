@@ -251,7 +251,7 @@ class PlanningLib:
         order_type = digraph_attr['order_type']
         cur_target = digraph_attr['target']
 
-        if order_type == 'breakthrough':
+        if order_type == 'breakthrough' or order_type == 'singleton':
             return self.execute_breakthrough(cur_target, start_h, end_h)
         elif order_type == 'escape':
             return self.execute_escape(cur_target, start_h, end_h)

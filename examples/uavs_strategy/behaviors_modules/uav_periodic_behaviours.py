@@ -502,11 +502,15 @@ class SyncAPFStep(PeriodicBehaviour):
         leader_id = self._get_leader_id(agent)
         frame_id = None
         segment_key = getattr(agent, "current_segment_key", None)
+        
+        # global_step_id 自增
+        agent.global_step_id += 1
 
         extra_info = {
             "cur_siblings_ids": s_ids,
             "formation_type": f_type,
             "frame_id": frame_id,
+            "global_id": agent.global_step_id,
             "segment_key": segment_key,
             "is_waiting": True,
         }
@@ -731,11 +735,15 @@ class SyncAPFStep(PeriodicBehaviour):
         if is_gathering:
              f_type = "unknown"
              s_ids = []
+             
+        # global_step_id 自增
+        agent.global_step_id += 1
 
         extra_info = {
             "cur_siblings_ids": s_ids,
             "formation_type": f_type,
             "frame_id": lookahead,
+            "global_id": agent.global_step_id,
             "segment_key": getattr(agent, "current_segment_key", None),
             "is_waiting": False,
         }

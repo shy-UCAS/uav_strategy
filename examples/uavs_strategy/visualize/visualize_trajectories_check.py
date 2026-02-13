@@ -9,12 +9,25 @@ visualize_trajectories_check.py
 import json
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from matplotlib import font_manager
 from matplotlib.widgets import Button, Slider, TextBox
 import os
 import sys
 
-# 设置中文字体（尝试常见的 Windows 中文字体，防止乱码）
-plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'Arial'] 
+# 设置中文字体（仅在检测到可用 CJK 字体时启用中文显示）
+_cjk_font_candidates = [
+    'SimHei', 'Microsoft YaHei', 'Noto Sans CJK SC',
+    'WenQuanYi Zen Hei', 'Source Han Sans SC', 'PingFang SC',
+    'Heiti SC', 'Arial Unicode MS'
+]
+_installed_fonts = {f.name for f in font_manager.fontManager.ttflist}
+_available_cjk_fonts = [name for name in _cjk_font_candidates if name in _installed_fonts]
+HAS_CJK_FONT = bool(_available_cjk_fonts)
+
+if HAS_CJK_FONT:
+    plt.rcParams['font.sans-serif'] = _available_cjk_fonts + ['DejaVu Sans']
+else:
+    plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False
 
 class TrajectoryPlayer:
@@ -40,6 +53,7 @@ class TrajectoryPlayer:
 
         self.lines = {}
         self.points = {}
+        self.labels = {}
         
         # 预先计算坐标范围，固定视角
         all_lats = []
@@ -59,9 +73,13 @@ class TrajectoryPlayer:
             self.ax.set_ylim(min(all_lats) - margin_lat, max(all_lats) + margin_lat)
             self.ax.set_xlim(min(all_lngs) - margin_lng, max(all_lngs) + margin_lng)
         
-        self.ax.set_xlabel('Longitude (经度)')
-        self.ax.set_ylabel('Latitude (纬度)')
-        self.ax.set_title(f'UAV 轨迹动态回放 (Total Frames: {self.max_frame})')
+        self.ax.set_xlabel('Longitude (经度)' if HAS_CJK_FONT else 'Longitude')
+        self.ax.set_ylabel('Latitude (纬度)' if HAS_CJK_FONT else 'Latitude')
+        self.ax.set_title(
+            f'UAV 轨迹动态回放 (Total Frames: {self.max_frame})'
+            if HAS_CJK_FONT else
+            f'UAV Trajectory Playback (Total Frames: {self.max_frame})'
+        )
         self.ax.grid(True, linestyle=':', alpha=0.6)
 
         # 初始化每个 Agent 的线条和当前的头部点
@@ -82,11 +100,19 @@ class TrajectoryPlayer:
             line, = self.ax.plot([], [], label=agent, linewidth=line_width, alpha=alpha)
             # 当前位置点
             point, = self.ax.plot([], [], marker=marker_style, markersize=markersize, color=line.get_color())
+            # 当前位置名称（颜色与轨迹一致）
+            label = self.ax.annotate(
+                agent,
+                xy=(0, 0),
+                xytext=(6, 6),
+                textcoords='offset points',
+                color=line.get_color(),
+                fontsize=9
+            )
             
             self.lines[agent] = line
             self.points[agent] = point
-
-        self.ax.legend(bbox_to_anchor=(1.01, 1), loc='upper left', borderaxespad=0.)
+            self.labels[agent] = label
 
         # 状态控制
         self.current_frame = 0
@@ -111,13 +137,13 @@ class TrajectoryPlayer:
     def _load_data(self, json_path):
         if not json_path:
              # 尝试自动寻找路径
-             current_dir = os.path.dirname(os.path.abspath(__file__))
+             current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
              # 假设在 examples/uavs_strategy/ 下，向上找
              # 1. search in current
              # 2. search in parent/parent (root)
              
              possible_paths = [
-                 os.path.join(current_dir,'data','raw_data' ,'uav_trajectories_persistent_20260204_143159.json'),
+                 os.path.join(current_dir,'data','raw_data' ,'uav_trajectories_persistent_20260213_164652.json'),
                  os.path.join(os.path.dirname(os.path.dirname(current_dir)), 'uav_trajectories_persistent.json'),
                  os.path.join(os.path.dirname(os.path.dirname(current_dir)), 'uav_trajectories.json'),
                  r'f:\CASIA\Drone Swarm Situational Awareness Algorithm\uav_strategy\uav_trajectories.json',
@@ -199,6 +225,8 @@ class TrajectoryPlayer:
             
             # 更新当前点
             self.points[agent].set_data([lngs[idx]], [lats[idx]])
+            # 更新名称位置
+            self.labels[agent].xy = (lngs[idx], lats[idx])
         
         self.fig.canvas.draw_idle()
 
