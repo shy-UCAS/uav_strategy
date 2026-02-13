@@ -362,8 +362,8 @@ class MapVisualizer:
 
 # 运行可视化，并实现动态更新
 if __name__ == "__main__":
-	    # 运行：python -m examples.uavs_strategy.redis_data_visualize
-    current_dir = os.path.dirname(__file__)
+	    # 运行：python -m examples.uavs_strategy.visualize.redis_data_visualize
+    current_dir = os.path.dirname(os.path.dirname(__file__))
     # facilities_file_name = 'facilities.json'
     facilities_file_name = 'test_facilities_locations.json'
     facilities_file = os.path.join(current_dir,"data" ,facilities_file_name)

@@ -249,7 +249,7 @@ class TrajectoryPlayer:
         plt.show()
 
 if __name__ == "__main__":
-    # python -m examples.uavs_strategy.visualize_trajectories_check
+    # python -m examples.uavs_strategy.visualize.visualize_trajectories_check
     player = TrajectoryPlayer()
     if player.max_frame > 0:
         player.show()
