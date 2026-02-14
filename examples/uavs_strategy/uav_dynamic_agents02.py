@@ -81,17 +81,35 @@ direction_range_set = {
     'detour': [0, 360]
 }
 
+switch_config = 1
+
 current_dir = os.path.dirname(__file__)
-# digraph_attrs_reference_path = os.path.join(current_dir, "data", "digraph_with_attrs.json")
-digraph_attrs_reference_path = os.path.join(current_dir, "data", "digraph_with_attrs02.json")
+
+if switch_config == 1:
+    digraph_attrs_reference_path = os.path.join(current_dir, "data", "digraph_with_attrs02.json")
+    facilities_file = os.path.join(current_dir,"data" ,"facilities.json")
+    key_paths = [
+        [0, 1, 4, 5, 2, 14],
+        [3, 4, 5, 2, 14],
+        [6, 7, 8, 9, 10, 14],
+        [11, 12, 13, 14]        
+    ]
+
+elif switch_config == 2:
+    digraph_attrs_reference_path = os.path.join(current_dir, "data", "digraph_with_attrs.json")
+    facilities_file = os.path.join(current_dir,"data" ,"test_facilities_locations.json")
+    key_paths = [
+        ["1_0","1_1","1_2","3_0","3_1","4_1","4_2"],
+        ["2_0","2_1","2_2","3_0","3_1","5_1","5_2"],
+        ["1_0","1_1","1_2","3_0","3_1","6_1","6_2"]
+    ]
+
 key_path_instructions_path = os.path.join(current_dir,"data" ,"key-path-analyzer02.json")
 asl_file = os.path.join(current_dir, "uav_key_path.asl")
-
 digraph_attrs = json.load(open(digraph_attrs_reference_path, "r"))
 key_path_instructions = json.load(open(key_path_instructions_path, "r"))
 bdi_instructions = key_path_instructions["bdi_instructions"]
-facilities_file = os.path.join(current_dir,"data" ,"facilities.json")
-# facilities_file = os.path.join(current_dir,"data" ,"test_facilities_locations.json")
+
 
 # =============================
 # 1. 蓝方无人机智能体
@@ -220,7 +238,7 @@ class BlueUAVAgent(BDIAgent):
                     _order_mode = digraph_attr['attrs']['order_mode']
                     _order_target = digraph_attr['attrs']['target']
                     # 修改判断条件：只要是 aggregate 模式，无论目标是动态点还是固定设施，都进行 merge_peers 计算
-                    if _order_mode == 'aggregate':
+                    if _order_mode == 'aggregate' and _order_target == 'aggregate_point':
                         self._merge_ready_flag = False
                         # 先清空或初始化一个临时列表
                         all_merge_peers = []
@@ -643,18 +661,7 @@ async def start_agent(server, password):
     except Exception as e:
         print(f"[System] Warning: Failed to flush Redis: {e}")
 
-    # 从key_paths解析bdi指令
-    key_paths = [
-        [0, 1, 4, 5, 2, 14],
-        [3, 4, 5, 2, 14],
-        [6, 7, 8, 9, 10, 14],
-        [11, 12, 13, 14]        
-    ]
-    # key_paths = [
-    #     ["1_0","1_1","1_2","3_0","3_1","4_1","4_2"],
-    #     ["2_0","2_1","2_2","3_0","3_1","5_1","5_2"],
-    #     ["1_0","1_1","1_2","3_0","3_1","6_1","6_2"]
-    # ]
+
     # bdi_instructions = KeyPathAnalyzer(key_paths).generate_bdi_instructions()
     # print(f"BDI instructions: {json.dumps(bdi_instructions, indent=2)}")
     orchestrator = MissionOrchestrator(

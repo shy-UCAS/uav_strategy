@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
 
 # ==== 势场与步进参数 ====
-DT = 1.0       # 周期（秒）
+DT = 3.0       # 周期（秒）
 STEP = 8.0     # 每步“最大位移”/速度上限（米/步）
 K_ATT = 0.85   # 引力系数 (独立飞行时)
 K_ATT_FORM = 1.5 # 引力系数 (编队飞行时，需要更强的跟随力)
@@ -550,7 +550,7 @@ class SyncAPFStep(PeriodicBehaviour):
                         print(f"[{agent.self_uid}] All siblings are SYNCED for segment start.")
                         for pid in agent.current_segment_siblings:
                             io.set_lookahead(pid, 1)
-                        return True
+                        return False # 修改为False, 允许当前帧继续运行不等待
 
                     else:
                         print(f"[{agent.self_uid}] Waiting for peers to sync for segment start.")
