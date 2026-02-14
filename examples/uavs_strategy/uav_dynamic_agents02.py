@@ -219,7 +219,8 @@ class BlueUAVAgent(BDIAgent):
                 if str(digraph_attr["from"]) == cur_start_node and str(digraph_attr["to"]) == cur_end_node:
                     _order_mode = digraph_attr['attrs']['order_mode']
                     _order_target = digraph_attr['attrs']['target']
-                    if _order_mode == 'aggregate' and _order_target == 'aggregate_point':
+                    # 修改判断条件：只要是 aggregate 模式，无论目标是动态点还是固定设施，都进行 merge_peers 计算
+                    if _order_mode == 'aggregate':
                         self._merge_ready_flag = False
                         # 先清空或初始化一个临时列表
                         all_merge_peers = []
@@ -230,9 +231,12 @@ class BlueUAVAgent(BDIAgent):
                                 peers = [_uav for _uav in v['uav_ids'] if _uav != self.self_uid]
                                 all_merge_peers.extend(peers)
                         
-                        # 去重
-                        self.merge_peers = list(set(all_merge_peers))
-                        print(f"[{self.self_uid}] Merge peers for aggregation: {self.merge_peers}")
+                        # 去重并固定顺序，保证日志与行为可复现
+                        self.merge_peers = sorted(list(set(all_merge_peers)))
+                        print(
+                            f"[{self.self_uid}] Merge peers for aggregation "
+                            f"(target={_order_target}): {self.merge_peers}"
+                        )
                     else:
                         self.merge_peers = []
 
