@@ -143,12 +143,12 @@ class TrajectoryPlayer:
              # 2. search in parent/parent (root)
              
              possible_paths = [
-                 os.path.join(current_dir,'data','raw_data' ,'uav_trajectories_persistent_20260214_200227.json'),
+                 os.path.join(current_dir,'data','raw_data' ,'uav_trajectories_persistent_20260224_232342.json'),
                  os.path.join(os.path.dirname(os.path.dirname(current_dir)), 'uav_trajectories_persistent.json'),
                  os.path.join(os.path.dirname(os.path.dirname(current_dir)), 'uav_trajectories.json'),
                  r'f:\CASIA\Drone Swarm Situational Awareness Algorithm\uav_strategy\uav_trajectories.json',
                  r'f:\CASIA\Drone Swarm Situational Awareness Algorithm\uav_strategy\uav_trajectories_persistent.json'
-             ]
+            ]
              
              for p in possible_paths:
                  if os.path.exists(p):

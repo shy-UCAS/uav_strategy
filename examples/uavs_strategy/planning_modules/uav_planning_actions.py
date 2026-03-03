@@ -51,14 +51,20 @@ class PlanningLib:
         - 等属性。
     通过asl的BDI 动作触发调用。
     """
-
+    
     def __init__(self, self_agent: "BlueUAVAgent"):
         self.self_agent = self_agent
+        self.VERBOSE = False # 控制日志输出
 
     # 为了书写方便，提供一个别名
     @property
     def agent(self):
         return self.self_agent
+
+    def log(self, msg):
+        """可控的日志输出方法"""
+        if self.VERBOSE:
+            print(msg)
 
     # ---------- 高度插值 ---------- #
     def insert_height_val(self, order_type: str, traj: List[List[float]],
@@ -76,15 +82,17 @@ class PlanningLib:
         # 生成随机起终高度
         alt_start_rand = random.randint(default_range[0][0], default_range[0][1])
         alt_end_rand = random.randint(default_range[1][0], default_range[1][1])
-        print(f"[{self.agent.jid}] Default 2d traj: {traj}")
+        self.log(f"[{self.agent.jid}] Default 2d traj: {traj}")
         # 起点高度
         if len(traj[0]) == 2:
-            print(f"[{self.agent.jid}] Insert start height: {start_height} (rand: {alt_start_rand})")
+
+            self.log(f"[{self.agent.jid}] Insert start height: {start_height} (rand: {alt_start_rand})")
             traj[0].append(start_height if start_height != -1 else alt_start_rand)
 
         # 终点高度
         if len(traj[-1]) == 2:
-            print(f"[{self.agent.jid}] Insert end height: {end_height} (rand: {alt_end_rand})")
+            # print(f"[{self.agent.jid}] Insert end height: {end_height} (rand: {alt_end_rand})")
+            self.log(f"[{self.agent.jid}] Insert end height: {end_height} (rand: {alt_end_rand})")
             traj[-1].append(end_height if end_height != -1 else alt_end_rand)
 
         # 此时只有首尾是三维，中间点需要补 z
@@ -228,7 +236,8 @@ class PlanningLib:
         if not border.is_inside_border(start_location):
             # 当前本来就在逃逸范围之外
             border_traj = [start_location, start_location]
-            print(f"_outside_border_traj: {border_traj}")
+            # print(f"_outside_border_traj: {border_traj}")
+            self.log(f"[{self.agent.jid}] is already outside the border, escape traj: {border_traj}")
             return [list(p) if isinstance(p, tuple) else list(p) for p in border_traj]
         else:
             # 计算最近边界点
@@ -238,7 +247,7 @@ class PlanningLib:
                 start_location,
                 list(nearest_point) if isinstance(nearest_point, tuple) else nearest_point,
             ]
-            print(f"_inside_border_traj: {border_traj}")
+            self.log(f"_inside_border_traj: {border_traj}")
             return [list(p) if isinstance(p, tuple) else list(p) for p in border_traj]
 
     # ---------- 执行动作封装 (解耦 BDI) ---------- #
@@ -258,7 +267,7 @@ class PlanningLib:
         elif order_type == 'detour':
             return self.execute_detour(cur_target, start_h, end_h)
         else:
-            print(f"[{self.agent.name}] Unknown order_type: {order_type}")
+            self.log(f"[{self.agent.name}] Unknown order_type: {order_type}")
 
 
     def execute_breakthrough(self, target: str, start_h: int, end_h: int):
@@ -273,7 +282,7 @@ class PlanningLib:
             traj_2d = self.plan_breakthrough_target(self.agent.traj[-1], target)
         elif target == 'aggregate_point':
             # 多机汇合点
-            print(f"[{self.agent.name}] is act aggregating to rendezvous point, merge_peers: {self.agent.merge_peers}")
+            self.log(f"[{self.agent.name}] is act aggregating to rendezvous point, merge_peers: {self.agent.merge_peers}")
             rendezvous_pos = self.agent.io.get_rendezvous_point(self.agent.merge_peers)
             traj_2d = self.planbreakthrough_target_location(self.agent.traj[-1], rendezvous_pos)
         else:
@@ -285,7 +294,7 @@ class PlanningLib:
         # 追加到当前完整轨迹
         # self.agent.traj.extend(traj_3d[1:])
 
-        print(f"{self.agent.name} is breaking through {target}, trajectory:\n{traj_3d}")
+        # print(f"{self.agent.name} is breaking through {target}, trajectory:\n{traj_3d}")
         return traj_3d
 
 
@@ -298,7 +307,7 @@ class PlanningLib:
         # self.agent.cur_reference_traj = traj_3d
         # self.agent.traj.extend(traj_3d[1:])
 
-        print(f"{self.agent.name} is escaping {target}, trajectory:\n{traj_3d}")
+        self.log(f"{self.agent.name} is escaping {target}, trajectory:\n{traj_3d}")
         return traj_3d
 
 
@@ -313,7 +322,7 @@ class PlanningLib:
         # self.agent.cur_reference_traj = traj_3d
         # self.agent.traj.extend(traj_3d[1:])
 
-        print(f"{self.agent.name} is detouring {target}, trajectory:\n{self.agent.cur_reference_traj}")
+        self.log(f"{self.agent.name} is detouring {target}, trajectory:\n{traj_3d}")
         return traj_3d
 
 
@@ -321,7 +330,7 @@ class PlanningLib:
         """
         执行攻击动作
         """
-        print(f"{self.agent.name} is attacking {target} ...")
+        self.log(f"{self.agent.name} is attacking {target} ...")
 
     def execute_join_formation(self, leader_id: str, off_x: float, off_y: float, off_z: float):
         """
@@ -332,7 +341,7 @@ class PlanningLib:
         self.agent.formation_state["leader_id"] = leader_id
         self.agent.formation_state["offset"] = np.array([off_x, off_y, off_z])
         
-        print(f"[{self.agent.name}] Joining Formation -> Leader: {leader_id}, Offset: {self.agent.formation_state['offset']}")
+        self.log(f"[{self.agent.name}] Joining Formation -> Leader: {leader_id}, Offset: {self.agent.formation_state['offset']}")
 
     def execute_leave_formation(self):
         """
@@ -350,7 +359,7 @@ class PlanningLib:
                  self.agent.traj = [[curr_pos['x'], curr_pos['y'], curr_pos['z']]]
                  self.agent.io.set_lookahead(self.agent.self_uid, 0)
 
-        print(f"[{self.agent.name}] ⚡ LEAVING FORMATION -> Independent Mode.")
+        self.log(f"[{self.agent.name}] ⚡ LEAVING FORMATION -> Independent Mode.")
 
 
 # ------------------------ 注册 BDI Action ------------------------ #
@@ -383,7 +392,7 @@ def register_planning_actions(self, actions):
         # 追加到当前完整轨迹
         self.traj.extend(traj_3d[1:])
 
-        print(f"{self.name} is breaking through {arg_target}, trajectory:\n{traj_3d}")
+        lib.log(f"{self.name} is breaking through {arg_target}, trajectory:\n{traj_3d}")
         # print(f"cur full trajectory: {self.traj}")
 
         # 如需写入 redis，可以在这里使用 self.io（如果有）
@@ -404,7 +413,7 @@ def register_planning_actions(self, actions):
         self.cur_reference_traj = traj_3d
         self.traj.extend(traj_3d[1:])
 
-        print(f"{self.name} is escaping {arg_target}, trajectory:\n{traj_3d}")
+        lib.log(f"{self.name} is escaping {arg_target}, trajectory:\n{traj_3d}")
         # print(f"cur full trajectory: {self.traj}")
         yield
 
@@ -421,15 +430,15 @@ def register_planning_actions(self, actions):
         self.cur_reference_traj = traj_3d
         self.traj.extend(traj_3d[1:])
 
-        print(f"{self.name} is detouring {arg_target}, trajectory:\n{self.cur_reference_traj}")
-        # print(f"cur full trajectory: {self.traj}")
+        lib.log(f"{self.name} is detouring {arg_target}, trajectory:\n{traj_3d}")
+        lib.log(f"cur full trajectory: {self.traj}")
         yield
 
     # ---------- 攻击（占位） ---------- #
     @actions.add(".act_attack", 1)
     def _action_attack(agent_, term, intention):
         arg = _ground(term.args[0], intention)
-        print(f"{self.name} is attacking {arg} ...")
+        lib.log(f"{self.name} is attacking {arg} ...")
         # 这里暂时只打印，后面你可以接火控/打击仿真
         yield
 
@@ -443,7 +452,7 @@ def register_planning_actions(self, actions):
         会把 self.traj[-1] 绑定到变量 X 上。
         """
         position = self.traj[-1]
-        print(f"{self.name} current position: {position}")
+        lib.log(f"{self.name} current position: {position}")
 
         var_term = term.args[0]
         v = _ground(var_term, intention)
@@ -484,7 +493,7 @@ def register_planning_actions(self, actions):
         然后根据条件决定是否在 ASL 层触发下一个任务。
         """
         arg = _ground(term.args[0], intention)
-        print(f"{self.name} checking join status: {arg}")
+        lib.log(f"{self.name} checking join status: {arg}")
 
         yield
 
@@ -501,7 +510,7 @@ def register_planning_actions(self, actions):
         self.formation_state["leader_id"] = leader_id
         self.formation_state["offset"] = np.array([off_x, off_y, off_z])
         
-        print(f"[{self.name}] Joining Formation -> Leader: {leader_id}, Offset: {self.formation_state['offset']}")
+        lib.log(f"[{self.name}] Joining Formation -> Leader: {leader_id}, Offset: {self.formation_state['offset']}")
         yield
         
     # ---------- 离开编队 (Leave Formation) ---------- #
@@ -519,7 +528,7 @@ def register_planning_actions(self, actions):
              self.traj = [[curr_pos['x'], curr_pos['y'], curr_pos['z']]]
              self.io.set_lookahead(self.self_uid, 0)
 
-        print(f"[{self.name}] ⚡ LEAVING FORMATION -> Independent Mode.")
+        lib.log(f"[{self.name}] ⚡ LEAVING FORMATION -> Independent Mode.")
         yield
 
 

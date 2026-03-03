@@ -333,7 +333,7 @@
     "from": 1,
     "to": 4,
     "attrs": {
-      "order_mode": "aggregate",
+      "order_mode": "singleton",
       "order_type": "breakthrough",
       "target": "hq_mark7",
       "fleet_no": "f1.2",
@@ -4389,7 +4389,7 @@
     "from": 3,
     "to": 4,
     "attrs": {
-      "order_mode": "aggregate",
+      "order_mode": "singleton",
       "order_type": "breakthrough",
       "target": "hq_mark7",
       "fleet_no": "f2.1",

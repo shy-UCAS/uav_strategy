@@ -369,6 +369,8 @@ if __name__ == "__main__":
         facilities_file_name = 'facilities.json'
     elif switch_config == 2:
         facilities_file_name = 'test_facilities_locations.json'
+    elif switch_config == 3:
+        facilities_file_name = 'facilities.json'
     facilities_file = os.path.join(current_dir,"data" ,facilities_file_name)
     visualizer = MapVisualizer(facilities_file=facilities_file)
 

@@ -1,0 +1,167 @@
+[
+    {
+        "from": 0,
+        "to": 1,
+        "attrs": {
+            "order_mode": "singleton",
+            "order_type": "breakthrough",
+            "target": "hq_mark6",
+            "fleet_no": "f1.1"
+        },
+        "members_num": 3
+    },
+    {
+        "from": 1,
+        "to": 4,
+        "attrs": {
+            "order_mode": "singleton",
+            "order_type": "breakthrough",
+            "target": "hq_mark7",
+            "fleet_no": "f1.2"
+        },
+        "members_num": 3
+    },
+    {
+        "from": 4,
+        "to": 5,
+        "attrs": {
+            "order_mode": "singleton",
+            "order_type": "breakthrough",
+            "target": "hq_mark1",
+            "fleet_no": "f1.3"
+        },
+        "members_num": 8
+    },
+    {
+        "from": 5,
+        "to": 2,
+        "attrs": {
+            "order_mode": "singleton",
+            "order_type": "breakthrough",
+            "target": "hq_mark5",
+            "fleet_no": "f1.4"
+        },
+        "members_num": 8
+    },
+    {
+        "from": 2,
+        "to": 14,
+        "attrs": {
+            "order_mode": "aggregate",
+            "order_type": "breakthrough",
+            "target": "hq_2",
+            "fleet_no": "f5.1"
+        },
+        "members_num": 8
+    },
+    {
+        "from": 3,
+        "to": 4,
+        "attrs": {
+            "order_mode": "singleton",
+            "order_type": "breakthrough",
+            "target": "hq_mark7",
+            "fleet_no": "f2.1"
+        },
+        "members_num": 4
+    },
+    {
+        "from": 6,
+        "to": 7,
+        "attrs": {
+            "order_mode": "singleton",
+            "order_type": "breakthrough",
+            "target": "hq_mark9",
+            "fleet_no": "f3.1"
+        },
+        "members_num": 4
+    },
+    {
+        "from": 7,
+        "to": 8,
+        "attrs": {
+            "order_mode": "singleton",
+            "order_type": "breakthrough",
+            "target": "hq_mark8",
+            "fleet_no": "f3.2"
+        },
+        "members_num": 4
+    },
+    {
+        "from": 8,
+        "to": 9,
+        "attrs": {
+            "order_mode": "singleton",
+            "order_type": "breakthrough",
+            "target": "hq_mark2",
+            "fleet_no": "f3.3"
+        },
+        "members_num": 4
+    },
+    {
+        "from": 9,
+        "to": 10,
+        "attrs": {
+            "order_mode": "singleton",
+            "order_type": "breakthrough",
+            "target": "hq_mark4",
+            "fleet_no": "f3.4"
+        },
+        "members_num": 4
+    },
+    {
+        "from": 10,
+        "to": 14,
+        "attrs": {
+            "order_mode": "aggregate",
+            "order_type": "breakthrough",
+            "target": "hq_2",
+            "fleet_no": "f5.2"
+        },
+        "members_num": 4
+    },
+    {
+        "from": 11,
+        "to": 12,
+        "attrs": {
+            "order_mode": "singleton",
+            "order_type": "breakthrough",
+            "target": "hq_mark10",
+            "fleet_no": "f4.1"
+        },
+        "members_num": 3
+    },
+    {
+        "from": 12,
+        "to": 13,
+        "attrs": {
+            "order_mode": "singleton",
+            "order_type": "breakthrough",
+            "target": "hq_mark3",
+            "fleet_no": "f4.2"
+        },
+        "members_num": 3
+    },
+    {
+        "from": 13,
+        "to": 14,
+        "attrs": {
+            "order_mode": "aggregate",
+            "order_type": "breakthrough",
+            "target": "hq_2",
+            "fleet_no": "f5.3"
+        },
+        "members_num": 3
+    },
+    {
+        "from": 14,
+        "to": 15,
+        "attrs": {
+            "order_mode": "singleton",
+            "order_type": "breakthrough",
+            "target": "hq_mark4",
+            "fleet_no": "f6.1"
+        },
+        "members_num": 17
+    }
+]

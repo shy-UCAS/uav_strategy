@@ -81,7 +81,7 @@ direction_range_set = {
     'detour': [0, 360]
 }
 
-switch_config = 1
+switch_config = 3
 
 current_dir = os.path.dirname(__file__)
 
@@ -103,6 +103,13 @@ elif switch_config == 2:
         ["2_0","2_1","2_2","3_0","3_1","5_1","5_2"],
         ["1_0","1_1","1_2","3_0","3_1","6_1","6_2"]
     ]
+elif switch_config == 3:
+    digraph_attrs_reference_path = os.path.join(current_dir, "data",'manual_plan_graph' ,"manual_plan_graph01.json")
+    facilities_file = os.path.join(current_dir,"data" ,"facilities.json")
+    key_paths = [[0, 1, 4, 5, 2, 14, 15],
+                    [3, 4, 5, 2, 14, 15],
+                    [6, 7, 8, 9, 10, 14, 15],
+                    [11, 12, 13, 14, 15]]
 
 key_path_instructions_path = os.path.join(current_dir,"data" ,"key-path-analyzer02.json")
 asl_file = os.path.join(current_dir, "uav_key_path.asl")
@@ -115,6 +122,13 @@ bdi_instructions = key_path_instructions["bdi_instructions"]
 # 1. 蓝方无人机智能体
 # =============================
 class BlueUAVAgent(BDIAgent):
+    VERBOSE = False  # 添加日志控制开关
+
+    def log(self, msg):
+        """可控的日志输出方法"""
+        if self.VERBOSE:
+            print(msg)
+
     def __init__(self, jid, password, asl_file, flight_plan, siblings_ref ,orchestrator, init_pos=None, facilities=facilities_file, **kwargs):
         super().__init__(jid, password, asl_file)
         self.flight_plan = flight_plan  # 航段列表: [{'segment': (u, v), 'coords': []}, ...]
@@ -144,7 +158,7 @@ class BlueUAVAgent(BDIAgent):
              # 尝试使用第一段航段的第一个坐标 (如果可用)
              # 但目前 extract_uav_trajectories 设置的 'coords' 是空的 (占位符)
              # 所以我们使用传入的 init_pos 或默认的随机逻辑
-             print("No initial position provided, generating random position.")
+             self.log("No initial position provided, generating random position.")
              _rdm_init_pos = bfunc.generate_circle_positions_from_diameter(1, init_loc1, init_loc2)
              self.position = _rdm_init_pos[0]
 
@@ -152,7 +166,7 @@ class BlueUAVAgent(BDIAgent):
         self.merge_peers = []
         self.traj = self._lnglat2utm_convertor.lng_lat_to_utm_array(np.array([self.position])).tolist()
         self.traj[0].append(self.position[2])
-        print(f"{self.jid} initialized at position: {self.position}")
+        self.log(f"{self.jid} initialized at position: {self.position}")
 
         # Redis I/O 模块
         self.io = UavRedisIO(**kwargs.get("redis_cfg", {}))
@@ -232,12 +246,12 @@ class BlueUAVAgent(BDIAgent):
             self.has_synced_segment = False
             self.current_segment_key = f"{cur_start_node}_{cur_end_node}"
             
-            print(f"[{self.self_uid}] Planning path from node {cur_start_node} to node {cur_end_node}")
+            self.log(f"[{self.self_uid}] Planning path from node {cur_start_node} to node {cur_end_node}")
             for digraph_attr in digraph_attrs:
                 if str(digraph_attr["from"]) == cur_start_node and str(digraph_attr["to"]) == cur_end_node:
                     _order_mode = digraph_attr['attrs']['order_mode']
                     _order_target = digraph_attr['attrs']['target']
-                    # 修改判断条件：只要是 aggregate 模式，无论目标是动态点还是固定设施，都进行 merge_peers 计算
+
                     if _order_mode == 'aggregate' and _order_target == 'aggregate_point':
                         self._merge_ready_flag = False
                         # 先清空或初始化一个临时列表
@@ -251,7 +265,7 @@ class BlueUAVAgent(BDIAgent):
                         
                         # 去重并固定顺序，保证日志与行为可复现
                         self.merge_peers = sorted(list(set(all_merge_peers)))
-                        print(
+                        self.log(
                             f"[{self.self_uid}] Merge peers for aggregation "
                             f"(target={_order_target}): {self.merge_peers}"
                         )
@@ -261,12 +275,12 @@ class BlueUAVAgent(BDIAgent):
                     # 获取当前航段的所有成员ID
                     cur_siblings_ids = self.siblings_ref.get((cur_start_node, cur_end_node), {}).get("uav_ids", [])
                     self.current_segment_siblings = cur_siblings_ids
-                    print(f"[{self.self_uid}] Current segment siblings: {cur_siblings_ids}")
+                    self.log(f"[{self.self_uid}] Current segment siblings: {cur_siblings_ids}")
                     # 检索当前航段的基准参考轨迹是否存在，如果不存在说明当前agent是第一个执行该航段的，需要设定参考基准轨迹，后续agent就可以直接获取
                     base_ref_traj = self.io.get_nodes_pair_base_ref_traj(cur_start_node, cur_end_node)
                     
                     if not base_ref_traj or len(base_ref_traj) == 0:    
-                        print(f"[{self.self_uid}] No base reference traj found for segment {cur_start_node}->{cur_end_node}. Now generate it.")
+                        self.log(f"[{self.self_uid}] No base reference traj found for segment {cur_start_node}->{cur_end_node}. Now generate it.")
                         # 1. 生成基准参考轨迹
                         base_ref_traj = self.planning_lib.execute_path_planning_from_digraph(digraph_attr, -1, -1)
                         # 存储基准参考轨迹
@@ -301,10 +315,10 @@ class BlueUAVAgent(BDIAgent):
                         for m_uid, m_traj in members_traj_map.items():
                             self.io.set_nodes_pair_member_traj(cur_start_node, cur_end_node, m_uid, m_traj)
                         
-                        print(f"[{self.self_uid}] Generated and saved trajectories for {len(members_traj_map)} members.")
+                        self.log(f"[{self.self_uid}] Generated and saved trajectories for {len(members_traj_map)} members.")
 
                     else:
-                        print(f"[{self.self_uid}] Found existing base reference trajectory for segment {cur_start_node} -> {cur_end_node}.")
+                        self.log(f"[{self.self_uid}] Found existing base reference trajectory for segment {cur_start_node} -> {cur_end_node}.")
                         # 尝试获取此航段的 formation_type
                         _ft = self.io.r.get(f"formation_type:{cur_start_node}:{cur_end_node}")
                         # 兼容 decode_responses=True 和 False 的情况
@@ -320,7 +334,7 @@ class BlueUAVAgent(BDIAgent):
                     my_traj = self.io.get_nodes_pair_member_traj(cur_start_node, cur_end_node, self.self_uid)
                     
                     if my_traj:
-                         print(f"[{self.self_uid}] Successfully retrieved my formation trajectory (len={len(my_traj)}).")
+                         self.log(f"[{self.self_uid}] Successfully retrieved my formation trajectory (len={len(my_traj)}).")
                          self.cur_reference_traj = my_traj
                          
                          #  保证轨迹是连续拼接
@@ -340,7 +354,7 @@ class BlueUAVAgent(BDIAgent):
 
                          self.bdi.set_belief("if_set_ref_traj", "true")
                     else:
-                         print(f"[{self.self_uid}] FAILED to retrieve formation trajectory after retries!")
+                         self.log(f"[{self.self_uid}] FAILED to retrieve formation trajectory after retries!")
 
             # 更新 path_index 以指向下一段航程
             current_idx = self.path_index
@@ -350,12 +364,12 @@ class BlueUAVAgent(BDIAgent):
                 next_end = self.flight_plan[next_idx][1]
                 
                 # 更新 BDI 信念，以便 agent 能够触发对下一段的处理
-                print(f"[{self.self_uid}] Segment planned. Prepared next belief: cur_nodes({next_start}, {next_end})")
+                self.log(f"[{self.self_uid}] Segment planned. Prepared next belief: cur_nodes({next_start}, {next_end})")
                 self.bdi.set_belief("cur_nodes", next_start, next_end)
                 self.path_index = next_idx
             else:
                  # 已经是最后一段
-                 print(f"[{self.self_uid}] All segments in flight plan are planned. Marking as final task.")
+                 self.log(f"[{self.self_uid}] All segments in flight plan are planned. Marking as final task.")
                  self.is_final_task = True
             
             # 将自己的状态设置为 ready，表示已经准备好执行任务（或者已经开始）
