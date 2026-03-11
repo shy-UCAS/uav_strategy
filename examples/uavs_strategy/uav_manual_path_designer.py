@@ -117,60 +117,66 @@ def compute_edge_members(paths, min_split_num=2):
 if __name__ == '__main__':
     # python -m examples.uavs_strategy.uav_manual_path_designer
     _plan_graph = nx.DiGraph()
-
-    _start_nodes = {
-        0: {'target': 'hq_mark11'},
-        3: {'target': 'hq_mark13'},
-        6: {'target': 'hq_mark14'},
-        11: {'target': 'hq_mark15'}
-    }
-    
-    # start from hq_mark11                       
-    _plan_graph.add_edge(0, 1, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark6", "fleet_no": "f1.1"})
-
-    _plan_graph.add_edge(1, 4, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark7", "fleet_no": "f1.2"})
-    
-    _plan_graph.add_edge(4, 5, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark1", "fleet_no": "f1.3"})
-    
-    _plan_graph.add_edge(5, 2, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark5", "fleet_no": "f1.4"})
-
-    # start from hq_mark13
-    _plan_graph.add_edge(3, 4, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark7", "fleet_no": "f2.1"})
-    
-    # start from hq_mark14
-    _plan_graph.add_edge(6, 7, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark9", "fleet_no": "f3.1"})
-    
-    _plan_graph.add_edge(7, 8, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark8", "fleet_no": "f3.2"})
-    
-    _plan_graph.add_edge(8, 9, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark2", "fleet_no": "f3.3"})
-    
-    _plan_graph.add_edge(9, 10, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark4", "fleet_no": "f3.4"})
-    
-    # start from hq_mark15
-    _plan_graph.add_edge(11, 12, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark10", "fleet_no": "f4.1"})
-    
-    _plan_graph.add_edge(12, 13, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark3", "fleet_no": "f4.2"})
-
-    # final aggregation
-    _plan_graph.add_edge(2, 14, **{"order_mode": "aggregate", "order_type": "breakthrough", "target": "hq_2", "fleet_no": "f5.1"})
-    
-    _plan_graph.add_edge(10, 14, **{"order_mode": "aggregate", "order_type": "breakthrough", "target": "hq_2", "fleet_no": "f5.2"})
-    
-    _plan_graph.add_edge(13, 14, **{"order_mode": "aggregate", "order_type": "breakthrough", "target": "hq_2", "fleet_no": "f5.3"})
-
-    _plan_graph.add_edge(14, 15, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark4", "fleet_no": "f6.1"})
-
+    switch_case = 1
     _digraph_with_attrs = []
+    if switch_case == 1:
+        _start_nodes = {
+            0: {'target': 'hq_mark11'},
+            3: {'target': 'hq_mark13'},
+            6: {'target': 'hq_mark14'},
+            11: {'target': 'hq_mark15'}
+        }
+        
+        # start from hq_mark11                       
+        _plan_graph.add_edge(0, 1, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark6", "fleet_no": "f1.1"})
 
-    _key_paths = [[0, 1, 4, 5, 2, 14, 15],
-                    [3, 4, 5, 2, 14, 15],
-                    [6, 7, 8, 9, 10, 14, 15],
-                    [11, 12, 13, 14, 15]]
-    key_paths = [
-        ["1_0","1_1","1_2","3_0","3_1","4_1","4_2"],
-        ["2_0","2_1","2_2","3_0","3_1","5_1","5_2"],
-        ["1_0","1_1","1_2","3_0","3_1","6_1","6_2"]
-    ]
+        _plan_graph.add_edge(1, 4, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark7", "fleet_no": "f1.2"})
+        
+        _plan_graph.add_edge(4, 5, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark1", "fleet_no": "f1.3"})
+        
+        _plan_graph.add_edge(5, 2, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark5", "fleet_no": "f1.4"})
+
+        # start from hq_mark13
+        _plan_graph.add_edge(3, 4, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark7", "fleet_no": "f2.1"})
+        
+        # start from hq_mark14
+        _plan_graph.add_edge(6, 7, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark9", "fleet_no": "f3.1"})
+        
+        _plan_graph.add_edge(7, 8, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark8", "fleet_no": "f3.2"})
+        
+        _plan_graph.add_edge(8, 9, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark2", "fleet_no": "f3.3"})
+        
+        _plan_graph.add_edge(9, 10, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark4", "fleet_no": "f3.4"})
+        
+        # start from hq_mark15
+        _plan_graph.add_edge(11, 12, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark10", "fleet_no": "f4.1"})
+        
+        _plan_graph.add_edge(12, 13, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark3", "fleet_no": "f4.2"})
+
+        # final aggregation
+        _plan_graph.add_edge(2, 14, **{"order_mode": "aggregate", "order_type": "breakthrough", "target": "hq_2", "fleet_no": "f5.1"})
+        
+        _plan_graph.add_edge(10, 14, **{"order_mode": "aggregate", "order_type": "breakthrough", "target": "hq_2", "fleet_no": "f5.2"})
+        
+        _plan_graph.add_edge(13, 14, **{"order_mode": "aggregate", "order_type": "breakthrough", "target": "hq_2", "fleet_no": "f5.3"})
+
+        _plan_graph.add_edge(14, 15, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark4", "fleet_no": "f6.1"})
+
+        
+
+        _key_paths = [[0, 1, 4, 5, 2, 14, 15],
+                        [3, 4, 5, 2, 14, 15],
+                        [6, 7, 8, 9, 10, 14, 15],
+                        [11, 12, 13, 14, 15]]
+    elif switch_case == 2:    
+        _key_paths = [
+            [0,1,2,3],
+            [0,2,3]
+        ]
+        _plan_graph.add_edge(0, 1, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark6", "fleet_no": "f1.1"})
+        _plan_graph.add_edge(1, 2, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark7", "fleet_no": "f1.2"})
+        _plan_graph.add_edge(2, 3, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark1", "fleet_no": "f1.3"})
+        _plan_graph.add_edge(0, 2, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark7", "fleet_no": "f2.1"})
 
 
     # 对 key_paths（含分离情况）计算

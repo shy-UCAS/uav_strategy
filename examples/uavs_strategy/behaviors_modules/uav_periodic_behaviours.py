@@ -7,7 +7,9 @@ from time import time, sleep
 from typing import TYPE_CHECKING
 from pyparsing import C
 from ray import state
+from regex import F
 from spade.behaviour import PeriodicBehaviour
+from sympy import true
 from examples.uavs_strategy.planning_modules import avoidance_agents as a_agents
 
 if TYPE_CHECKING:
@@ -15,7 +17,7 @@ if TYPE_CHECKING:
     from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
 
 # ==== 势场与步进参数 ====
-DT = 5.0      # 周期（秒）
+DT = 0.5       # 周期（秒）
 STEP = 8.0     # 每步“最大位移”/速度上限（米/步）
 K_ATT = 0.85   # 引力系数 (独立飞行时)
 K_ATT_FORM = 1.5 # 引力系数 (编队飞行时，需要更强的跟随力)
@@ -280,146 +282,6 @@ class APFStep(PeriodicBehaviour):
 
         print(f"[{agent.self_uid}] New position for {agent.self_uid}: {nxt}, target_loc: {traj[-1]}")
 
-class Single_APFStep(PeriodicBehaviour):
-    async def run(self):
-        agent: "BlueUAVAgent" = self.agent
-        io = agent.io
-        
-        # 将自己的 BDI 状态同步到 Redis (can_task_start)
-        my_can_start = agent.bdi.get_belief("can_task_start", "false") # 如果没获取到，默认为 "false"
-        # 注意：get_belief 返回的可能是 Tuple 或 None，需要解析一下
-        # 你的 ASL 定义: can_task_start(true). -> 所以这里获取的是 "can_task_start(true)" 这样的结构
-        # 简单起见，我们根据是否包含 "true" 来判断
-        state_val = "true" if "true" in str(my_can_start) else "false"
-        io.set_uav_state(agent.self_uid, "can_task_start", state_val)
-
-        if agent.merge_peers and state_val == "true":
-            # print(f"[{agent.self_uid}] Checking sync with peers: {agent.merge_peers}")
-            states = io.mget_uav_states(agent.merge_peers, "can_task_start")
-            all_ready = True
-            for pid, status in states.items():
-                if status != "true":
-                    all_ready = False
-                    # print(f"[{agent.self_uid}] Peer {pid} is NOT ready.")
-                    break
-            
-            if not all_ready:
-                # 如果同伴没准备好，自己就先原地等待，不要执行后面的运动计算
-                print(f"[{agent.self_uid}] Waiting for peers to be ready...")
-                return 
-            else:
-                 print(f"[{agent.self_uid}] All merge peers are READY!")
-                 # 只有首次满足时打印一下，避免刷屏
-                 if not hasattr(agent, "_merge_ready_flag") or not agent._merge_ready_flag:
-                     print(f"[{agent.self_uid}] All merge peers are READY! Proceeding.")
-                     agent._merge_ready_flag = True
-                     # 【补全逻辑】汇聚完成，统一触发下一段任务
-                     if hasattr(agent, "add_achievement_goal"):
-                        agent.add_achievement_goal("task_digraph")
-                     # 重置 merge_peer 防止重复进入
-                     # agent.merge_peers = []
-                 return # 【关键修复】触发后依然要等待BDI更新状态，防止飞回旧轨迹起点
-
-        # # 如果没有汇聚同伴，但状态是 "true" (单机任务完成)，也应该等待
-        # if state_val == "true":
-        #      return
-
-        # 0. 轨迹同步 (与 Formation 保持一致的这种写法更干净)
-        if_set_ref = agent.bdi.get_belief("if_set_ref_traj")
-        if if_set_ref:
-             val_str = if_set_ref[len("if_set_ref_traj("):-1]
-             if val_str == "true" and agent.cur_reference_traj:
-                 io.set_ref_traj(agent.self_uid, agent.cur_reference_traj)
-                 agent.bdi.set_belief("if_set_ref_traj", "false")
-                 print(f"[{agent.self_uid}] Trajectory synced to Redis.")
-
-        # 1. 获取状态与预瞄
-        # ----------------------------------------------------
-        me = io.get_pos(agent.self_uid, blue=True)
-        if not me: return
-
-        traj = agent.cur_reference_traj
-        if not traj: return
-
-        lookahead = io.get_lookahead(agent.self_uid)
-        max_idx = len(traj) - 1
-        lookahead = max(0, min(lookahead, max_idx)) # 修正索引边界
-        
-        target = traj[lookahead]
-        self_pos = [me["x"], me["y"], me["z"]]
-        
-        # 2. 检查任务结束 (借鉴 Formation 的逻辑，放在计算前或后都可以，放在前效率高)
-        # ----------------------------------------------------
-        # 优先使用 redis 里的距离计算（假设 io.get_dist_2d 已经在某处更新，或者我们自己算）
-        dist_to_target = v_norm(v_sub(target, self_pos))
-        
-        # 如果已经到了轨迹末端，且距离很近，认为段结束
-        if lookahead >= max_idx and dist_to_target <= CLOSE_TH:
-            # 或者使用 io.get_dist_2d(agent.self_uid) 如果它是全局终点距离
-            io.set_lookahead(agent.self_uid, 0)
-            agent.bdi.set_belief("can_task_start", True)
-
-            if agent.is_final_task:
-                agent.is_finished = True
-            else:
-                # 触发 BDI 下一步
-                if not agent.is_finished: # 防止重复触发
-                    if hasattr(agent, "add_achievement_goal") and not agent.merge_peers:
-                        agent.add_achievement_goal("task_digraph")
-                    print(f"[{agent.self_uid}] Segment completed (reached end).")
-            return
-
-        # 3. 物理计算 (改进斥力)
-        # ----------------------------------------------------
-        # 获取周围环境
-        agent.blue_ids = io.get_ids(blue=True)
-        all_blue_pos = io.mget_pos(agent.blue_ids, blue=True)
-        
-        # 引力
-        F_att = v_scale(v_sub(target, self_pos), K_ATT)
-        
-        # 斥力 (这里可以改进：区分不同类型的邻居)
-        F_rep = [0.0, 0.0, 0.0]
-        
-        # 简单的改进版斥力计算，不依赖复杂的外部库，保持轻量
-        for other_uid, other_data in all_blue_pos.items():
-            if other_uid == agent.self_uid or not other_data: continue
-            
-            other_pos = [other_data['x'], other_data['y'], other_data['z']]
-            dist = v_norm(v_sub(self_pos, other_pos))
-            
-            # 使用较大的安全距离，因为是独立飞行
-            d_safe = 15.0  
-            if dist < d_safe:
-                # 越近斥力指数级增大
-                rep_mag = K_REP * (1.0/dist - 1.0/d_safe) * 50.0 
-                rep_dir = v_unit(v_sub(self_pos, other_pos))
-                F_rep = v_add(F_rep, v_scale(rep_dir, rep_mag))
-
-        # 合成
-        # F_total = v_add(F_att, F_rep)
-        F_total = F_att  # 先只用引力测试效果
-        # 速度限制/归一化 (Formation 里用了 nxt = curr + Force，这里建议加一个限幅)
-        # 这样能防止斥力过大时飞出地球
-        # force_mag = v_norm(F_total)
-        # if force_mag > STEP:
-        #     F_total = v_scale(v_unit(F_total), STEP)
-
-        nxt = v_add(self_pos, F_total)
-
-        # 4. 状态更新写入 Redis
-        # ----------------------------------------------------
-        # 推进 Lookahead (阈值判定)
-        if dist_to_target <= CLOSE_TH and lookahead < max_idx:
-            io.set_lookahead(agent.self_uid, lookahead + 1)
-            # 这种快速推进可以让飞机在直线上飞得更快，转弯时自动减速
-
-        # 写入
-        io.set_pos(agent.self_uid, nxt[0], nxt[1], nxt[2])
-        io.append_traj_points(agent.self_uid, nxt)
-        
-        # print (可选，减少日志垃圾)
-        # print(f"[{agent.self_uid}] Pos: {[round(x,1) for x in nxt]} -> Target: {lookahead}")
 # 世界状态查询行为
 class FetchWorldState(PeriodicBehaviour):
     async def run(self):
@@ -442,49 +304,52 @@ class SyncAPFStep(PeriodicBehaviour):
     VERBOSE = False  # Set False to disable print logs
 
     def log(self, *args):
+        from datetime import datetime
+        ms_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        msg = f"[{ms_time}] " + " ".join(map(str, args))
         if self.VERBOSE:
-            print(*args)
+            print(msg)
+        if hasattr(self, "agent"):
+            if not hasattr(self.agent, "step_logs"):
+                self.agent.step_logs = []
+            self.agent.step_logs.append(msg)
 
     async def run(self):
         agent: "BlueUAVAgent" = self.agent
         io = agent.io
         # 向redis写入参考轨迹
-        self._sync_trajectory(agent, io)
+        # self._sync_trajectory(agent, io)
 
         # 获取状态
         state = self._get_agent_state(agent, io)
         if not state:
+            self.log(f"[{agent.self_uid}] Cannot get agent state, skipping step.")
             return
         me, traj, lookahead, max_idx, target, self_pos, _ = state
 
         # 检查同步检查点，返回True表示需要等待
         if self._sync_state_checkpoint(agent, io):
             self.log(f"[{agent.self_uid}] Waiting at sync checkpoint.")
-            self._record_wait_state(agent, io)
+            self._record_wait_state(agent, io, target=target)
             return
 
-        # # 等待下一段任务
-        # if getattr(agent, "waiting_next_segment", False):
-        #      self.log(f"[{agent.self_uid}] Waiting for next segment.")
-        #      self._record_wait_state(agent, io, self_pos)
-        #      return
-
+        if not state:
+            raise ValueError("Cannot get agent state for checkpoint sync.")
+        me, traj, lookahead, max_idx, target, self_pos, dist2target = state
         # 物理计算
         nxt = self._calculate_physics(agent, io, target, self_pos)
         # 计算移动后的真实误差 (决定是否到达/同步)
         dist_after_move = v_norm_2d(v_sub_2d(target, nxt))
 
         # 状态更新写入 Redis, 包括Lookahead推进 logic
-        self._update_status_and_redis(agent, io, nxt, lookahead, max_idx, dist_after_move)
+        self._update_status_and_redis(agent, io, nxt, lookahead, max_idx, dist_after_move, target)
         
         # 检查当前任务是否结束
-        self._check_task_completion(agent, io, lookahead, max_idx, dist_after_move)
+        # self._check_task_completion(agent, io, lookahead, max_idx, dist_after_move)
 
 
 
-
-
-    def _record_wait_state(self, agent: "BlueUAVAgent", io: "UavRedisIO", pos=None):
+    def _record_wait_state(self, agent: "BlueUAVAgent", io: "UavRedisIO", pos=None, target=None):
         """辅助函数：记录当前位置为等待状态（悬停）"""
         if pos is None:
              me = io.get_pos(agent.self_uid, blue=True)
@@ -511,13 +376,23 @@ class SyncAPFStep(PeriodicBehaviour):
         # global_step_id 自增
         agent.global_step_id += 1
 
+        from time import time
+        current_logs = getattr(agent, "step_logs", []).copy()
+        if hasattr(agent, "step_logs"):
+            agent.step_logs.clear()
+
         extra_info = {
             "cur_siblings_ids": s_ids,
             "formation_type": f_type,
             "frame_id": frame_id,
+            "lookahead": lookahead,
             "global_id": agent.global_step_id,
             "segment_key": segment_key,
             "is_waiting": True,
+            "leader_id": leader_id,
+            "timestamp": time(),
+            'lookahead_coord': target if target else None,
+            "logs": current_logs,
         }
 
         # 使用组合原子更新
@@ -561,22 +436,10 @@ class SyncAPFStep(PeriodicBehaviour):
                             self.log(f"[{agent.self_uid}] Peer {pid} at segment {seg_key} not synced, waiting for {target_sync_key}.")
                             break
                     if all_synced:
-                        # # 判断谁是最后到达的 UAV
-                        # last_arrival_uid = self._find_last_arrival(
-                        #     agent, io, target_sync_key, agent.current_segment_siblings
-                        # )
-                        # self.log(f"[{agent.self_uid}] All siblings are SYNCED for segment start. "
-                        #       f"Last arrival: {last_arrival_uid}")
-                        # if last_arrival_uid == agent.self_uid:
-                        #     io.set_lookahead(agent.self_uid, 1)  # 从0开始飞行
-                        #     return True
-                        # else:
-                        #     return False
                         self.log(f"[{agent.self_uid}] All siblings are SYNCED for segment start.")
                         for pid in agent.current_segment_siblings:
                             io.set_lookahead(pid, 1)
-                        return True                       
-
+                        return True     
                     else:
                         self.log(f"[{agent.self_uid}] Waiting for peers to sync for segment start.")
                         return True
@@ -640,43 +503,6 @@ class SyncAPFStep(PeriodicBehaviour):
             return sorted(agent.current_segment_siblings)[0]
         return agent.self_uid
 
-    def _find_last_arrival(self, agent: "BlueUAVAgent", io: "UavRedisIO",
-                           segment_key: str, siblings: list) -> str:
-        """判断当前航段同步点中，谁是最后到达的 UAV。
-        
-        通过比较 Redis 中 segment_arrival:{segment_key} 哈希表里
-        各成员记录的到达时间戳，返回时间戳最大（最晚到达）的 uid。
-        """
-        arrival_key = f"segment_arrival:{segment_key}"
-        all_arrivals = io.r.hgetall(arrival_key)
-        
-        if not all_arrivals:
-            return agent.self_uid  # fallback
-        
-        # 解析时间戳（兼容 bytes / str）
-        parsed = {}
-        for uid, ts in all_arrivals.items():
-            uid_str = uid.decode('utf-8') if isinstance(uid, bytes) else uid
-            ts_str = ts.decode('utf-8') if isinstance(ts, bytes) else ts
-            try:
-                parsed[uid_str] = float(ts_str)
-            except (ValueError, TypeError):
-                continue
-        
-        if not parsed:
-            return agent.self_uid  # fallback
-        
-        # 找最大时间戳对应的 uid
-        last_uid = max(parsed, key=parsed.get)
-        
-        # 打印所有成员的到达顺序（按时间排序）
-        sorted_arrivals = sorted(parsed.items(), key=lambda x: x[1])
-        arrival_order = [f"{uid}(+{ts - sorted_arrivals[0][1]:.2f}s)" 
-                         for uid, ts in sorted_arrivals]
-        self.log(f"[{agent.self_uid}] Arrival order for {segment_key}: {' -> '.join(arrival_order)}")
-        
-        return last_uid
-
     def _get_agent_state(self, agent: "BlueUAVAgent", io: "UavRedisIO"):
         """2. 获取状态: 位置、轨迹、进度等"""
         me = io.get_pos(agent.self_uid, blue=True)
@@ -712,46 +538,11 @@ class SyncAPFStep(PeriodicBehaviour):
         
         return me, traj, lookahead, max_idx, target, self_pos, dist_to_target
 
-    def _sync_segment_start(self, agent: "BlueUAVAgent", io: "UavRedisIO", lookahead, dist_to_target, self_pos):
-        """ 3. 段起点同步：起点协同 """
-        if lookahead == 0 and dist_to_target <= CLOSE_TH_SYNC and agent.current_segment_siblings:
-             # 检查是否已为当前段同步
-            if not getattr(agent, "has_synced_segment", False):
-                # A. 标记自己正在等待当前特定的 Segment
-                target_sync_key = getattr(agent, "current_segment_key", "unknown")
-                io.set_uav_state(agent.self_uid, "current_segment_sync", target_sync_key)
-                
-                # B. 检查队友状态
-                peers_to_check = [p for p in agent.current_segment_siblings if p != agent.self_uid]
-                
-                if peers_to_check:
-                    peer_states = io.mget_uav_states(peers_to_check, "current_segment_sync")
-                    all_arrived = True
-                    for p, s in peer_states.items():
-                        if s != target_sync_key:
-                            all_arrived = False
-                            break
-                    
-                    if not all_arrived:
-                        # 还没齐，继续执行后续的物理循环，在起点附近动态盘旋
-                        return False
-                    else:
-                        self.log(f"[{agent.self_uid}] All siblings synced at start of {target_sync_key}. Starting!")
-                        agent.has_synced_segment = True
-                        # io.set_lookahead(agent.self_uid, 1)
-                else:
-                    agent.has_synced_segment = True
-                    # io.set_lookahead(agent.self_uid, 1)
-        
-        return True
-
     def _check_task_completion(self, agent: "BlueUAVAgent", io: "UavRedisIO", lookahead, max_idx, dist_to_target):
         """4. 检查任务结束"""
         if lookahead >= max_idx:
             # 清理状态与重置
-            io.set_uav_state(agent.self_uid, "current_segment_sync", "finished")
-            agent.has_synced_segment = False
-            io.set_uav_sync_state(agent.self_uid, agent.has_synced_segment)
+            # io.set_uav_state(agent.self_uid, "current_segment_sync", "finished")
             # 是否所有任务彻底结束
             if agent.is_final_task:
                 agent.is_finished = True
@@ -768,6 +559,39 @@ class SyncAPFStep(PeriodicBehaviour):
             agent.bdi.set_belief("can_task_start", True)
             return True
         return False
+    
+    # def _check_task_completion(self, agent: "BlueUAVAgent", io: "UavRedisIO", lookahead, max_idx, dist_to_target):
+    #     """4. 检查任务结束"""
+    #     # 清理状态与重置
+    #     io.set_uav_state(agent.self_uid, f"{agent.current_segment_key}_current_segment_sync", "finished")
+    #     is_all_finished = True
+    #     for pid in agent.current_segment_siblings:
+    #         peer_sync_state = io.get_uav_state(pid, f"{agent.current_segment_key}_current_segment_sync")
+    #         if peer_sync_state != "finished":
+    #             is_all_finished = False
+    #             self.log(f"[{agent.self_uid}] Peer {pid} not finished yet (state: {peer_sync_state}).")
+    #             break
+    #     if is_all_finished:
+    #         agent.has_synced_segment = False
+    #         io.set_uav_sync_state(agent.self_uid, agent.has_synced_segment)
+    #         # 是否所有任务彻底结束
+    #         if agent.is_final_task:
+    #             agent.is_finished = True
+    #             self.log(f"[{agent.self_uid}] Final task completed.")
+    #         else:
+    #             # 准备下一段：重置Lookahead并等待新指令
+    #             agent.waiting_next_segment = True
+    #             # io.set_lookahead(agent.self_uid, 0)
+    #             # 触发下一个BDI规划
+    #             agent.add_achievement_goal("task_digraph")
+    #             self.log(f"[{agent.self_uid}] Segment completed. Waiting next.")
+
+    #         # 通用信号：通知ASL层任务完成（触发can_task_start -> !task_digraph）
+    #         agent.bdi.set_belief("can_task_start", True)
+    #         return True
+    #     else:
+    #         return False
+
 
     def _calculate_physics(self, agent: "BlueUAVAgent", io: "UavRedisIO", target, self_pos):
         """5. 物理计算: 引力 + 斥力"""
@@ -783,7 +607,7 @@ class SyncAPFStep(PeriodicBehaviour):
         # nxt = v_add(self_pos, F_total) 
         return nxt
 
-    def _update_status_and_redis(self, agent: "BlueUAVAgent", io: "UavRedisIO", nxt, lookahead, max_idx, dist_to_target):
+    def _update_status_and_redis(self, agent: "BlueUAVAgent", io: "UavRedisIO", nxt, lookahead, max_idx, dist_to_target,target=None):
         """6. 状态更新与 Redis 写入: 推进 lookahead 及记录轨迹"""
         # 记录额外信息
         f_type = getattr(agent, "formation_type", "unknown")
@@ -793,21 +617,43 @@ class SyncAPFStep(PeriodicBehaviour):
         if lookahead == 0:
              if not getattr(agent, "has_synced_segment", False):
                  is_gathering = True
-        
+        waiting_message = "False"
         if is_gathering:
              f_type = "unknown"
-             s_ids = []
+
+             waiting_message = "flying to start"
              
         # global_step_id 自增
         agent.global_step_id += 1
+        self.log(f"[{agent.self_uid}] Step {agent.global_step_id}: lookahead={lookahead}, dist_to_target={dist_to_target:.2f}, waiting_message={waiting_message}")
+
+        if dist_to_target <= CLOSE_TH_SYNC and lookahead <= max_idx:
+            if getattr(agent, "has_synced_segment", False):
+                self.log(f"[{agent.self_uid}] move forward {dist_to_target} meters [DEBUG_ADVANCE] Increasing lookahead {lookahead} -> {lookahead + 1}")
+                # 只有在已经同步了当前段的情况下才推进lookahead,否则说明agent还在飞往起点，不能推进lookahead
+                io.set_lookahead(agent.self_uid, lookahead + 1)
+
+        self._check_task_completion(agent, io, lookahead, max_idx, dist_to_target)
+
+        from time import time
+        current_logs = getattr(agent, "step_logs", []).copy()
+        if hasattr(agent, "step_logs"):
+            agent.step_logs.clear()
 
         extra_info = {
             "cur_siblings_ids": s_ids,
             "formation_type": f_type,
             "frame_id": lookahead,
+            "lookahead": lookahead,
             "global_id": agent.global_step_id,
             "segment_key": getattr(agent, "current_segment_key", None),
-            "is_waiting": False,
+            "is_waiting": waiting_message,
+            "dist_to_target": dist_to_target,
+            "leader_id": self._get_leader_id(agent),
+            'lookahead_coord': target if target else None,
+            "timestamp": time(),
+            'phase_state': agent.has_synced_segment,
+            "logs": current_logs,
         }
         
         # [DEBUG PRINT]
@@ -816,8 +662,552 @@ class SyncAPFStep(PeriodicBehaviour):
         # 使用组合原子更新
         io.append_pos_traj_with_extra(agent.self_uid, nxt, extra_info, blue=True)
 
-        if dist_to_target <= CLOSE_TH and lookahead <= max_idx:
-            if getattr(agent, "has_synced_segment", False):
-                self.log(f"[{agent.self_uid}] move forward {dist_to_target} meters [DEBUG_ADVANCE] Increasing lookahead {lookahead} -> {lookahead + 1}")
-                # 只有在已经同步了当前段的情况下才推进lookahead,否则说明agent还在飞往起点，不能推进lookahead
-                io.set_lookahead(agent.self_uid, lookahead + 1)
+class GlobalRoundCoordinator(PeriodicBehaviour):
+    VERBOSE = False
+
+    def log(self, *args):
+        from datetime import datetime
+        ms_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        msg = f"[{ms_time}] " + " ".join(map(str, args))
+        if self.VERBOSE:
+            print(msg)
+
+    def _ensure_round_initialized(self, io: "UavRedisIO"):
+        cur = io.get_world_state("sim_round")
+        if cur is None:
+            io.set_world_state("sim_round", 0)
+            return 0
+        return int(cur)
+
+    async def run(self):
+        io = self.agent.io
+        current_round = self._ensure_round_initialized(io)
+
+        all_blue_ids = sorted(io.get_ids(blue=True))
+        if not all_blue_ids:
+            return
+
+        round_done_map = io.mget_uav_states(all_blue_ids, "round_done")
+
+        all_done = True
+        for uid in all_blue_ids:
+            v = round_done_map.get(uid)
+            if v is None or int(v) != current_round:
+                all_done = False
+                break
+
+        if all_done:
+            io.set_world_state("sim_round", current_round + 1)
+
+class SyncAPFStepEnhance(PeriodicBehaviour):
+    VERBOSE = False  # Set False to disable print logs
+
+    # =========================
+    # 基础日志
+    # =========================
+    def log(self, *args):
+        from datetime import datetime
+        ms_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        msg = f"[{ms_time}] " + " ".join(map(str, args))
+        if self.VERBOSE:
+            print(msg)
+        if hasattr(self, "agent"):
+            if not hasattr(self.agent, "step_logs"):
+                self.agent.step_logs = []
+            self.agent.step_logs.append(msg)
+
+    # =========================
+    # 运行主入口
+    # =========================
+    async def run(self):
+        agent: "BlueUAVAgent" = self.agent
+        io = agent.io
+
+        # 1) 确保 world round 已初始化
+        current_round = self._ensure_world_round_initialized(io)
+
+        # 2) 防止同一无人机在同一 round 内重复执行
+        last_done = self._get_agent_round_done(agent, io)
+        if last_done is not None and last_done == current_round:
+            return
+
+        # 3) 获取状态
+        state = self._get_agent_state(agent, io)
+        if not state:
+            self.log(f"[{agent.self_uid}] Cannot get agent state, skipping round {current_round}.")
+            self._mark_agent_round_done(agent, io, current_round)
+            return
+
+        me, traj, lookahead, max_idx, target, self_pos, _ = state
+
+        # 4) 检查同步检查点，返回 True 表示需要等待
+        if self._sync_state_checkpoint(agent, io, current_round):
+            self.log(f"[{agent.self_uid}] Waiting at sync checkpoint. round={current_round}")
+            self._record_wait_state(agent, io, target=target, current_round=current_round)
+            self._mark_agent_round_done(agent, io, current_round)
+            return
+
+        # 5) 再读一次状态，因为 checkpoint 中可能把 lookahead 从 0 -> 1
+        state = self._get_agent_state(agent, io)
+        if not state:
+            self.log(f"[{agent.self_uid}] Cannot get agent state after checkpoint, skipping round {current_round}.")
+            self._mark_agent_round_done(agent, io, current_round)
+            return
+
+        me, traj, lookahead, max_idx, target, self_pos, dist2target = state
+
+        # 6) 物理计算
+        nxt = self._calculate_physics(agent, io, target, self_pos)
+
+        # 7) 计算移动后的真实误差
+        dist_after_move = v_norm_2d(v_sub_2d(target, nxt))
+
+        # 8) 写回状态
+        self._update_status_and_redis(
+            agent=agent,
+            io=io,
+            nxt=nxt,
+            lookahead=lookahead,
+            max_idx=max_idx,
+            dist_to_target=dist_after_move,
+            target=target,
+            current_round=current_round,
+        )
+
+        # 9) 标记本 round 已完成
+        self._mark_agent_round_done(agent, io, current_round)
+
+    # =========================
+    # world round / round_done
+    # =========================
+    def _ensure_world_round_initialized(self, io: "UavRedisIO"):
+        cur = io.get_world_state("sim_round")
+        if cur is None:
+            io.set_world_state("sim_round", 0)
+            return 0
+        return int(cur)
+
+    def _get_current_round(self, io: "UavRedisIO"):
+        cur = io.get_world_state("sim_round")
+        if cur is None:
+            raise ValueError("sim_round is not initialized in Redis/world state.")
+        return int(cur)
+
+    def _get_agent_round_done(self, agent: "BlueUAVAgent", io: "UavRedisIO"):
+        val = self._get_single_uav_state(io, agent.self_uid, "round_done")
+        if val is None or val == "":
+            return None
+        return int(val)
+
+    def _mark_agent_round_done(self, agent: "BlueUAVAgent", io: "UavRedisIO", current_round: int):
+        io.set_uav_state(agent.self_uid, "round_done", str(current_round))
+
+    # =========================
+    # 基础状态读写辅助
+    # =========================
+    def _get_single_uav_state(self, io: "UavRedisIO", uid, key):
+        if hasattr(io, "get_uav_state"):
+            return io.get_uav_state(uid, key)
+        data = io.mget_uav_states([uid], key)
+        return data.get(uid)
+
+    def _get_segment_group_ids(self, agent: "BlueUAVAgent"):
+        peers = list(getattr(agent, "current_segment_siblings", []) or [])
+        return sorted(set(peers + [agent.self_uid]))
+
+    def _get_leader_id(self, agent: "BlueUAVAgent"):
+        group_ids = self._get_segment_group_ids(agent)
+        return group_ids[0] if group_ids else agent.self_uid
+
+    # =========================
+    # 带 round 戳的 release
+    # =========================
+    def _get_segment_release_info(self, agent: "BlueUAVAgent", io: "UavRedisIO"):
+        leader_id = self._get_leader_id(agent)
+
+        release_key = self._get_single_uav_state(io, leader_id, "current_segment_release")
+        release_round = self._get_single_uav_state(io, leader_id, "current_segment_release_round")
+
+        if release_round is not None and release_round != "":
+            release_round = int(release_round)
+        else:
+            release_round = None
+
+        return release_key, release_round
+
+    def _set_segment_release_info(
+        self,
+        agent: "BlueUAVAgent",
+        io: "UavRedisIO",
+        segment_key: str,
+        round_id: int,
+    ):
+        leader_id = self._get_leader_id(agent)
+        io.set_uav_state(leader_id, "current_segment_release", segment_key)
+        io.set_uav_state(leader_id, "current_segment_release_round", str(round_id))
+
+    def _mark_arrived_at_segment_start(self, agent: "BlueUAVAgent", io: "UavRedisIO", segment_key: str):
+        agent.has_synced_segment = True
+        io.set_uav_state(agent.self_uid, "current_segment_sync", segment_key)
+        io.set_uav_state(agent.self_uid, f"{segment_key}_segment_arrive", "arrived")
+
+    def _all_group_arrived(self, agent: "BlueUAVAgent", io: "UavRedisIO", segment_key: str):
+        group_ids = self._get_segment_group_ids(agent)
+        states = io.mget_uav_states(group_ids, "current_segment_sync")
+
+        for pid in group_ids:
+            if states.get(pid) != segment_key:
+                self.log(
+                    f"[{agent.self_uid}] Peer {pid} current_segment_sync={states.get(pid)} "
+                    f"!= target segment {segment_key}"
+                )
+                return False
+        return True
+
+    # =========================
+    # 记录等待状态
+    # =========================
+    def _record_wait_state(self, agent: "BlueUAVAgent", io: "UavRedisIO", pos=None, target=None, current_round=None):
+        """辅助函数：记录当前位置为等待状态（悬停）"""
+        if pos is None:
+            me = io.get_pos(agent.self_uid, blue=True)
+            if me:
+                pos = [me["x"], me["y"], me["z"]]
+            else:
+                return
+
+        f_type = getattr(agent, "formation_type", "unknown")
+        s_ids = getattr(agent, "current_segment_siblings", [])
+
+        lookahead = io.get_lookahead(agent.self_uid) or 0
+        is_gathering = (lookahead == 0 and not getattr(agent, "has_synced_segment", False))
+
+        if is_gathering:
+            f_type = "is_gathering"
+            s_ids = []
+
+        leader_id = self._get_leader_id(agent)
+        frame_id = None
+        segment_key = getattr(agent, "current_segment_key", None)
+
+        agent.global_step_id += 1
+
+        from time import time
+        current_logs = getattr(agent, "step_logs", []).copy()
+        if hasattr(agent, "step_logs"):
+            agent.step_logs.clear()
+
+        extra_info = {
+            "cur_siblings_ids": s_ids,
+            "formation_type": f_type,
+            "frame_id": frame_id,
+            "lookahead": lookahead,
+            "global_id": agent.global_step_id,
+            "segment_key": segment_key,
+            "is_waiting": True,
+            "leader_id": leader_id,
+            "timestamp": time(),
+            "lookahead_coord": target if target else None,
+            "round_id": current_round,
+            "logs": current_logs,
+        }
+
+        io.append_pos_traj_with_extra(agent.self_uid, pos, extra_info, blue=True)
+
+    # =========================
+    # 起始 barrier（最终版）
+    # =========================
+    def _sync_state_checkpoint(self, agent: "BlueUAVAgent", io: "UavRedisIO", current_round: int):
+        """
+        返回:
+            False -> 本 round 可以继续执行
+            True  -> 本 round 需要等待
+
+        核心规则：
+        1. 到达起点，只登记 arrived，不直接飞
+        2. 全员 arrived 后，只写 release(segment_key, release_round=current_round)，本 round 仍等待
+        3. 只有在后续 round，且满足 release_round < current_round 时，才允许 lookahead 0 -> 1
+        """
+
+        # 同步 BDI can_task_start
+        my_can_start = agent.bdi.get_belief("can_task_start", "false")
+        state_val = "true" if "true" in str(my_can_start) else "false"
+        io.set_uav_state(agent.self_uid, "can_task_start", state_val)
+
+        lookahead = io.get_lookahead(agent.self_uid) or 0
+
+        # 已经开始飞，不再参与起始 barrier
+        if lookahead > 0:
+            self.log(f"[{agent.self_uid}] Already started flight, no checkpoint wait needed.")
+            return False
+
+        state = self._get_agent_state(agent, io)
+        if not state:
+            raise ValueError("Cannot get agent state for checkpoint sync.")
+
+        me, traj, lookahead, max_idx, target, self_pos, dist2target = state
+        segment_key = getattr(agent, "current_segment_key", "unknown")
+
+        my_sync_key = self._get_single_uav_state(io, agent.self_uid, "current_segment_sync")
+        release_key, release_round = self._get_segment_release_info(agent, io)
+
+        # -------------------------------------------------------
+        # A. 消费旧 release
+        # -------------------------------------------------------
+        # 只有 release_round < current_round 才允许启动。
+        # 同 round 新写入的 release，本 round 不可消费。
+        # -------------------------------------------------------
+        if (
+            my_sync_key == segment_key
+            and release_key == segment_key
+            and release_round is not None
+            and release_round < current_round
+        ):
+            io.set_lookahead(agent.self_uid, 1)
+            self.log(
+                f"[{agent.self_uid}] Consume release for segment={segment_key}, "
+                f"release_round={release_round}, current_round={current_round}, "
+                f"lookahead 0 -> 1"
+            )
+            return False
+
+        # -------------------------------------------------------
+        # B. 还没到起始点：继续向起始点推进
+        # -------------------------------------------------------
+        # 此时不能等待 barrier，因为自己还没进入 barrier
+        # -------------------------------------------------------
+        if my_sync_key != segment_key and dist2target > CLOSE_TH_SYNC:
+            self.log(
+                f"[{agent.self_uid}] Not at segment start yet. "
+                f"dist2target={dist2target:.3f} > CLOSE_TH_SYNC={CLOSE_TH_SYNC}"
+            )
+            return False
+
+        # -------------------------------------------------------
+        # C. 到了起始点，但还没登记：只登记，不起飞
+        # -------------------------------------------------------
+        if my_sync_key != segment_key and dist2target <= CLOSE_TH_SYNC:
+            self._mark_arrived_at_segment_start(agent, io, segment_key)
+            self.log(
+                f"[{agent.self_uid}] Arrived at start and marked sync. "
+                f"segment={segment_key}, round={current_round}"
+            )
+            return True
+
+        # 单机段不需要 barrier，但仍然保持 round 规则一致
+        group_ids = self._get_segment_group_ids(agent)
+        if len(group_ids) <= 1:
+            io.set_lookahead(agent.self_uid, 1)
+            self.log(f"[{agent.self_uid}] Single-agent segment, lookahead 0 -> 1")
+            return False
+
+        # -------------------------------------------------------
+        # D. 已经登记 arrived，检查是不是全员都 arrived
+        # -------------------------------------------------------
+        if not self._all_group_arrived(agent, io, segment_key):
+            self.log(
+                f"[{agent.self_uid}] Waiting for all peers to arrive. "
+                f"group={group_ids}, segment={segment_key}"
+            )
+            return True
+
+        # -------------------------------------------------------
+        # E. 全员已到，但 release 不存在：本 round 只写 release，不起飞
+        # -------------------------------------------------------
+        if release_key != segment_key:
+            self._set_segment_release_info(agent, io, segment_key, current_round)
+            self.log(
+                f"[{agent.self_uid}] All peers arrived. "
+                f"Release latched for segment={segment_key}, release_round={current_round}. "
+                f"This round still waits."
+            )
+            return True
+
+        # -------------------------------------------------------
+        # F. release 已存在，但如果 release_round == current_round，
+        #    说明它就是本 round 刚写进去的，本 round 仍不能消费
+        # -------------------------------------------------------
+        self.log(
+            f"[{agent.self_uid}] Release exists but not consumable yet. "
+            f"segment={segment_key}, release_round={release_round}, current_round={current_round}"
+        )
+        return True
+
+    # =========================
+    # BDI merge 检查（保留）
+    # =========================
+    def _sync_bdi_state(self, agent: "BlueUAVAgent", io: "UavRedisIO"):
+        my_can_start = agent.bdi.get_belief("can_task_start", "false")
+        state_val = "true" if "true" in str(my_can_start) else "false"
+        io.set_uav_state(agent.self_uid, "can_task_start", state_val)
+
+        if agent.merge_peers and state_val == "true":
+            states = io.mget_uav_states(agent.merge_peers, "can_task_start")
+            all_ready = True
+            for pid, status in states.items():
+                if status != "true":
+                    all_ready = False
+                    break
+
+            if all_ready:
+                if not hasattr(agent, "_merge_ready_flag") or not agent._merge_ready_flag:
+                    self.log(f"[{agent.self_uid}] All merge peers are READY! Proceeding.")
+                    agent._merge_ready_flag = True
+                    agent.add_achievement_goal("task_digraph")
+
+            return False
+
+        return True
+
+    # =========================
+    # 获取状态
+    # =========================
+    def _get_agent_state(self, agent: "BlueUAVAgent", io: "UavRedisIO"):
+        me = io.get_pos(agent.self_uid, blue=True)
+        if not me:
+            return None
+
+        traj = agent.cur_reference_traj
+        if not traj:
+            return None
+
+        lookahead = io.get_lookahead(agent.self_uid)
+        if lookahead is None:
+            self.log(f"[{agent.self_uid}] lookahead not set, defaulting to 0.")
+            lookahead = 0
+
+        max_idx = len(traj) - 1
+        lookahead = max(0, min(lookahead, max_idx))
+
+        target = traj[lookahead]
+        self_pos = [me["x"], me["y"], me["z"]]
+        dist_to_target = v_norm_2d(v_sub_2d(target, self_pos))
+        self.log(
+            f"[{agent.self_uid}] lookahead: {lookahead}, target: {target}, dist_to_target: {dist_to_target}"
+        )
+
+        return me, traj, lookahead, max_idx, target, self_pos, dist_to_target
+
+    # =========================
+    # 任务完成检查
+    # =========================
+    def _check_task_completion(self, agent: "BlueUAVAgent", io: "UavRedisIO", lookahead, max_idx, dist_to_target):
+        if lookahead >= max_idx:
+            if agent.is_final_task:
+                agent.is_finished = True
+                self.log(f"[{agent.self_uid}] Final task completed.")
+            else:
+                agent.waiting_next_segment = True
+                agent.add_achievement_goal("task_digraph")
+                self.log(f"[{agent.self_uid}] Segment completed. Waiting next.")
+
+            agent.bdi.set_belief("can_task_start", True)
+            return True
+        return False
+
+    # =========================
+    # 物理计算
+    # =========================
+    def _calculate_physics(self, agent: "BlueUAVAgent", io: "UavRedisIO", target, self_pos):
+        if not hasattr(agent, "cached_blue_ids") or not agent.cached_blue_ids:
+            agent.cached_blue_ids = io.get_ids(blue=True)
+
+        all_blue_pos = io.mget_pos(agent.cached_blue_ids, blue=True)
+
+        F_att = v_scale(v_sub(target, self_pos), K_ATT)
+        F_total = F_att
+
+        # 这里仍保留你的强同步写法
+        nxt = target
+        # nxt = v_add(self_pos, F_total)
+        return nxt
+
+    # =========================
+    # 状态更新与 Redis 写入
+    # =========================
+    def _update_status_and_redis(
+        self,
+        agent: "BlueUAVAgent",
+        io: "UavRedisIO",
+        nxt,
+        lookahead,
+        max_idx,
+        dist_to_target,
+        target=None,
+        current_round=None,
+    ):
+        """
+        注意：
+        - lookahead == 0 表示仍在“飞向段起点 / 起始 barrier”
+        - 这一阶段即使已经到达，也只能登记 arrived，不能自己推进到 1
+        - 只有 _sync_state_checkpoint() 消费旧 release 时，才允许 0 -> 1
+        """
+        f_type = getattr(agent, "formation_type", "unknown")
+        s_ids = getattr(agent, "current_segment_siblings", [])
+
+        is_gathering = False
+        if lookahead == 0 and not getattr(agent, "has_synced_segment", False):
+            is_gathering = True
+
+        waiting_message = "False"
+        if is_gathering:
+            f_type = "unknown"
+            waiting_message = "flying to start"
+
+        agent.global_step_id += 1
+        self.log(
+            f"[{agent.self_uid}] Step {agent.global_step_id}: "
+            f"lookahead={lookahead}, dist_to_target={dist_to_target:.2f}, "
+            f"waiting_message={waiting_message}, round={current_round}"
+        )
+
+        if dist_to_target <= CLOSE_TH_SYNC and lookahead <= max_idx:
+            if lookahead == 0:
+                # barrier 阶段：只登记 arrived，不推进 lookahead
+                if not getattr(agent, "has_synced_segment", False):
+                    target_sync_key = getattr(agent, "current_segment_key", "unknown")
+                    self._mark_arrived_at_segment_start(agent, io, target_sync_key)
+                    self.log(
+                        f"[{agent.self_uid}] Reached gathering start point at segment={target_sync_key}. "
+                        f"Arrival marked only, waiting for release."
+                    )
+            else:
+                # 正常飞行阶段：才允许推进 lookahead
+                if getattr(agent, "has_synced_segment", False):
+                    self.log(
+                        f"[{agent.self_uid}] move forward {dist_to_target:.2f} meters "
+                        f"[DEBUG_ADVANCE] Increasing lookahead {lookahead} -> {lookahead + 1}"
+                    )
+                    io.set_lookahead(agent.self_uid, lookahead + 1)
+
+        self._check_task_completion(agent, io, lookahead, max_idx, dist_to_target)
+
+        from time import time
+        current_logs = getattr(agent, "step_logs", []).copy()
+        if hasattr(agent, "step_logs"):
+            agent.step_logs.clear()
+
+        release_key, release_round = self._get_segment_release_info(agent, io)
+
+        extra_info = {
+            "cur_siblings_ids": s_ids,
+            "formation_type": f_type,
+            "frame_id": lookahead,
+            "lookahead": lookahead,
+            "global_id": agent.global_step_id,
+            "segment_key": getattr(agent, "current_segment_key", None),
+            "is_waiting": waiting_message,
+            "dist_to_target": dist_to_target,
+            "leader_id": self._get_leader_id(agent),
+            "lookahead_coord": target if target else None,
+            "timestamp": time(),
+            "round_id": current_round,
+            "phase_state": {
+                "has_synced_segment": getattr(agent, "has_synced_segment", False),
+                "release_key": release_key,
+                "release_round": release_round,
+            },
+            "logs": current_logs,
+        }
+
+        io.append_pos_traj_with_extra(agent.self_uid, nxt, extra_info, blue=True)

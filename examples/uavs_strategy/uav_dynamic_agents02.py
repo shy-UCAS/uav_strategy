@@ -32,14 +32,14 @@ from matplotlib.animation import FuncAnimation
 from datetime import datetime
 from sympy import N
 
-
+from spade.agent import Agent
 from spade_bdi.bdi import BDIAgent
 from spade.behaviour import PeriodicBehaviour
 from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
 from examples.uavs_strategy.planning_modules.uav_planning_actions import PlanningLib
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
 from examples.uavs_strategy.planning_modules.formation_generator import FormationGenerator3D, Formation_Elements
-from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FormationAPFStep, Single_APFStep, FetchWorldState, SyncAPFStep ,DT
+from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FetchWorldState, SyncAPFStep, RobustFormationAPF, SyncAPFStepEnhance, GlobalRoundCoordinator, testAPF, DT
 from examples.uavs_strategy.key_path_analyzer import KeyPathAnalyzer
 
 init_loc1 = [
@@ -110,6 +110,13 @@ elif switch_config == 3:
                     [3, 4, 5, 2, 14, 15],
                     [6, 7, 8, 9, 10, 14, 15],
                     [11, 12, 13, 14, 15]]
+elif switch_config == 4:
+    digraph_attrs_reference_path = os.path.join(current_dir, "data","digraph_with_attrs03.json")
+    facilities_file = os.path.join(current_dir,"data" ,"facilities.json")
+    key_paths = [
+                [0,1,2,3],
+                [0,2,3]
+            ]
 
 key_path_instructions_path = os.path.join(current_dir,"data" ,"key-path-analyzer02.json")
 asl_file = os.path.join(current_dir, "uav_key_path.asl")
@@ -128,9 +135,13 @@ class BlueUAVAgent(BDIAgent):
         """可控的日志输出方法"""
         if self.VERBOSE:
             print(msg)
+        if not hasattr(self, "step_logs"):
+            self.step_logs = []
+        self.step_logs.append(msg)
 
     def __init__(self, jid, password, asl_file, flight_plan, siblings_ref ,orchestrator, init_pos=None, facilities=facilities_file, **kwargs):
         super().__init__(jid, password, asl_file)
+        from time import time
         self.flight_plan = flight_plan  # 航段列表: [{'segment': (u, v), 'coords': []}, ...]
         self.siblings_ref = siblings_ref
         self.orchestrator = orchestrator
@@ -158,9 +169,10 @@ class BlueUAVAgent(BDIAgent):
              # 尝试使用第一段航段的第一个坐标 (如果可用)
              # 但目前 extract_uav_trajectories 设置的 'coords' 是空的 (占位符)
              # 所以我们使用传入的 init_pos 或默认的随机逻辑
-             self.log("No initial position provided, generating random position.")
+
              _rdm_init_pos = bfunc.generate_circle_positions_from_diameter(1, init_loc1, init_loc2)
              self.position = _rdm_init_pos[0]
+             self.log(f"{self.jid} no initial position provided, generated random position: {self.position}")
 
         # 汇聚时sibling无人机列表
         self.merge_peers = []
@@ -175,14 +187,18 @@ class BlueUAVAgent(BDIAgent):
         self.io.set_pos(self.self_uid, self.traj[0][0], self.traj[0][1], self.position[2])
         self.io.set_traj(self.self_uid, [[self.traj[0][0], self.traj[0][1], self.position[2]]])
         self.io.set_lookahead(self.self_uid, 0)
-        
+
+        self.io.set_uav_state(self.self_uid, "round_done", "-1")
+        self.io.set_uav_state(self.self_uid, "current_segment_sync", "")
+        self.io.set_uav_state(self.self_uid, "can_task_start", "false")
+
         # 同步属性
         self.current_segment_siblings = []
         self.current_segment_key = None
         self.has_synced_segment = False
         self.io.set_uav_sync_state(self.self_uid, False)
 
-        self.APFStep = SyncAPFStep
+        self.APFStep = SyncAPFStepEnhance
         self.FetchWorldState = FetchWorldState
         self.planning_lib = PlanningLib(self)
         self.cur_reference_traj = []
@@ -198,6 +214,31 @@ class BlueUAVAgent(BDIAgent):
         
         self.formation_type = "unknown" # 初始化队形类型
         self.global_step_id = 0 # 全局步数ID，不随航段清零
+        self.segment_step_id = 0 # 航段内步数ID，只能由leader在确认所有人执行了一次操作后更新，每个航段开始时清零
+        self.my_ack = -1 # 当前航段内自身的确认状态
+
+
+        extra_info = {
+            "cur_siblings_ids": 'initializing',  # 初始状态没有兄弟无人机
+            "formation_type": "unknown",  # 初始状态未知编队类型
+            "my_ack": f"{self.my_ack} initializing",
+            "frame_id": f"{self.segment_step_id} initializing",
+            'lookahead': f"0",
+            "global_id": f"{self.global_step_id} initializing",
+            "segment_key": 'initializing',
+            "is_waiting": 'initializing',
+            'dist_to_target': 'initializing',
+            'lookahead_coord': None,
+            'phase_state': 'initializing',
+            'leader_id': 'initializing',
+            "timestamp": time(),
+            "logs": getattr(self, "step_logs", []).copy()
+        }
+        if hasattr(self, "step_logs"):
+            self.step_logs.clear()
+        # 与 set_traj 写入的初始轨迹点对齐，保证 traj 和 traj_extra 长度一致
+        self.io.set_traj_extra(self.self_uid, [extra_info])
+        
 
     def _default_facilities(self, default_json_path=None):
         if default_json_path is None:
@@ -228,7 +269,7 @@ class BlueUAVAgent(BDIAgent):
 
     async def setup(self):
         # 注册周期任务
-        self.add_behaviour(SyncAPFStep(period=DT))
+        self.add_behaviour(self.APFStep(period=DT))
         
     def add_custom_actions(self, actions):
         @actions.add(".act_digraph_path_planning", 2)
@@ -244,6 +285,9 @@ class BlueUAVAgent(BDIAgent):
             
             # 为新航段重置同步标志位
             self.has_synced_segment = False
+            self.io.set_uav_state(self.self_uid, "current_segment_sync", "")
+            self.io.set_uav_state(self.self_uid, "can_task_start", "false")
+            self.io.set_lookahead(self.self_uid, 0)
             self.current_segment_key = f"{cur_start_node}_{cur_end_node}"
             
             self.log(f"[{self.self_uid}] Planning path from node {cur_start_node} to node {cur_end_node}")
@@ -352,7 +396,20 @@ class BlueUAVAgent(BDIAgent):
                             #      print(f"[{self.self_uid}] Detect gap ({dist:.2f}m) between segments. Keeping full trajectory.")
                             #      self.traj.extend(my_traj)
 
-                         self.bdi.set_belief("if_set_ref_traj", "true")
+                         if self.cur_reference_traj:
+                            self.io.set_ref_traj(self.self_uid, self.cur_reference_traj)
+                            self.io.set_lookahead(self.self_uid, 0)
+                            # if self.APFStep != SyncAPFStep or self.APFStep != SyncAPFStepEnhance:
+                            #     self.io.set_uav_state(self.self_uid, "current_segment_sync", self.current_segment_key)
+                            self.io.set_uav_state(self.self_uid, "can_task_start", "false")
+                            self.bdi.set_belief("if_set_ref_traj", "false")
+                            self.waiting_next_segment = False
+                            self.log(f"[{self.self_uid}] Trajectory synced to Redis.")
+                            self.my_ack = -1 # 重置确认状态
+                            self.segment_step_id = 0 # 重置航段内步数
+                            self.io.set_uav_state(self.self_uid, f"{self.current_segment_key}_segment_step_id", f"{self.segment_step_id}")
+                            self.io.set_uav_state(self.self_uid, f"{self.current_segment_key}_ack", f"{self.my_ack}")
+                             
                     else:
                          self.log(f"[{self.self_uid}] FAILED to retrieve formation trajectory after retries!")
 
@@ -380,6 +437,15 @@ class BlueUAVAgent(BDIAgent):
             # 暂时我们只在这里处理路径规划本身的逻辑。
 
             yield
+
+class RoundCoordinatorAgent(Agent):
+    def __init__(self, jid, password, redis_cfg=None):
+        super().__init__(jid, password)
+        self.redis_cfg = redis_cfg or {}
+
+    async def setup(self):
+        self.io = UavRedisIO(**self.redis_cfg)
+        self.add_behaviour(GlobalRoundCoordinator(period=max(0.05, DT / 4.0)))
 
 class MissionOrchestrator:
     """结合key_path_analyzer.log数据, 生成 Persistent Agents 并管理生命周期"""
@@ -496,27 +562,32 @@ class MissionOrchestrator:
             # 开始位置? 可以在此处指定, 也可以随机
             await self._spawn_persistent_agent(agent_id, flight_plan)
 
-        # 监控任务
-        while self.active_agents:
-            current_ids = list(self.active_agents.keys())
-            all_done = True
-            for aid in current_ids:
-                agent = self.active_agents[aid]
-                if not agent.is_finished:
-                    all_done = False
-                else:
-                    # 如果已完成, 进行清理 (占位)
-                    pass 
-            
-            if all_done:
-                print("Stopping all agents...")
-                for agent in self.active_agents.values():
-                    await agent.stop()
-                break
-            await asyncio.sleep(1.0)
-            
-        print("All persistent missions completed.")
-        self.save_trajectories()
+        try:
+            # 监控任务
+            while self.active_agents:
+                current_ids = list(self.active_agents.keys())
+                all_done = True
+                for aid in current_ids:
+                    agent = self.active_agents[aid]
+                    if not agent.is_finished:
+                        all_done = False
+                    else:
+                        # 如果已完成, 进行清理 (占位)
+                        pass 
+                
+                if all_done:
+                    print("Stopping all agents...")
+                    for agent in self.active_agents.values():
+                        await agent.stop()
+                    break
+                await asyncio.sleep(1.0)
+                
+            print("All persistent missions completed.")
+        except BaseException as e:
+            print(f"Mission interrupted: {e}")
+        finally:
+            print("Saving trajectories before exiting...")
+            self.save_trajectories()
 
     async def _spawn_persistent_agent(self, agent_name, flight_plan):
         jid = f"{agent_name}@{self.server}"
@@ -661,33 +732,60 @@ class MissionOrchestrator:
             
         print(f"All data saved to {output_file}")
 
-
-
-
-
 async def start_agent(server, password):
-    # 清空 Redis 数据库，防止历史数据干扰
     try:
-        # 假设 Redis 运行在本地默认端口
         r_conn = redis.Redis(host='127.0.0.1', port=6379, db=0)
         r_conn.flushdb()
         print("[System] uav_dynamic_agents02 with Redis database flushed successfully.")
     except Exception as e:
         print(f"[System] Warning: Failed to flush Redis: {e}")
 
+    # 初始化全局 round
+    io = UavRedisIO()
+    io.set_world_state("sim_round", 0)
 
-    # bdi_instructions = KeyPathAnalyzer(key_paths).generate_bdi_instructions()
-    # print(f"BDI instructions: {json.dumps(bdi_instructions, indent=2)}")
-    orchestrator = MissionOrchestrator(
-        json_data=digraph_attrs,
-        key_paths=key_paths,
-        server=server,
-        password=password,
-        asl_file=asl_file,
-        BlueBDIAgentTemplate=BlueUAVAgent
-    )
+    # 启动 round coordinator
+    coordinator = RoundCoordinatorAgent(f"round_coordinator@{server}", password)
+    await coordinator.start()
+
+    try:
+        orchestrator = MissionOrchestrator(
+            json_data=digraph_attrs,
+            key_paths=key_paths,
+            server=server,
+            password=password,
+            asl_file=asl_file,
+            BlueBDIAgentTemplate=BlueUAVAgent
+        )
+        await orchestrator.run()
+    finally:
+        await coordinator.stop()
+
+
+
+# async def start_agent(server, password):
+#     # 清空 Redis 数据库，防止历史数据干扰
+#     try:
+#         # 假设 Redis 运行在本地默认端口
+#         r_conn = redis.Redis(host='127.0.0.1', port=6379, db=0)
+#         r_conn.flushdb()
+#         print("[System] uav_dynamic_agents02 with Redis database flushed successfully.")
+#     except Exception as e:
+#         print(f"[System] Warning: Failed to flush Redis: {e}")
+
+
+#     # bdi_instructions = KeyPathAnalyzer(key_paths).generate_bdi_instructions()
+#     # print(f"BDI instructions: {json.dumps(bdi_instructions, indent=2)}")
+#     orchestrator = MissionOrchestrator(
+#         json_data=digraph_attrs,
+#         key_paths=key_paths,
+#         server=server,
+#         password=password,
+#         asl_file=asl_file,
+#         BlueBDIAgentTemplate=BlueUAVAgent
+#     )
     
-    await orchestrator.run()
+#     await orchestrator.run()
 
 if __name__ == "__main__":
     # 启动代码：python -m examples.uavs_strategy.uav_dynamic_agents02

@@ -8,7 +8,7 @@
             "target": "hq_mark6",
             "fleet_no": "f1.1"
         },
-        "members_num": 3
+        "members_num": 4
     },
     {
         "from": 1,
@@ -19,7 +19,7 @@
             "target": "hq_mark7",
             "fleet_no": "f1.2"
         },
-        "members_num": 3
+        "members_num": 4
     },
     {
         "from": 4,
@@ -63,7 +63,7 @@
             "target": "hq_mark7",
             "fleet_no": "f2.1"
         },
-        "members_num": 4
+        "members_num": 3
     },
     {
         "from": 6,
@@ -74,7 +74,7 @@
             "target": "hq_mark9",
             "fleet_no": "f3.1"
         },
-        "members_num": 4
+        "members_num": 3
     },
     {
         "from": 7,
@@ -85,7 +85,7 @@
             "target": "hq_mark8",
             "fleet_no": "f3.2"
         },
-        "members_num": 4
+        "members_num": 3
     },
     {
         "from": 8,
@@ -96,7 +96,7 @@
             "target": "hq_mark2",
             "fleet_no": "f3.3"
         },
-        "members_num": 4
+        "members_num": 3
     },
     {
         "from": 9,
@@ -107,7 +107,7 @@
             "target": "hq_mark4",
             "fleet_no": "f3.4"
         },
-        "members_num": 4
+        "members_num": 3
     },
     {
         "from": 10,
@@ -118,7 +118,7 @@
             "target": "hq_2",
             "fleet_no": "f5.2"
         },
-        "members_num": 4
+        "members_num": 3
     },
     {
         "from": 11,
@@ -162,6 +162,6 @@
             "target": "hq_mark4",
             "fleet_no": "f6.1"
         },
-        "members_num": 17
+        "members_num": 16
     }
 ]

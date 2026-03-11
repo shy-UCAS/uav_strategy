@@ -1,53 +1,47 @@
 ﻿import redis
 import time
-import matplotlib.pyplot as plt
 import json
 import numpy as np
 import os.path as osp
 import os
-from matplotlib.widgets import RectangleSelector
-from matplotlib.animation import FuncAnimation
+import sys
+
+# matplotlib 必须使用 FigureCanvasQTAgg 嵌入到 PyQt5
+import matplotlib
+matplotlib.use('Qt5Agg')
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.figure import Figure
+
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
+                             QPushButton, QLabel, QWidget, QTextEdit)
+from PyQt5.QtCore import Qt, QTimer
+
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
 from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import DT
 from examples.uavs_strategy.uav_dynamic_agents02 import switch_config
+
+
 class MapVisualizer:
     """
-    地图可视化类，负责从Redis中读取无人机数据并绘制实时地图。
+    地图可视化核心类，负责从Redis中读取无人机数据并绘制地图。
+    移除了原有的自定义框选逻辑，完全交由 Matplotlib 原生 Toolbar 处理缩放和平移。
     """
-
     def __init__(self, redis_host='127.0.0.1', redis_port=6379, facilities_file=None):
-        """
-        初始化MapVisualizer类。
-
-        :param redis_host: Redis服务器的主机地址，默认为127.0.0.1。
-        :param redis_port: Redis服务器的端口，默认为6379。
-        :param facilities_file: 设施文件路径，默认为None。
-        """
-        # Redis配置
         self.redis_host = redis_host
         self.redis_port = redis_port
         self.r = redis.StrictRedis(host=self.redis_host, port=self.redis_port, db=0)
-        self.r.flushdb()
 
-        # 加载设施信息
         self.facilities = self._default_facilities(facilities_file)
-        self.custom_xlim = None
-        self.custom_ylim = None
-        self.is_zoomed = False
-        self.zoom_selector = None
-        self.zoom_margin = 200
-        self._fig = None
-        self._ax = None
-
+        
+        # 保存最新获取的数据供 UI 面板显示
+        self.latest_positions = {}
+        self.latest_extra_info = {}
+        
+        # 标记是否为第一次绘制，用于初始化坐标系范围
+        self.first_draw = True 
 
     def _default_facilities(self, default_json_path=None):
-        """
-        加载设施的默认数据。
-
-        :param default_json_path: 设施数据的JSON文件路径，默认为None。
-        :return: 返回一个设施对象。
-        """
-        # 默认路径：设施信息数据
         if default_json_path is None:
             _facilities_info_json = osp.join(bfunc.WS_ROOT, 'data', 'test_facilities_locations.json')
             print(f"Using default facilities file: {_facilities_info_json}")
@@ -59,43 +53,7 @@ class MapVisualizer:
 
         return bfunc.Facilities(_facilities_info['facilities_str'], _facilities_info['defence_rings'])
 
-    def get_drone_positions_and_traj(self, blue=True):
-        """
-        获取蓝方或红方无人机的当前位置信息和历史轨迹数据。
-
-        :param blue: 是否获取蓝方数据，默认为True。
-        :return: 返回无人机的位置信息和轨迹数据。
-        """
-        # 获取UAV的ID
-        ids = self.r.smembers("uav:ids" if blue else "red:ids")
-        print(f"UAV {'Blue' if blue else 'Red'} IDs: {ids}")
-        ids = [uid.decode('utf-8') for uid in ids]
-
-
-        # 获取每个UAV的当前位置和轨迹数据
-        positions = {}
-        traj_data = {}
-        for uid in ids:
-            pos = self.r.get(f"uav:{uid}:pos")
-            traj_raw = self.r.get(f"uav:{uid}:traj")
-            print(f"get uav:{uid}:pos: {pos}, get uav:{uid}:traj: {traj_raw}")
-            if pos:
-                positions[uid] = json.loads(pos.decode('utf-8'))  # 解码并存储位置信息
-            if traj_raw:
-                # String -> JSON list，例如 [[x,y,z], [x,y,z], ...]
-                traj_list = json.loads(traj_raw.decode('utf-8'))
-                traj_data[uid] = traj_list
-        print(f"UAV {'Blue' if blue else 'Red'} Positions: {positions}")
-        return positions, traj_data
-
     def get_drone_states(self, blue=True):
-        """
-        读取 UAV 当前状态：
-        - 当前位置 pos
-        - 实际轨迹 traj
-        - 预设轨迹 ref_traj
-        - 预设轨迹当前索引 lookahead
-        """
         ids = self.r.smembers("uav:ids" if blue else "red:ids")
         ids = [uid.decode('utf-8') for uid in ids]
 
@@ -103,267 +61,287 @@ class MapVisualizer:
         traj_data = {}
         ref_traj_data = {}
         lookahead_data = {}
+        extra_info_data = {}
 
         for uid in ids:
             pos = self.r.get(f"uav:{uid}:pos")
-            traj_raw = self.r.get(f"uav:{uid}:traj")  # 你现在用 String(JSON) 存轨迹
+            traj_raw = self.r.get(f"uav:{uid}:traj")
             ref_raw = self.r.get(f"uav:{uid}:ref_traj")
             lookahead_raw = self.r.get(f"uav:{uid}:lookahead")
+            extra_raw = self.r.get(f"uav:{uid}:traj_extra")
 
             if pos:
                 positions[uid] = json.loads(pos.decode('utf-8'))
-
             if traj_raw:
-                traj_data[uid] = json.loads(traj_raw.decode('utf-8'))  # [[x,y,z], ...]
-
+                traj_data[uid] = json.loads(traj_raw.decode('utf-8'))
             if ref_raw:
-                ref_traj_data[uid] = json.loads(ref_raw.decode('utf-8'))  # [[x,y,z], ...]
-
+                ref_traj_data[uid] = json.loads(ref_raw.decode('utf-8'))
             if lookahead_raw:
                 try:
                     lookahead_data[uid] = int(lookahead_raw.decode('utf-8'))
                 except ValueError:
                     pass
+            if extra_raw:
+                extra_list = json.loads(extra_raw.decode('utf-8'))
+                if extra_list:
+                    extra_info_data[uid] = extra_list[-1]  # 取最新一条
 
-        return positions, traj_data, ref_traj_data, lookahead_data
-
-    def visualize(self, blue=True):
-        """
-        可视化当前蓝方或红方无人机的位置信息和轨迹。
-
-        :param blue: 是否显示蓝方数据，默认为True。
-        """
-        # 获取UAV的当前位置和轨迹数据
-        positions, traj_data = self.get_drone_positions_and_traj(blue)
-
-        # 创建绘图
-        fig, ax = plt.subplots()
-
-        # 绘制设施信息
-        self.plot_facilities(ax)
-
-        # 绘制UAV的位置和轨迹
-        for uid, pos in positions.items():
-            # 绘制当前位置信息
-            ax.plot(pos['x'], pos['y'], 'go', label=f'{uid} Position')
-
-            # 绘制历史轨迹
-            traj = traj_data.get(uid, [])
-            if traj:
-                traj = np.array(traj)
-                ax.plot(traj[:, 0], traj[:, 1], label=f'{uid} Trajectory')
-
-        ax.set_title(f"{'Blue' if blue else 'Red'} UAVs - Positions and Trajectories")
-        ax.set_xlabel('X Coordinate')
-        ax.set_ylabel('Y Coordinate')
-        ax.legend()
-        plt.show()
+        return positions, traj_data, ref_traj_data, lookahead_data, extra_info_data
 
     def plot_facilities(self, ax):
-        """
-        绘制设施信息和防御圈。
-
-        :param ax: Matplotlib的轴对象，用于绘制设施。
-        """
         if self.facilities:
-            # 绘制防空设施
             for _fac, _utm_xy in self.facilities.antiairs.items():
                 ax.plot(_utm_xy[0], _utm_xy[1], 'ro', label=f'{_fac} Antiair')
-
-            # 绘制指挥所设施
             for _fac, _utm_xy in self.facilities.headquartors.items():
                 ax.plot(_utm_xy[0], _utm_xy[1], 'bo', label=f'{_fac} Headquarters')
-
-            # 绘制探测设施
             for _fac, _utm_xy in self.facilities.probers.items():
                 ax.plot(_utm_xy[0], _utm_xy[1], 'go', label=f'{_fac} Prober')
-
-            # 绘制防御环（如果需要）
             for _fac, _utm_xy in self.facilities.defend_rings.items():
                 ax.fill(_utm_xy[: ,0], _utm_xy[: ,1], alpha=0.2, label=f'{_fac} Defence Ring')
 
-    def update_plot(self, frame, ax, blue=True):
-        ax.clear()  # 清除上一帧
-        self._restore_zoom_artists(ax)
+    def update_plot(self, ax, blue=True):
+        """核心绘图函数，由 QTimer 定期调用"""
         
-        # 设置标题和坐标轴
+        # 如果不是第一次绘制，先记录当前的缩放/平移视角范围
+        if not self.first_draw:
+            current_xlim = ax.get_xlim()
+            current_ylim = ax.get_ylim()
+
+        ax.clear()
+        
         ax.set_title(f"{'Blue' if blue else 'Red'} UAVs - Real-time Monitor")
         ax.set_xlabel('X (UTM)')
         ax.set_ylabel('Y (UTM)')
 
-        positions, traj_data, ref_traj_data, lookahead_data = self.get_drone_states(blue)
+        positions, traj_data, ref_traj_data, lookahead_data, extra_info_data = self.get_drone_states(blue)
+        self.latest_positions = positions  # 保存供 UI 使用
+        self.latest_extra_info = extra_info_data  # 保存供 UI 面板使用
         
-        # 获取当前时间戳（毫秒）
         now_ms = int(time.time() * 1000)
-
-        # 画设施
         self.plot_facilities(ax)
 
         for uid, pos in positions.items():
-            # 判断该无人机是否“活跃” (2秒内有更新)
             is_active = False
-            if 'ts' in pos:
-                if abs(now_ms - pos['ts']) < 2000:
-                    is_active = True
+            if 'ts' in pos and abs(now_ms - pos['ts']) < 2000:
+                is_active = True
 
-            # # 1. 实际飞行轨迹（历史） - 始终显示
-            # # 即使是停止的无人机，也保留其轨迹线
-            # traj = traj_data.get(uid, [])
-            # if traj:
-            #     traj_arr = np.array(traj)  # [[x,y,z],...]
-            #     # 活跃的用实线，非活跃的可以用虚线或透明度区别，这里统一用实线
-            #     style = '-' 
-            #     alpha = 1.0 if is_active else 0.4  # 非活跃的变淡
-            #     ax.plot(traj_arr[:, 0], traj_arr[:, 1],
-            #             style, linewidth=1.5, alpha=alpha, label=f'{uid} Path')
-
-            # 2. 当前无人机位置
-            # 活跃状态正常显示，不活跃状态变浅
             alpha_val = 1.0 if is_active else 0.4
             text_color = 'black' if is_active else 'gray'
             
             ax.plot(pos['x'], pos['y'], 'go', markersize=8, alpha=alpha_val, label=f'{uid} Pos')
-            # 添加文字标签
-            ax.text(pos['x'], pos['y'], uid, fontsize=9, color=text_color, fontweight='bold', alpha=alpha_val)
 
-            # 3. 预设轨迹 - 只显示活跃的
+            # 构建地图上的标注文本：uid + extra_info 摘要
+            extra = extra_info_data.get(uid, {})
+            map_label = uid
+            if extra:
+                seg = extra.get('segment_key', '')
+                fmt = extra.get('formation_type', '')
+                fid = extra.get('frame_id', '')
+                waiting = extra.get('is_waiting', False)
+                status_tag = '[W]' if waiting else ''
+                map_label = f"{uid} {status_tag}\nSeg:{seg} F:{fmt}\nFrame:{fid}"
+            ax.text(pos['x'], pos['y'], map_label, fontsize=7, color=text_color,
+                    fontweight='bold', alpha=alpha_val, va='bottom')
+
             if is_active:
                 ref_traj = ref_traj_data.get(uid, [])
                 if ref_traj:
-                    ref_arr = np.array(ref_traj)  # [[x,y,z],...]
-                    ax.plot(ref_arr[:, 0], ref_arr[:, 1],
-                            '--', linewidth=1, color='orange', alpha=0.7)
+                    ref_arr = np.array(ref_traj)
+                    ax.plot(ref_arr[:, 0], ref_arr[:, 1], '--', linewidth=1, color='orange', alpha=0.7)
 
-                # 4. 绘制 Lookahead 点
                 lh_idx = lookahead_data.get(uid)
                 if lh_idx is not None and ref_traj and 0 <= lh_idx < len(ref_traj):
-                    lh_pt = ref_traj[lh_idx]  # [x, y, z]
-                    # 用紫色星号表示预瞄点
+                    lh_pt = ref_traj[lh_idx]
                     ax.plot(lh_pt[0], lh_pt[1], 'm*', markersize=10, label=f'{uid} Lookahead')
-        
-        # 避免图例过多，可以只显示一部分或者不显示
-        # ax.legend(loc='upper right', fontsize='small')
 
-
-        # 坐标轴信息
-        ax.set_title(f"{'Blue' if blue else 'Red'} UAVs - Realtime Map")
-        ax.set_xlabel('X Coordinate')
-        ax.set_ylabel('Y Coordinate')
         ax.legend(loc='best')
 
-        if self.is_zoomed and self.custom_xlim and self.custom_ylim:
-            ax.set_xlim(*self.custom_xlim)
-            ax.set_ylim(*self.custom_ylim)
-        else:
+        # === 恢复视角范围逻辑 ===
+        if self.first_draw:
+            # 第一次绘制：使用自动计算的全局范围
             xmin, xmax, ymin, ymax = self.compute_static_range(positions)
             ax.set_xlim(xmin, xmax)
             ax.set_ylim(ymin, ymax)
-
-        return ax
+            self.first_draw = False
+        else:
+            # 后续绘制：强制应用刚才记录的视角，让 Matplotlib 工具栏的缩放不被 ax.clear() 重置
+            ax.set_xlim(current_xlim)
+            ax.set_ylim(current_ylim)
 
     def handle_click(self, event):
-        """在鼠标点击点位置打印xy坐标，并保留小数位精度。
-        """
-
+        """保留：点击地图输出坐标功能"""
         if event.inaxes is None or event.xdata is None or event.ydata is None:
             return
-
         print(f"Clicked coordinates: ({event.xdata:.13f}, {event.ydata:.13f})")
 
-    def init_interaction(self, fig, ax):
-        """初始化框选放大与视角重置的交互。"""
-        self._fig = fig
-        self._ax = ax
-        if self.zoom_selector is None:
-            self.zoom_selector = RectangleSelector(
-                ax,
-                self.on_select,
-                useblit=True,
-                button=[1],
-                interactive=True,
-                drag_from_anywhere=True,
-            )
-        fig.canvas.mpl_connect('key_press_event', self.on_key_press)
-
-    def on_select(self, eclick, erelease):
-        if eclick.xdata is None or erelease.xdata is None:
-            return
-        xmin, xmax = sorted([eclick.xdata, erelease.xdata])
-        ymin, ymax = sorted([eclick.ydata, erelease.ydata])
-        if abs(xmax - xmin) < 1e-6 or abs(ymax - ymin) < 1e-6:
-            return
-        pad = self.zoom_margin
-        self.custom_xlim = (xmin - pad, xmax + pad)
-        self.custom_ylim = (ymin - pad, ymax + pad)
-        self.is_zoomed = True
-        if self._ax is not None:
-            self._ax.set_xlim(*self.custom_xlim)
-            self._ax.set_ylim(*self.custom_ylim)
-            if self._fig is not None:
-                self._fig.canvas.draw_idle()
-
-    def on_key_press(self, event):
-        if event.key in ('r', 'escape'):
-            self.is_zoomed = False
-            self.custom_xlim = None
-            self.custom_ylim = None
-            if self._fig is not None:
-                self._fig.canvas.draw_idle()
-
-    def _restore_zoom_artists(self, ax):
-        if not self.zoom_selector:
-            return
-        selection_artist = getattr(self.zoom_selector, "_selection_artist", None)
-        if selection_artist is not None and selection_artist not in ax.patches:
-            ax.add_patch(selection_artist)
-            selection_artist.set_visible(False)
-        handles = getattr(self.zoom_selector, "_handles_artists", None)
-        if handles:
-            for artist in handles:
-                if artist not in ax.get_children():
-                    ax.add_artist(artist)
-
-    def compute_static_range(self, positions = None , buffer = 3000):
-        """
-        自动根据设施与无人机位置计算坐标轴范围。
-        positions: UAV 的实时位置 dict
-        """
-        xs = []
-        ys = []
-
-        # ① 加入设施坐标
-        for d in [
-            self.facilities.antiairs,
-            self.facilities.headquartors,
-            self.facilities.probers,
-        ]:
+    def compute_static_range(self, positions=None, buffer=3000):
+        xs, ys = [], []
+        for d in [self.facilities.antiairs, self.facilities.headquartors, self.facilities.probers]:
             for _name, utm_xy in d.items():
                 xs.append(utm_xy[0])
                 ys.append(utm_xy[1])
-
-        # ② 加入防御圈（polygon）
         for _name, poly in self.facilities.defend_rings.items():
             xs.extend(poly[:, 0])
             ys.extend(poly[:, 1])
-
-        # ③ 加入 UAV 位置
         if positions:
             for _uid, pos in positions.items():
                 xs.append(pos["x"])
                 ys.append(pos["y"])
-
-        # ④ 计算范围 + buffer
-        xmin, xmax = min(xs), max(xs)
-        ymin, ymax = min(ys), max(ys)
-
-          # 自定义 buffer，避免贴边
-
-        return xmin - buffer, xmax + buffer, ymin - buffer, ymax + buffer
+        
+        if not xs or not ys:
+            return 0, 10000, 0, 10000
+            
+        return min(xs) - buffer, max(xs) + buffer, min(ys) - buffer, max(ys) + buffer
 
 
-# 运行可视化，并实现动态更新
+class RealTimeRedisVisualizerApp(QMainWindow):
+    """
+    PyQt5 主窗口类，整合了 MapVisualizer 和 UI 控件
+    """
+    def __init__(self, facilities_file):
+        super().__init__()
+        self.setWindowTitle("Redis 实时无人机轨迹监控系统")
+        self.setGeometry(100, 100, 1400, 800)
+
+        # 核心可视化逻辑
+        self.visualizer = MapVisualizer(facilities_file=facilities_file)
+        self.is_playing = True
+
+        # 定时器用于实时刷新
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_frame)
+
+        self.init_ui()
+        # 启动定时器 (每 500 毫秒更新一次)
+        self.timer.start(500)
+
+    def init_ui(self):
+        main_widget = QWidget()
+        self.setCentralWidget(main_widget)
+        layout = QHBoxLayout(main_widget)
+
+        # --- 左侧：绘图区域 ---
+        left_layout = QVBoxLayout()
+        
+        # 顶部工具栏
+        top_bar = QHBoxLayout()
+        self.btn_play = QPushButton("暂停实时刷新")
+        self.btn_play.clicked.connect(self.toggle_play)
+        top_bar.addWidget(self.btn_play)
+        top_bar.addStretch()
+        left_layout.addLayout(top_bar)
+
+        # Matplotlib 画布
+        self.figure = Figure()
+        self.canvas = FigureCanvas(self.figure)
+        self.ax = self.figure.add_subplot(111)
+        
+        # 添加标准工具栏 (提供原生的拖拽平移、框选放大、Home复位、保存截图等功能)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        left_layout.addWidget(self.toolbar)
+        left_layout.addWidget(self.canvas)
+
+        # 仅绑定点击输出坐标事件（移除了自定义的 RectangleSelector 交互绑定）
+        self.canvas.mpl_connect('button_press_event', self.visualizer.handle_click)
+
+        layout.addLayout(left_layout, stretch=4)
+
+        # --- 右侧：状态信息面板 ---
+        self.info_panel = QVBoxLayout()
+        self.info_label = QLabel("实时无人机状态监控")
+        self.info_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        
+        self.info_display = QTextEdit()
+        self.info_display.setReadOnly(True)
+        self.info_display.setPlaceholderText("等待数据接入...")
+        
+        self.info_panel.addWidget(self.info_label)
+        self.info_panel.addWidget(self.info_display)
+        
+        layout.addLayout(self.info_panel, stretch=1)
+
+    def toggle_play(self):
+        self.is_playing = not self.is_playing
+        if self.is_playing:
+            self.btn_play.setText("暂停实时刷新")
+            self.timer.start(500)
+        else:
+            self.btn_play.setText("恢复实时刷新")
+            self.timer.stop()
+
+    def update_frame(self):
+        """定时器回调，触发重绘和状态面板更新"""
+        self.visualizer.update_plot(self.ax, blue=True)
+        self.canvas.draw()
+        
+        # 更新侧边状态栏
+        self.update_info_panel()
+
+    def update_info_panel(self):
+        positions = self.visualizer.latest_positions
+        extra_info_data = getattr(self.visualizer, 'latest_extra_info', {})
+        if not positions:
+            self.info_display.setText("当前暂无活跃的无人机数据。")
+            return
+
+        now_ms = int(time.time() * 1000)
+        info_text = f"--- 更新时间: {time.strftime('%H:%M:%S')} ---\n\n"
+        
+        sorted_uids = sorted(positions.keys())
+        
+        for uid in sorted_uids:
+            pos = positions[uid]
+            is_active = False
+            if 'ts' in pos and abs(now_ms - pos['ts']) < 2000:
+                is_active = True
+
+            status_str = "活跃" if is_active else "离线/静止"
+            
+            info_text += f"【无人机: {uid}】 ({status_str})\n"
+            info_text += f"  位置: ({pos.get('x', 0):.2f}, {pos.get('y', 0):.2f}, {pos.get('z', 0):.2f})\n"
+
+            # 显示 extra_info 详细字段
+            extra = extra_info_data.get(uid, {})
+            if extra:
+                seg_key = extra.get('segment_key', 'N/A')
+                formation = extra.get('formation_type', 'N/A')
+                frame_id = extra.get('frame_id', 'N/A')
+                lookahead = extra.get('lookahead', 'N/A')
+                global_id = extra.get('global_id', 'N/A')
+                my_ack = extra.get('my_ack', 'N/A')
+                is_waiting = extra.get('is_waiting', False)
+                wait_msg = extra.get('wait_message', '')
+                dist = extra.get('dist_to_target', None)
+                siblings = extra.get('cur_siblings_ids', [])
+                lh_coord = extra.get('lookahead_coord', None)
+                leader_id = extra.get('leader_id', None)
+
+                info_text += f"  航段: {seg_key}\n"
+                info_text += f"  编队类型: {formation}\n"
+                info_text += f"  帧ID/ACK: {frame_id} / {my_ack}\n"
+                info_text += f"  Lookahead: {lookahead}"
+                if lh_coord:
+                    info_text += f"  -> ({lh_coord[0]:.1f}, {lh_coord[1]:.1f})"
+                info_text += "\n"
+                info_text += f"  全局步数: {global_id}\n"
+                if dist is not None:
+                    info_text += f"  距目标: {dist:.2f}m\n"
+                if is_waiting:
+                    info_text += f"  ⏳ 等待中: {wait_msg}\n"
+                if siblings:
+                    info_text += f"  同组成员: {', '.join(str(s) for s in siblings)}\n"
+                if leader_id is not None:
+                    info_text += f"  领队ID: {leader_id}\n"
+            else:
+                info_text += "  (暂无额外状态信息)\n"
+
+            info_text += "-"*30 + "\n"
+
+        self.info_display.setText(info_text)
+
+
 if __name__ == "__main__":
-	    # 运行：python -m examples.uavs_strategy.visualize.redis_data_visualize
+    # python -m examples.uavs_strategy.visualize.redis_data_visualize
     current_dir = os.path.dirname(os.path.dirname(__file__))
     if switch_config == 1:
         facilities_file_name = 'facilities.json'
@@ -371,16 +349,12 @@ if __name__ == "__main__":
         facilities_file_name = 'test_facilities_locations.json'
     elif switch_config == 3:
         facilities_file_name = 'facilities.json'
-    facilities_file = os.path.join(current_dir,"data" ,facilities_file_name)
-    visualizer = MapVisualizer(facilities_file=facilities_file)
-
-    # 创建绘图和轴
-    fig, ax = plt.subplots()
-    fig.canvas.mpl_connect('button_press_event', visualizer.handle_click)
-    visualizer.init_interaction(fig, ax)
-
-    # 使用FuncAnimation动态更新图像，每秒更新一次
-    ani = FuncAnimation(fig, visualizer.update_plot, fargs=(ax, True), interval=100, cache_frame_data=False)  # 每秒更新一次
-    plt.show()
-
-
+    else:
+        facilities_file_name = 'facilities.json'
+        
+    facilities_file = os.path.join(current_dir, "data", facilities_file_name)
+    
+    app = QApplication(sys.argv)
+    window = RealTimeRedisVisualizerApp(facilities_file=facilities_file)
+    window.show()
+    sys.exit(app.exec_())

@@ -14,6 +14,29 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/uav_strategy"
             }
-        }
+        },
+        {
+            "name": "🚀 启动可视化 (Redis Vis)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "examples.uavs_strategy.visualize.redis_data_visualize",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "🚁 启动 UAV Agents02",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "examples.uavs_strategy.uav_dynamic_agents02",
+            "console": "integratedTerminal"
+        },
+                {
+            "name": "🚀 启动 pyqt轨迹回放",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "examples.uavs_strategy.visualize.pyqt_visualize",
+            "console": "integratedTerminal"
+        },
+
     ]
 }

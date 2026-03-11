@@ -173,6 +173,18 @@ class UavRedisIO:
             result[uid] = val if val else None
         return result
     
+    WORLD_UID = "__world__"
+
+    def set_world_state(self, key: str, value) -> None:
+        self.set_uav_state(self.WORLD_UID, key, str(value))
+
+    def get_world_state(self, key: str):
+        return self.get_uav_state(self.WORLD_UID, key)
+
+    def init_world_round(self, initial_round: int = 0):
+        if self.get_world_state("sim_round") is None:
+            self.set_world_state("sim_round", initial_round)
+    
     def set_uav_sync_state(self, uid: str, is_synced: bool) -> None:
         """设置无人机的同步状态 (用于多机协同)"""
         key = f"uav:{uid}:state:sync"

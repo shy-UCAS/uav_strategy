@@ -28,7 +28,7 @@ from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
 from examples.uavs_strategy.planning_modules.uav_planning_actions import PlanningLib
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
 from examples.uavs_strategy.planning_modules.formation_generator import FormationGenerator3D, Formation_Elements
-from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FormationAPFStep, Single_APFStep, FetchWorldState ,DT
+from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FetchWorldState ,DT
 from examples.uavs_strategy.key_path_analyzer import KeyPathAnalyzer
 
 if __name__ == "__main__":
