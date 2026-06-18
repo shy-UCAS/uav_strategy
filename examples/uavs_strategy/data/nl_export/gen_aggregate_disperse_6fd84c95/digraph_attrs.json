@@ -1,0 +1,120 @@
+[
+  {
+    "from": 0,
+    "to": 1,
+    "attrs": {
+      "order_mode": "singleton",
+      "order_type": "breakthrough",
+      "target": "radar_2",
+      "fleet_no": "f5.1",
+      "action": "track",
+      "action_class": "recon",
+      "segment_id": "seg_t0",
+      "depends_on": [],
+      "sync_group": null
+    },
+    "members_num": 3
+  },
+  {
+    "from": 2,
+    "to": 3,
+    "attrs": {
+      "order_mode": "singleton",
+      "order_type": "breakthrough",
+      "target": "hq_mark14",
+      "fleet_no": "f2.1",
+      "action": "breakthrough",
+      "action_class": "assault",
+      "segment_id": "seg_t1_strike",
+      "depends_on": [
+        "seg_t0"
+      ],
+      "sync_group": null
+    },
+    "members_num": 3
+  },
+  {
+    "from": 3,
+    "to": 4,
+    "attrs": {
+      "order_mode": "aggregate",
+      "order_type": "breakthrough",
+      "target": "hq_mark7",
+      "fleet_no": "f2.2",
+      "action": "rendezvous",
+      "action_class": "maneuver",
+      "segment_id": "seg_t1_rdv",
+      "depends_on": [],
+      "sync_group": "sync_0"
+    },
+    "members_num": 3
+  },
+  {
+    "from": 5,
+    "to": 6,
+    "attrs": {
+      "order_mode": "singleton",
+      "order_type": "breakthrough",
+      "target": "hq_mark6",
+      "fleet_no": "f1.1",
+      "action": "intercept",
+      "action_class": "assault",
+      "segment_id": "seg_t2_strike",
+      "depends_on": [
+        "seg_t0"
+      ],
+      "sync_group": null
+    },
+    "members_num": 3
+  },
+  {
+    "from": 6,
+    "to": 4,
+    "attrs": {
+      "order_mode": "aggregate",
+      "order_type": "breakthrough",
+      "target": "hq_mark7",
+      "fleet_no": "f1.2",
+      "action": "rendezvous",
+      "action_class": "maneuver",
+      "segment_id": "seg_t2_rdv",
+      "depends_on": [],
+      "sync_group": "sync_0"
+    },
+    "members_num": 3
+  },
+  {
+    "from": 7,
+    "to": 8,
+    "attrs": {
+      "order_mode": "singleton",
+      "order_type": "breakthrough",
+      "target": "hq_mark3",
+      "fleet_no": "f4.1",
+      "action": "strike",
+      "action_class": "assault",
+      "segment_id": "seg_t3_strike",
+      "depends_on": [
+        "seg_t0"
+      ],
+      "sync_group": null
+    },
+    "members_num": 3
+  },
+  {
+    "from": 8,
+    "to": 4,
+    "attrs": {
+      "order_mode": "aggregate",
+      "order_type": "breakthrough",
+      "target": "hq_mark7",
+      "fleet_no": "f4.2",
+      "action": "rendezvous",
+      "action_class": "maneuver",
+      "segment_id": "seg_t3_rdv",
+      "depends_on": [],
+      "sync_group": "sync_0"
+    },
+    "members_num": 3
+  }
+]
