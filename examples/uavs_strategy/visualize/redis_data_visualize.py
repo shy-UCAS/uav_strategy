@@ -3,12 +3,17 @@ import time
 import json
 import numpy as np
 import os.path as osp
-import os
 import sys
 
 # matplotlib 必须使用 FigureCanvasQTAgg 嵌入到 PyQt5
 import matplotlib
 matplotlib.use('Qt5Agg')
+
+# 配置中文字体，解决工具提示乱码问题
+import matplotlib.pyplot as plt
+plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'DejaVu Sans']
+plt.rcParams['axes.unicode_minus'] = False
+
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
@@ -18,8 +23,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout
 from PyQt5.QtCore import Qt, QTimer
 
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
-from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import DT
-from examples.uavs_strategy.uav_dynamic_agents02 import switch_config
+from examples.uavs_strategy.uav_dynamic_agents02 import facilities_file
 
 
 class MapVisualizer:
@@ -33,13 +37,17 @@ class MapVisualizer:
         self.r = redis.StrictRedis(host=self.redis_host, port=self.redis_port, db=0)
 
         self.facilities = self._default_facilities(facilities_file)
-        
+
         # 保存最新获取的数据供 UI 面板显示
         self.latest_positions = {}
         self.latest_extra_info = {}
-        
+
         # 标记是否为第一次绘制，用于初始化坐标系范围
-        self.first_draw = True 
+        self.first_draw = True
+
+        # 收集设施点坐标和名称，用于悬浮提示
+        self.facility_points = []  # [(x, y, display_name), ...]
+        self._collect_facility_points()
 
     def _default_facilities(self, default_json_path=None):
         if default_json_path is None:
@@ -52,6 +60,18 @@ class MapVisualizer:
             _facilities_info = json.load(f)
 
         return bfunc.Facilities(_facilities_info['facilities_str'], _facilities_info['defence_rings'])
+
+    def _collect_facility_points(self):
+        """收集所有设施点的坐标和名称，用于鼠标悬浮提示"""
+        self.facility_points = []
+        if not self.facilities:
+            return
+        for name, utm_xy in self.facilities.antiairs.items():
+            self.facility_points.append((utm_xy[0], utm_xy[1], f"{name} [防空]"))
+        for name, utm_xy in self.facilities.headquartors.items():
+            self.facility_points.append((utm_xy[0], utm_xy[1], f"{name} [指挥部]"))
+        for name, utm_xy in self.facilities.probers.items():
+            self.facility_points.append((utm_xy[0], utm_xy[1], f"{name} [探测]"))
 
     def get_drone_states(self, blue=True):
         ids = self.r.smembers("uav:ids" if blue else "red:ids")
@@ -244,6 +264,13 @@ class RealTimeRedisVisualizerApp(QMainWindow):
         # 仅绑定点击输出坐标事件（移除了自定义的 RectangleSelector 交互绑定）
         self.canvas.mpl_connect('button_press_event', self.visualizer.handle_click)
 
+        # 悬浮提示注释占位（实际在 update_frame 中每次 ax.clear() 后重建）
+        self.hover_annotation = None
+        self._hover_active = False      # 当前是否悬浮在设施点上
+        self._hover_xy = (0, 0)         # 上次悬浮的设施点坐标
+        self._hover_text = ''           # 上次悬浮的显示文本
+        self.canvas.mpl_connect('motion_notify_event', self.on_hover)
+
         layout.addLayout(left_layout, stretch=4)
 
         # --- 右侧：状态信息面板 ---
@@ -269,9 +296,63 @@ class RealTimeRedisVisualizerApp(QMainWindow):
             self.btn_play.setText("恢复实时刷新")
             self.timer.stop()
 
+    def on_hover(self, event):
+        """鼠标悬浮事件处理：靠近设施点时显示名称提示框"""
+        if self.hover_annotation is None:
+            return
+        if event.inaxes != self.ax or not self.visualizer.facility_points:
+            if self.hover_annotation.get_visible():
+                self.hover_annotation.set_visible(False)
+                self.canvas.draw_idle()
+            self._hover_active = False
+            return
+
+        # 动态阈值：视图范围的 1.5%，随缩放自适应
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        threshold = max(abs(xlim[1] - xlim[0]), abs(ylim[1] - ylim[0])) * 0.015
+
+        # 查找最近的设施点
+        min_dist = float('inf')
+        nearest = None
+        for x, y, display_name in self.visualizer.facility_points:
+            dist = ((event.xdata - x) ** 2 + (event.ydata - y) ** 2) ** 0.5
+            if dist < min_dist:
+                min_dist = dist
+                nearest = (x, y, display_name)
+
+        if nearest and min_dist < threshold:
+            x, y, display_name = nearest
+            self._hover_active = True
+            self._hover_xy = (x, y)
+            self._hover_text = display_name
+            self.hover_annotation.xy = (x, y)
+            self.hover_annotation.set_text(display_name)
+            if not self.hover_annotation.get_visible():
+                self.hover_annotation.set_visible(True)
+                self.canvas.draw_idle()
+        else:
+            self._hover_active = False
+            if self.hover_annotation.get_visible():
+                self.hover_annotation.set_visible(False)
+                self.canvas.draw_idle()
+
+    def _rebuild_hover_annotation(self):
+        """ax.clear() 会移除所有 artist，需重新创建悬浮提示注释；
+        如果之前正在悬浮到设施点上，重建时直接恢复为可见状态，避免闪烁"""
+        self.hover_annotation = self.ax.annotate(
+            self._hover_text if self._hover_active else '',
+            xy=self._hover_xy if self._hover_active else (0, 0),
+            xytext=(15, 15), textcoords='offset points',
+            bbox=dict(boxstyle='round,pad=0.4', fc='lightyellow', alpha=0.92, edgecolor='gray'),
+            arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.15'),
+            fontsize=9, visible=self._hover_active
+        )
+
     def update_frame(self):
         """定时器回调，触发重绘和状态面板更新"""
         self.visualizer.update_plot(self.ax, blue=True)
+        self._rebuild_hover_annotation()
         self.canvas.draw()
         
         # 更新侧边状态栏
@@ -342,18 +423,7 @@ class RealTimeRedisVisualizerApp(QMainWindow):
 
 if __name__ == "__main__":
     # python -m examples.uavs_strategy.visualize.redis_data_visualize
-    current_dir = os.path.dirname(os.path.dirname(__file__))
-    if switch_config == 1:
-        facilities_file_name = 'facilities.json'
-    elif switch_config == 2:
-        facilities_file_name = 'test_facilities_locations.json'
-    elif switch_config == 3:
-        facilities_file_name = 'facilities.json'
-    else:
-        facilities_file_name = 'facilities.json'
-        
-    facilities_file = os.path.join(current_dir, "data", facilities_file_name)
-    
+    # facilities_file 已从 uav_dynamic_agents02 导入，自动适配当前 switch_config
     app = QApplication(sys.argv)
     window = RealTimeRedisVisualizerApp(facilities_file=facilities_file)
     window.show()

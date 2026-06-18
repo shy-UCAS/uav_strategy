@@ -3,6 +3,7 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
+from examples.uavs_strategy.uav_dynamic_agents02 import facilities_file as _default_facilities_file
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
@@ -33,6 +34,21 @@ class UAVVisualizer(QMainWindow):
 
         self.init_ui()
 
+        # 自动加载当前 switch_config 对应的默认地图
+        self._load_default_map()
+
+    def _load_default_map(self):
+        """尝试加载 agent02 的 switch_config 对应的 facilities_file 作为默认地图"""
+        try:
+            with open(_default_facilities_file, 'r', encoding='utf-8') as f:
+                map_data = json.load(f)
+            self.load_map_data(map_data)
+            print(f"已自动加载默认地图: {_default_facilities_file}")
+        except FileNotFoundError:
+            print(f"默认地图文件不存在，请手动加载: {_default_facilities_file}")
+        except Exception as e:
+            print(f"加载默认地图失败: {e}，请手动加载地图数据文件")
+
     def init_ui(self):
         # 主布局
         main_widget = QWidget()
@@ -54,8 +70,8 @@ class UAVVisualizer(QMainWindow):
         top_bar = QHBoxLayout()
         self.btn_load = QPushButton("上传可视化文件")
         self.btn_load.clicked.connect(self.open_file)
-        # 加载地图json数据
-        self.btn_map = QPushButton("加载地图数据文件")
+        # 加载地图json数据（默认已从 agent02 自动加载，可手动切换）
+        self.btn_map = QPushButton("切换地图数据文件")
         self.btn_map.clicked.connect(self.open_map_file)
         # 切换坐标系
         self.btn_toggle_coord = QPushButton("切换为 UTM 坐标")
