@@ -731,6 +731,18 @@ class SyncAPFStepEnhance(PeriodicBehaviour):
         if last_done is not None and last_done == current_round:
             return
 
+        # 2.5) 阶段2.1：航段依赖闸——在等前置航段时，满足后重新触发规划
+        if getattr(agent, "_waiting_for_deps", False):
+            _deps = getattr(agent, "current_depends_on", []) or []
+            if all(io.r.get(f"seg_done:{d}") == "1" for d in _deps):
+                agent._waiting_for_deps = False
+                # 关键：复位 can_task_start，否则 ASL 走 can_task_start(false) 的 .wait 分支、不重规划
+                agent.bdi.set_belief("can_task_start", True)
+                agent.add_achievement_goal("task_digraph")
+                self.log(f"[{agent.self_uid}] deps satisfied, re-arm planning.")
+            self._mark_agent_round_done(agent, io, current_round)
+            return
+
         # 3) 获取状态
         state = self._get_agent_state(agent, io)
         if not state:
@@ -1093,6 +1105,10 @@ class SyncAPFStepEnhance(PeriodicBehaviour):
     # =========================
     def _check_task_completion(self, agent: "BlueUAVAgent", io: "UavRedisIO", lookahead, max_idx, dist_to_target):
         if lookahead >= max_idx:
+            # 阶段2.1：本航段完成 → 置 seg_done 供依赖闸消费（幂等，同段多机均写 "1"）
+            _seg_id = getattr(agent, "current_segment_id", None)
+            if _seg_id:
+                io.r.set(f"seg_done:{_seg_id}", "1")
             if agent.is_final_task:
                 agent.is_finished = True
                 self.log(f"[{agent.self_uid}] Final task completed.")

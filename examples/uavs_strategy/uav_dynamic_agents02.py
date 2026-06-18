@@ -39,7 +39,7 @@ from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
 from examples.uavs_strategy.planning_modules.uav_planning_actions import PlanningLib
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
 from examples.uavs_strategy.planning_modules.formation_generator import FormationGenerator3D, Formation_Elements
-from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FetchWorldState, SyncAPFStep, RobustFormationAPF, SyncAPFStepEnhance, GlobalRoundCoordinator, testAPF, DT
+from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FetchWorldState, SyncAPFStep, SyncAPFStepEnhance, GlobalRoundCoordinator, DT
 from examples.uavs_strategy.key_path_analyzer import KeyPathAnalyzer
 
 init_loc1 = [
@@ -73,7 +73,9 @@ init_locs = [
 height_range_value_set = {
     'breakthrough': [[250, 400], [0, 100]],
     'escape': [[0, 100], [250, 400]],
-    'detour': [[0, 100], [200, 400]]
+    'detour': [[0, 100], [200, 400]],
+    'orbit': [[150, 300], [150, 300]],     # 侦察盘旋：中低空保持
+    'loiter': [[200, 350], [200, 350]]     # 待命悬停
 }
 direction_range_set = {
     'breakthrough': [-20, 20],
@@ -81,7 +83,7 @@ direction_range_set = {
     'detour': [0, 360]
 }
 
-switch_config = 3
+switch_config = 5
 
 current_dir = os.path.dirname(__file__)
 
@@ -117,6 +119,12 @@ elif switch_config == 4:
                 [0,1,2,3],
                 [0,2,3]
             ]
+elif switch_config == 5:
+    # 接入 NLTaskOrchestration 导出的样本
+    _export_dir = os.path.join(current_dir, "data", "nl_export", "gen_aggregate_disperse_6fd84c95")
+    digraph_attrs_reference_path = os.path.join(_export_dir, "digraph_attrs.json")
+    facilities_file = os.path.join(_export_dir, "facilities.json")
+    key_paths = json.load(open(os.path.join(_export_dir, "key_paths.json"), "r", encoding="utf-8"))
 
 key_path_instructions_path = os.path.join(current_dir,"data" ,"key-path-analyzer02.json")
 asl_file = os.path.join(current_dir, "uav_key_path.asl")
@@ -197,6 +205,10 @@ class BlueUAVAgent(BDIAgent):
         self.current_segment_key = None
         self.has_synced_segment = False
         self.io.set_uav_sync_state(self.self_uid, False)
+        # 阶段2.1：航段依赖闸状态
+        self.current_segment_id = None      # 当前航段 segment_id
+        self.current_depends_on = []        # 当前航段前置依赖（segment_id 列表）
+        self._waiting_for_deps = False      # 是否在等待前置航段完成
 
         self.APFStep = SyncAPFStepEnhance
         self.FetchWorldState = FetchWorldState
@@ -289,6 +301,23 @@ class BlueUAVAgent(BDIAgent):
             self.io.set_uav_state(self.self_uid, "can_task_start", "false")
             self.io.set_lookahead(self.self_uid, 0)
             self.current_segment_key = f"{cur_start_node}_{cur_end_node}"
+
+            # === 阶段2.1：航段依赖闸（先侦察后突击 / condition_trigger）===
+            for _da in digraph_attrs:
+                if str(_da["from"]) == cur_start_node and str(_da["to"]) == cur_end_node:
+                    _a = _da["attrs"]
+                    self.current_segment_id = _a.get("segment_id")
+                    self.current_depends_on = _a.get("depends_on") or []
+                    break
+            _unmet = [d for d in self.current_depends_on
+                      if self.io.r.get(f"seg_done:{d}") != "1"]
+            if _unmet:
+                self.log(f"[{self.self_uid}] segment {self.current_segment_id} waiting on deps {_unmet}")
+                self._waiting_for_deps = True
+                yield
+                return
+            self._waiting_for_deps = False
+            # === /阶段2.1 ===
             
             self.log(f"[{self.self_uid}] Planning path from node {cur_start_node} to node {cur_end_node}")
             for digraph_attr in digraph_attrs:
@@ -487,7 +516,10 @@ class MissionOrchestrator:
         # 1. 构建图结构和属性索引
         edge_attrs = {}
         graph = collections.defaultdict(list)
-        
+        # 如果 json_data 是一个列表，逐项处理，如果是一个字典，则查找是否包含了key为'digraph_attrs'的项
+        if isinstance(json_data, dict) and "digraph_attrs" in json_data:
+            json_data = json_data["digraph_attrs"]
+
         for item in json_data:
             u, v = str(item["from"]), str(item["to"]) # 确保键是字符串
             # members_num + 1 (1个主机 + N个从机)

@@ -98,8 +98,8 @@ class PlanningLib:
         # 此时只有首尾是三维，中间点需要补 z
         traj_3d = curve_gen.interpolate_z_coordinates(traj)
 
-        if order_type == "detour":
-            # detour：本身点较多，用三次样条平滑
+        if order_type in ("detour", "orbit", "loiter"):
+            # detour/orbit/loiter：点较多或盘旋/悬停，用三次样条平滑
             return curve_gen.cubic_interpolation_3d(traj_3d)
         else:
             # breakthrough/escape：只有两个关键点，套突破专用插值
@@ -253,13 +253,25 @@ class PlanningLib:
     # ---------- 执行动作封装 (解耦 BDI) ---------- #
     def execute_path_planning_from_digraph(self, digraph: Dict[str, Any], start_h: int, end_h: int):
         """
-        根据 digraph_attr 进行路径规划
-        目前逻辑简化为根据 order_type 分发，不再冗余判断 order_mode
+        根据 digraph_attr 进行路径规划。
+        L1 优先按 action_class 分发飞行模式；无该字段时回落到旧的 order_type 分发。
         """
         digraph_attr = digraph['attrs']
-        order_type = digraph_attr['order_type']
         cur_target = digraph_attr['target']
 
+        # L1：按 action_class 分发（侦察盘旋 / 打击直插 / 支援 / 机动汇合）
+        action_class = digraph_attr.get('action_class')
+        if action_class == 'recon':
+            return self.execute_orbit(cur_target, start_h, end_h)
+        if action_class == 'support':
+            if digraph_attr.get('action') == 'standby':
+                return self.execute_loiter(start_h, end_h)
+            return self.execute_orbit(cur_target, start_h, end_h)   # jam 绕目标盘旋
+        if action_class in ('assault', 'maneuver'):
+            return self.execute_breakthrough(cur_target, start_h, end_h)
+
+        # 兜底：无 action_class（switch_config 1~4）走旧 order_type 分发
+        order_type = digraph_attr['order_type']
         if order_type == 'breakthrough' or order_type == 'singleton':
             return self.execute_breakthrough(cur_target, start_h, end_h)
         elif order_type == 'escape':
@@ -323,6 +335,30 @@ class PlanningLib:
         # self.agent.traj.extend(traj_3d[1:])
 
         self.log(f"{self.agent.name} is detouring {target}, trajectory:\n{traj_3d}")
+        return traj_3d
+
+
+    def execute_orbit(self, target: str, start_h: int, end_h: int, radius: float = 80.0, steps: int = 8):
+        """侦察/跟踪/干扰：抵近 target 后绕其盘旋一圈。
+        自带画圆几何，不依赖 facilities 分类（plan_detour 对 hq_markN/ua_N 会 raise）。
+        radius 盘旋半径(米)、steps 圆周采样点数——可按战场尺度调整。
+        """
+        tgt = self.agent.facilities.get_target_location(target, utm=True)
+        cx, cy = tgt[0], tgt[1]
+        start = self.agent.traj[-1]
+        orbit = [[cx + radius * np.cos(2 * np.pi * k / steps),
+                  cy + radius * np.sin(2 * np.pi * k / steps)] for k in range(steps + 1)]
+        traj_2d = [list(start[:2])] + orbit
+        traj_3d = self.insert_height_val("orbit", traj_2d, start_h, end_h)
+        self.log(f"{self.agent.name} is orbiting {target}, trajectory:\n{traj_3d}")
+        return traj_3d
+
+    def execute_loiter(self, start_h: int, end_h: int):
+        """待命(standby)：返回当前位置的最小停留轨迹。"""
+        pos = self.agent.traj[-1]
+        traj_2d = [list(pos[:2]), list(pos[:2])]
+        traj_3d = self.insert_height_val("loiter", traj_2d, start_h, end_h)
+        self.log(f"{self.agent.name} is loitering, trajectory:\n{traj_3d}")
         return traj_3d
 
 

@@ -119,7 +119,16 @@ if __name__ == '__main__':
     _plan_graph = nx.DiGraph()
     switch_case = 1
     _digraph_with_attrs = []
+    _natural_language_description = ""
+    descriptions_with_digraphplan = {}
     if switch_case == 1:
+
+        _natural_language_description = """蓝方兵力分为四个集群，
+        1号集群首先独立进攻hq_mark6、随后飞往hq_mark7与2号集群会合形成大部队，然后一起共同执行突破hq_mark1，然后突破hq_mark5，最后与其他编队汇聚到hq_2后，所有人飞往hq_mark4完成最后的突破。
+        2号集群独立飞往hq_mark7，与1号集群会合后执行同样的后续行动。
+        3号集群独立依次飞往hq_mark9、hq_mark8、hq_mark2、hq_mark4完成突破，随后前往hq_2与1、2、4号集群会合，后续共同行动。
+        4号集群独立飞往hq_mark10、hq_mark3执行突破任务后，汇聚到hq_2与1、3号集群会合后，所有集群一起飞往hq_mark4完成突破。
+        """
         _start_nodes = {
             0: {'target': 'hq_mark11'},
             3: {'target': 'hq_mark13'},
@@ -162,7 +171,11 @@ if __name__ == '__main__':
 
         _plan_graph.add_edge(14, 15, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark4", "fleet_no": "f6.1"})
 
-        
+        # 打印所有边的起点、终点以及附带的属性
+        print("--- _plan_graph 所有的边和属性 ---")
+        for u, v, attrs in _plan_graph.edges(data=True):
+            print(f"起点: {u}, 终点: {v}, 属性: {attrs}")
+        print("---------------------------------")
 
         _key_paths = [[0, 1, 4, 5, 2, 14, 15],
                         [3, 4, 5, 2, 14, 15],
@@ -195,9 +208,13 @@ if __name__ == '__main__':
                 "members_num": _edge_members.get((u, v), 0)  # 添加从机数量信息 
             }
         )
-    print(f"_digraph_with_attrs:{json.dumps(_digraph_with_attrs, indent=4)}")   
+    print(f"_digraph_with_attrs:{json.dumps(_digraph_with_attrs, indent=4)}")  
 
+    descriptions_with_digraphplan['_natural_language_description'] = [
+        line.strip() for line in _natural_language_description.strip().split('\n')
+    ]
+    descriptions_with_digraphplan['_digraph_with_attrs'] = _digraph_with_attrs
     current_dir = osp.dirname(os.path.abspath(__file__))
     with open(osp.join(current_dir, "data", 'manual_plan_graph', "manual_plan_graph01.json"), "w") as _f:
-        json.dump(_digraph_with_attrs, _f, indent=4)
+        json.dump(descriptions_with_digraphplan, _f, indent=4, ensure_ascii=False)
 
