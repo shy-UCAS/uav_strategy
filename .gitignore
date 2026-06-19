@@ -106,3 +106,6 @@ examples/uavs_strategy/data/raw_data/
 
 # graphify skill output
 graphify-out/
+
+# IDE settings
+.vscode/settings.json
