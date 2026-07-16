@@ -1,0 +1,57 @@
+{
+  "meta": {
+    "format_version": "2.0",
+    "dt": "<float: 仿真步长 (s)>",
+    "case_id": "<string: 想定标识>"
+  },
+
+  "trajectories": {
+    "<agent_id>": {
+      "frames": [
+        {
+          "t": "<float: simulation time (s)>",
+
+          "pos": {
+            "lat": "<float: WGS84 latitude (deg)>",
+            "lng": "<float: WGS84 longitude (deg)>",
+            "alt": "<float: altitude (m)>"
+          },
+
+          "pos_utm": {
+            "x": "<float: UTM easting (m)>",
+            "y": "<float: UTM northing (m)>",
+            "z": "<float: UTM height (m)>"
+          },
+
+          "vel": {
+            "vx": "<float: east velocity (m/s)>",
+            "vy": "<float: north velocity (m/s)>",
+            "vz": "<float: vertical velocity (m/s)>",
+            "ground_speed": "<float: sqrt(vx²+vy²) (m/s)>"
+          },
+
+          "acc": {
+            "ax": "<float: east acceleration (m/s²)>",
+            "ay": "<float: north acceleration (m/s²)>",
+            "az": "<float: vertical acceleration (m/s²)>"
+          },
+
+          "orientation": {
+            "quat": {
+              "x": "<float>",
+              "y": "<float>",
+              "z": "<float>",
+              "w": "<float>"
+            }
+          },
+
+          "angular_vel": {
+            "p": "<float: roll rate about body X-axis (rad/s)>",
+            "q": "<float: pitch rate about body Y-axis (rad/s)>",
+            "r": "<float: yaw rate about body Z-axis (rad/s)>"
+          }
+        }
+      ]
+    }
+  }
+}
