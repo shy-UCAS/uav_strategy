@@ -66,6 +66,33 @@ class PlanningLib:
         if self.VERBOSE:
             print(msg)
 
+    # ---------- 统一目标解析：坐标兜底 ---------- #
+    def _is_coordinate_target(self, target: Any) -> bool:
+        """判断 target 是否为坐标形式（数值 list/tuple，长度 >= 2）。
+
+        坐标以经纬度给出（前两维）。仅当 target 是数值列表时才判定为坐标，
+        避免把设施名 typo 等字符串误解析为坐标。
+        """
+        if not isinstance(target, (list, tuple)):
+            return False
+        if len(target) < 2:
+            return False
+        try:
+            return all(isinstance(v, (int, float)) and np.isfinite(v) for v in target[:2])
+        except TypeError:
+            return False
+
+    def _coordinate_to_utm(self, target: Any) -> List[float]:
+        """坐标 target（经纬度）转换为 UTM 平面点 [x, y]，供点指向型模式使用。
+
+        复用 Facilities 的经纬度转换器，与设施坐标保持同一 UTM zone。
+        """
+        lng, lat = float(target[0]), float(target[1])
+        if not (-180.0 <= lng <= 180.0 and -90.0 <= lat <= 90.0):
+            raise ValueError("coordinate target out of range: {}".format(target))
+        x, y = self.agent.facilities.lnglat_converter.lon_lat_to_utm(lng, lat)
+        return [x, y]
+
     # ---------- 高度插值 ---------- #
     def insert_height_val(self, order_type: str, traj: List[List[float]],
                           start_height: int, end_height: int) -> List[List[float]]:
@@ -153,7 +180,16 @@ class PlanningLib:
         """
         fac = self.agent.facilities
 
-        if target in fac.facilities_info.keys() or target in fac.defend_rings.keys():
+        if self._is_coordinate_target(target):
+            # 坐标兜底：以该点为圆心按默认半径构造合成绕行边界
+            detour_polygon_xys = fac.get_spec_facility_polyborder(
+                [float(target[0]), float(target[1])],
+                bfunc.GlobalBasicConfigs.AVOID_AVERAGE_DISTANCE,
+                ll2utm=utm,
+            )
+        elif isinstance(target, (list, tuple)):
+            raise ValueError(f"Unknown detour target: {target}")
+        elif target in fac.facilities_info.keys() or target in fac.defend_rings.keys():
             if target in fac.antiairs:
                 detour_polygon_xys = fac.get_spec_facility_polyborder(
                     fac.facilities_info[target],
@@ -215,7 +251,16 @@ class PlanningLib:
         """
         fac = self.agent.facilities
 
-        if target in fac.facilities_info.keys() or target in fac.defend_rings.keys():
+        if self._is_coordinate_target(target):
+            # 坐标兜底：以该点为圆心按默认半径构造合成逃逸边界
+            escape_polygon_xys = fac.get_spec_facility_polyborder(
+                [float(target[0]), float(target[1])],
+                bfunc.GlobalBasicConfigs.AVOID_AVERAGE_DISTANCE,
+                ll2utm=utm,
+            )
+        elif isinstance(target, (list, tuple)):
+            raise ValueError(f"Unknown escape target: {target}")
+        elif target in fac.facilities_info.keys() or target in fac.defend_rings.keys():
             if target in fac.antiairs:
                 escape_polygon_xys = fac.get_spec_facility_polyborder(
                     fac.facilities_info[target],
@@ -301,35 +346,59 @@ class PlanningLib:
             return self.execute_escape(cur_target, start_h, end_h)
         elif order_type == 'detour':
             return self.execute_detour(cur_target, start_h, end_h)
+        elif order_type == 'routine':
+            return self.execute_routine(cur_target, start_h, end_h)
         else:
             self.log(f"[{self.agent.name}] Unknown order_type: {order_type}")
 
+
+    def _plan_point_target(self, target: Any) -> List[List[float]]:
+        """点指向型通用目标解析：返回 [start, target] 二维轨迹。
+
+        解析顺序：坐标(经纬度列表) -> 设施类型 -> 设施名 -> 动态汇合点；
+        均无法解析时保持原地（与既有突防兜底行为一致）。
+        """
+        if self._is_coordinate_target(target):
+            # 坐标兜底：任意经纬度坐标作为飞行终点
+            return self.planbreakthrough_target_location(
+                self.agent.traj[-1], self._coordinate_to_utm(target)
+            )
+        if target in bfunc.GlobalBasicConfigs.PLANNING_BREAKTHROUGH_FACILITY_TYPES:
+            return self.plan_breakthrough_targettype(self.agent.traj[-1], target)
+        if target in self.agent.facilities.get_facilities_names():
+            return self.plan_breakthrough_target(self.agent.traj[-1], target)
+        if target == 'aggregate_point':
+            # 多机汇合点
+            self.log(f"[{self.agent.name}] is act aggregating to rendezvous point, merge_peers: {self.agent.merge_peers}")
+            rendezvous_pos = self.agent.io.get_rendezvous_point(self.agent.merge_peers)
+            return self.planbreakthrough_target_location(self.agent.traj[-1], rendezvous_pos)
+        # 兜底：目标既不是类型也不是设施名，就保持原地
+        return [self.agent.traj[-1], self.agent.traj[-1]]
 
     def execute_breakthrough(self, target: str, start_h: int, end_h: int):
         """
         执行突防动作：规划路径并更新 agent 轨迹
         新增一个针对动态汇合点的处理方法
         """
-        # 根据 target 类型决定调用哪个 planner
-        if target in bfunc.GlobalBasicConfigs.PLANNING_BREAKTHROUGH_FACILITY_TYPES:
-            traj_2d = self.plan_breakthrough_targettype(self.agent.traj[-1], target)
-        elif target in self.agent.facilities.get_facilities_names():
-            traj_2d = self.plan_breakthrough_target(self.agent.traj[-1], target)
-        elif target == 'aggregate_point':
-            # 多机汇合点
-            self.log(f"[{self.agent.name}] is act aggregating to rendezvous point, merge_peers: {self.agent.merge_peers}")
-            rendezvous_pos = self.agent.io.get_rendezvous_point(self.agent.merge_peers)
-            traj_2d = self.planbreakthrough_target_location(self.agent.traj[-1], rendezvous_pos)
-        else:
-            # 兜底：目标既不是类型也不是设施名，就保持原地
-            traj_2d = [self.agent.traj[-1], self.agent.traj[-1]]
-
+        traj_2d = self._plan_point_target(target)
         traj_3d = self.insert_height_val("breakthrough", traj_2d, start_h, end_h)
         # self.agent.cur_reference_traj = traj_3d
         # 追加到当前完整轨迹
         # self.agent.traj.extend(traj_3d[1:])
 
         # print(f"{self.agent.name} is breaking through {target}, trajectory:\n{traj_3d}")
+        return traj_3d
+
+
+    def execute_routine(self, target: str, start_h: int, end_h: int):
+        """
+        执行常规飞行动作：直线飞向目标（设施名/设施类型/任意坐标）。
+        复用突防的点指向型规划（_plan_point_target），
+        仅高度剖面取 routine 平飞区间（需 height_range_value_set 提供 'routine' 条目）。
+        """
+        traj_2d = self._plan_point_target(target)
+        traj_3d = self.insert_height_val("routine", traj_2d, start_h, end_h)
+        self.log(f"{self.agent.name} is flying routine to {target}, trajectory:\n{traj_3d}")
         return traj_3d
 
 
@@ -366,8 +435,13 @@ class PlanningLib:
         自带画圆几何，不依赖 facilities 分类（plan_detour 对 hq_markN/ua_N 会 raise）。
         radius 盘旋半径(米)、steps 圆周采样点数——可按战场尺度调整。
         """
-        tgt = self.agent.facilities.get_target_location(target, utm=True)
-        cx, cy = tgt[0], tgt[1]
+        if self._is_coordinate_target(target):
+            cx, cy = self._coordinate_to_utm(target)
+        elif isinstance(target, (list, tuple)):
+            raise KeyError(f"Unknown orbit target: {target}")
+        else:
+            tgt = self.agent.facilities.get_target_location(target, utm=True)
+            cx, cy = tgt[0], tgt[1]
         start = self.agent.traj[-1]
         orbit = [[cx + radius * np.cos(2 * np.pi * k / steps),
                   cy + radius * np.sin(2 * np.pi * k / steps)] for k in range(steps + 1)]
