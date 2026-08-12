@@ -15,7 +15,7 @@ agent02 是**多无人机集群任务仿真主程序**：所有无人机作为�
 - 同步机制：round（`GlobalRoundCoordinator`）+ 航段起点 barrier + `seg_done` 航段依赖闸
 - 时间机制：全部 Agent 共用 `sim_round` 仿真时钟，默认每 round 代表 500ms
 - 运动机制：参考轨迹点之间执行有界物理步进，不再直接瞬移到下一个点
-- 导出机制：同时提供完整原始轨迹 `uavs_coords_raw` 和 latest 可直接消费的任务轨迹 `uavs_coords_str`
+- 导出机制：同时提供完整原始轨迹 `uavs_coords_raw`、latest 可直接消费的任务轨迹 `uavs_coords_str`，以及集群任务语义 `missionMeta`（供 latest 生成器做语义一致的合规数据分配）
 
 ## 2. 运行环境与启动
 
@@ -311,6 +311,42 @@ Redis 当前位置中的 `ts` 也使用 `simTimeMs`，而 `recordedAtMs` 保留�
 
 该逻辑只在仿真结束导出时读取 Redis，不修改 `cur_reference_traj`、lookahead、同步状态或 Agent 飞行过程。`flightRoute` 是计划轨迹，`uavs_coords_str/uavs_coords_raw` 仍是实际执行轨迹，两者保持独立。
 
+### 7.5.1 集群任务语义导出（missionMeta，2026-08-13 新增）
+
+agents02 按集群（swarm）规划任务，latest 侧生成器需要这一语义真值做一致的合规数据分配。
+`save_trajectories()` 现在额外导出顶层 `missionMeta`：
+
+```json
+{
+  "missionMeta": {
+    "source": "digraph_attrs",
+    "swarms": [
+      {
+        "swarmId": "swarm1",
+        "fleetNo": "sx1.1",
+        "orderType": "detour",
+        "target": "shaoxing_1",
+        "segmentKey": "0_3",
+        "leaderId": "agent_1_0",
+        "memberIds": ["agent_1_0", "agent_1_1", "agent_1_2", "agent_1_3"]
+      }
+    ]
+  }
+}
+```
+
+字段来源与约束：
+
+| 字段 | 来源 | 说明 |
+|---|---|---|
+| `orderType/target/fleetNo` | digraph 边属性（`order_type/target/fleet_no`） | 任务设计真值，不从轨迹反推 |
+| `memberIds` | `plannedRoutes[].flightPlan` 按 `segmentKey` 分组 | 比 digraph `members_num` 权威（后者历史上一度不含主机） |
+| `leaderId` | 运行期 extras 的 `leader_id` | 缺失时回落首个成员 |
+| `swarmId` | 按 digraph 边顺序 `swarmN` | 多航段任务共享同一 `fleetNo`，消费方可按 fleetNo 合并 |
+
+`build_mission_meta()` 只组装导出数据，不修改仿真逻辑、Redis 内容或 Agent 状态。任务设计图
+未覆盖的目标会进入兜底条目（`orderType=null` + `note`），不会静默丢失。
+
 ### 7.6 与 latest 的字段对应
 
 | agent02 导出 | latest `uavs_coords_str.targetId` | 说明 |
@@ -348,6 +384,12 @@ conda run -n study python tools/agents02_export_to_payload.py "../uav_strategy/e
 - 实时面板和离线回放面板增加 `waiting_reason` 和 `flight_phase`。
 - 实时活跃性使用 `recordedAtMs`，不使用可能跑在真实墙钟前后的 `simTimeMs`。
 - 离线回放可根据用途选择 `uavs_coords_raw` 或 `uavs_coords_str`：前者展示完整生命周期，后者展示 latest 实际消费的任务轨迹。
+- 2026-08-13 离线回放右侧信息面板扩展为"无人机状态与任务语义信息"，新增展示：
+  - `simulationMeta`：仿真起点（可读时间）、时间基准/dt、运动学上限；
+  - `missionMeta`：每集群的任务类型/目标设施/航段/舰队/领队/成员列表（旧导出显示"未包含"）；
+  - 每架无人机：所属集群（任务语义归属）、高度 `alts`、仿真时间 `simTimeMs`（含 `round_id` 与
+    `recordedAtMs` 写入延迟）、`plannedRoutes` 计划航迹（段数/点数/完整性/航段列表/缺失航段）；
+  - 初始化阶段的字符串型 `cur_siblings_ids` 不再被逐字符拼接。
 
 ### 7.9 回归测试与验证
 
@@ -370,6 +412,8 @@ conda run -n study python -m unittest discover -s tests -p "test*.py" -v
 
 当前新增的 11 项契约、物理和完整计划航迹测试全部通过，相关 Python 文件也已通过 `py_compile`。这些是不依赖 Redis/Openfire 的逻辑回归；每次改动 round/barrier 或 Redis 写入逻辑后，仍应补跑一次完整 SPADE + Redis + XMPP 仿真。
 
+2026-08-13 追加 missionMeta 导出契约测试 4 项（`MissionMetaExportTests`：segmentKey 成员分组与设计属性保持、leaderId 回落、无 digraph 边目标进兜底集群、缺 attrs 容忍），合计 15 项全部通过。
+
 latest 侧另有 `tests/test_agents02_export_adapter.py`，覆盖设施/圈层映射、阶段过滤、历史时间兼容、滑窗、多目标快照、陈旧目标剔除和 SituationEngine 直连。当前 7 项测试全部通过；改造后的实际样本以 `--require-all-targets` 转换后，13 个目标直连引擎得到 `code=0`、`skippedTargets=[]`、3 个集群。
 
 ### 7.10 本轮改造文件清单
@@ -385,6 +429,17 @@ latest 侧另有 `tests/test_agents02_export_adapter.py`，覆盖设施/圈层�
 | `situationawareness latest/tools/agents02_export_to_payload.py` | agent02 导出到 `SituationEngine.analyze()` 请求的离线适配器和可选引擎回放 CLI |
 | `situationawareness latest/tests/test_agents02_export_adapter.py` | 新增 7 项适配器契约及引擎直连测试 |
 | `situationawareness latest/agents02_to_situation_judgment_接入清单.md` | 更新生产者当前能力、已完成项和风险边界 |
+
+### 7.11 集群任务语义导出改造（2026-08-13）
+
+| 文件 | 改动 |
+|---|---|
+| `uav_dynamic_agents02.py` | 新增 `build_mission_meta()` 并挂入 `save_trajectories()`：导出顶层 `missionMeta.swarms[]`（orderType/target/fleetNo 来自 digraph 边属性，memberIds 按 plannedRoutes segmentKey 分组，leaderId 来自运行期 extras；无 digraph 边的目标进兜底条目）。只组装导出数据，不修改仿真逻辑、Redis 内容或 Agent 状态 |
+| `tests/test_agents02_trajectory_contract.py` | 新增 `MissionMetaExportTests` 4 项契约测试 |
+| `visualize/pyqt_visualize.py` | 右侧信息面板扩展：新增 simulationMeta/missionMeta 区块与每机所属集群、高度、仿真时间/写入延迟、计划航迹展示；修复初始化阶段字符串型 `cur_siblings_ids` 被逐字符拼接 |
+
+详见 §7.5.1；latest 侧对应消费方（生成器集群级语义分配与数据管线）见根目录恢复指南 §13 及
+`situationawareness latest/tools/README.md`。
 
 ## 8. 已知问题与后续建议
 
