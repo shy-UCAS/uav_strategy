@@ -1,0 +1,35 @@
+[
+    {
+        "from": 0,
+        "to": 3,
+        "attrs": {
+            "order_mode": "singleton",
+            "order_type": "detour",
+            "target": "shaoxing_1",
+            "fleet_no": "sx1.1"
+        },
+        "members_num": 3
+    },
+    {
+        "from": 1,
+        "to": 4,
+        "attrs": {
+            "order_mode": "singleton",
+            "order_type": "detour",
+            "target": "shaoxing_2",
+            "fleet_no": "sx2.1"
+        },
+        "members_num": 4
+    },
+    {
+        "from": 2,
+        "to": 5,
+        "attrs": {
+            "order_mode": "singleton",
+            "order_type": "breakthrough",
+            "target": "shaoxing_3",
+            "fleet_no": "sx3.1"
+        },
+        "members_num": 3
+    }
+]

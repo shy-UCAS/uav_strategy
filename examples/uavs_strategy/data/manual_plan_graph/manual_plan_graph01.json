@@ -1,20 +1,24 @@
 {
     "_natural_language_description": [
-        "À¶·½±øÁ¦·ÖÎªËÄ¸ö¼¯Èº£¬",
-        "1ºÅ¼¯ÈºÊ×ÏÈ¶ÀÁ¢½ø¹¥hq_mark6¡¢Ëæºó·ÉÍùhq_mark7Óë2ºÅ¼¯Èº»áºÏĞÎ+³É´ó²¿¶Ó£¬È»ºóÒ»Æğ¹²Í¬Ö´ĞĞÍ»ÆÆhq_mark1£¬È»ºóÍ»ÆÆhq_mark5£¬×îºóÓëÆäËû±à¶Ó»ã¾Ûµ½hq_2ºó£¬ËùÓĞÈË·ÉÍùhq_mark4Íê³É×îºóµÄÍ»ÆÆ¡£",
-        "2ºÅ¼¯Èº¶ÀÁ¢·ÉÍùhq_mark7£¬Óë1ºÅ¼¯Èº»áºÏºóÖ´ĞĞÍ¬ÑùµÄºóĞøĞĞ¶¯¡£",
-        "3ºÅ¼¯Èº¶ÀÁ¢ÒÀ´Î·ÉÍùhq_mark9¡¢hq_mark8¡¢hq_mark2¡¢hq_mark4Íê³ÉÍ»ÆÆ£¬ËæºóÇ°Íùhq_2Óë1¡¢2¡¢4ºÅ¼¯Èº»áºÏ£¬ºóĞø¹²Í¬ĞĞ¶¯¡£",
-        "4ºÅ¼¯Èº¶ÀÁ¢·ÉÍùhq_mark10¡¢hq_mark3Ö´ĞĞÍ»ÆÆÈÎÎñºó£¬»ã¾Ûµ½hq_2Óë1¡¢3ºÅ¼¯Èº»áºÏºó£¬ËùÓĞ¼¯ÈºÒ»Æğ·ÉÍùhq_mark4Íê³ÉÍ»ÆÆ¡£"
+        "è“æ–¹å…µåŠ›åˆ†ä¸ºä¸‰ä¸ªç‹¬ç«‹é›†ç¾¤ï¼Œ",
+        "1å·é›†ç¾¤å¯¹ç»å…´ test01 è®¾æ–½æ‰§è¡Œä¾¦æŸ¥ï¼ˆç›˜æ—‹ä¾¦å¯Ÿï¼‰ã€‚",
+        "2å·é›†ç¾¤å¯¹ç»å…´ test02 è®¾æ–½æ‰§è¡Œä¾¦æŸ¥ï¼ˆç›˜æ—‹ä¾¦å¯Ÿï¼‰ã€‚",
+        "3å·é›†ç¾¤å¯¹ç»å…´ test03 è®¾æ–½æ‰§è¡Œçªç ´ã€‚"
     ],
     "_digraph_with_attrs": [
         {
             "from": 0,
-            "to": 1,
+            "to": 3,
             "attrs": {
                 "order_mode": "singleton",
                 "order_type": "breakthrough",
-                "target": "hq_mark6",
-                "fleet_no": "f1.1"
+                "target": "shaoxing_1",
+                "fleet_no": "sx1.1",
+                "action": "track",
+                "action_class": "recon",
+                "segment_id": "seg_recon_1",
+                "depends_on": [],
+                "sync_group": null
             },
             "members_num": 3
         },
@@ -24,153 +28,31 @@
             "attrs": {
                 "order_mode": "singleton",
                 "order_type": "breakthrough",
-                "target": "hq_mark7",
-                "fleet_no": "f1.2"
+                "target": "shaoxing_2",
+                "fleet_no": "sx2.1",
+                "action": "track",
+                "action_class": "recon",
+                "segment_id": "seg_recon_2",
+                "depends_on": [],
+                "sync_group": null
             },
             "members_num": 3
         },
         {
-            "from": 4,
+            "from": 2,
             "to": 5,
             "attrs": {
                 "order_mode": "singleton",
                 "order_type": "breakthrough",
-                "target": "hq_mark1",
-                "fleet_no": "f1.3"
-            },
-            "members_num": 8
-        },
-        {
-            "from": 5,
-            "to": 2,
-            "attrs": {
-                "order_mode": "singleton",
-                "order_type": "breakthrough",
-                "target": "hq_mark5",
-                "fleet_no": "f1.4"
-            },
-            "members_num": 8
-        },
-        {
-            "from": 2,
-            "to": 14,
-            "attrs": {
-                "order_mode": "aggregate",
-                "order_type": "breakthrough",
-                "target": "hq_2",
-                "fleet_no": "f5.1"
-            },
-            "members_num": 8
-        },
-        {
-            "from": 3,
-            "to": 4,
-            "attrs": {
-                "order_mode": "singleton",
-                "order_type": "breakthrough",
-                "target": "hq_mark7",
-                "fleet_no": "f2.1"
-            },
-            "members_num": 4
-        },
-        {
-            "from": 6,
-            "to": 7,
-            "attrs": {
-                "order_mode": "singleton",
-                "order_type": "breakthrough",
-                "target": "hq_mark9",
-                "fleet_no": "f3.1"
+                "target": "shaoxing_3",
+                "fleet_no": "sx3.1",
+                "action": "breakthrough",
+                "action_class": "assault",
+                "segment_id": "seg_assault_3",
+                "depends_on": [],
+                "sync_group": null
             },
             "members_num": 3
-        },
-        {
-            "from": 7,
-            "to": 8,
-            "attrs": {
-                "order_mode": "singleton",
-                "order_type": "breakthrough",
-                "target": "hq_mark8",
-                "fleet_no": "f3.2"
-            },
-            "members_num": 3
-        },
-        {
-            "from": 8,
-            "to": 9,
-            "attrs": {
-                "order_mode": "singleton",
-                "order_type": "breakthrough",
-                "target": "hq_mark2",
-                "fleet_no": "f3.3"
-            },
-            "members_num": 3
-        },
-        {
-            "from": 9,
-            "to": 10,
-            "attrs": {
-                "order_mode": "singleton",
-                "order_type": "breakthrough",
-                "target": "hq_mark4",
-                "fleet_no": "f3.4"
-            },
-            "members_num": 3
-        },
-        {
-            "from": 10,
-            "to": 14,
-            "attrs": {
-                "order_mode": "aggregate",
-                "order_type": "breakthrough",
-                "target": "hq_2",
-                "fleet_no": "f5.2"
-            },
-            "members_num": 3
-        },
-        {
-            "from": 11,
-            "to": 12,
-            "attrs": {
-                "order_mode": "singleton",
-                "order_type": "breakthrough",
-                "target": "hq_mark10",
-                "fleet_no": "f4.1"
-            },
-            "members_num": 3
-        },
-        {
-            "from": 12,
-            "to": 13,
-            "attrs": {
-                "order_mode": "singleton",
-                "order_type": "breakthrough",
-                "target": "hq_mark3",
-                "fleet_no": "f4.2"
-            },
-            "members_num": 3
-        },
-        {
-            "from": 13,
-            "to": 14,
-            "attrs": {
-                "order_mode": "aggregate",
-                "order_type": "breakthrough",
-                "target": "hq_2",
-                "fleet_no": "f5.3"
-            },
-            "members_num": 3
-        },
-        {
-            "from": 14,
-            "to": 15,
-            "attrs": {
-                "order_mode": "singleton",
-                "order_type": "breakthrough",
-                "target": "hq_mark4",
-                "fleet_no": "f6.1"
-            },
-            "members_num": 16
         }
     ]
 }

@@ -1,0 +1,176 @@
+{
+    "_natural_language_description": [
+        "蓝方兵力分为四个集群，",
+        "1号集群首先独立进攻hq_mark6、随后飞往hq_mark7与2号集群会合形+成大部队，然后一起共同执行突破hq_mark1，然后突破hq_mark5，最后与其他编队汇聚到hq_2后，所有人飞往hq_mark4完成最后的突破。",
+        "2号集群独立飞往hq_mark7，与1号集群会合后执行同样的后续行动。",
+        "3号集群独立依次飞往hq_mark9、hq_mark8、hq_mark2、hq_mark4完成突破，随后前往hq_2与1、2、4号集群会合，后续共同行动。",
+        "4号集群独立飞往hq_mark10、hq_mark3执行突破任务后，汇聚到hq_2与1、3号集群会合后，所有集群一起飞往hq_mark4完成突破。"
+    ],
+    "_digraph_with_attrs": [
+        {
+            "from": 0,
+            "to": 1,
+            "attrs": {
+                "order_mode": "singleton",
+                "order_type": "breakthrough",
+                "target": "hq_mark6",
+                "fleet_no": "f1.1"
+            },
+            "members_num": 3
+        },
+        {
+            "from": 1,
+            "to": 4,
+            "attrs": {
+                "order_mode": "singleton",
+                "order_type": "breakthrough",
+                "target": "hq_mark7",
+                "fleet_no": "f1.2"
+            },
+            "members_num": 3
+        },
+        {
+            "from": 4,
+            "to": 5,
+            "attrs": {
+                "order_mode": "singleton",
+                "order_type": "breakthrough",
+                "target": "hq_mark1",
+                "fleet_no": "f1.3"
+            },
+            "members_num": 8
+        },
+        {
+            "from": 5,
+            "to": 2,
+            "attrs": {
+                "order_mode": "singleton",
+                "order_type": "breakthrough",
+                "target": "hq_mark5",
+                "fleet_no": "f1.4"
+            },
+            "members_num": 8
+        },
+        {
+            "from": 2,
+            "to": 14,
+            "attrs": {
+                "order_mode": "aggregate",
+                "order_type": "breakthrough",
+                "target": "hq_2",
+                "fleet_no": "f5.1"
+            },
+            "members_num": 8
+        },
+        {
+            "from": 3,
+            "to": 4,
+            "attrs": {
+                "order_mode": "singleton",
+                "order_type": "breakthrough",
+                "target": "hq_mark7",
+                "fleet_no": "f2.1"
+            },
+            "members_num": 4
+        },
+        {
+            "from": 6,
+            "to": 7,
+            "attrs": {
+                "order_mode": "singleton",
+                "order_type": "breakthrough",
+                "target": "hq_mark9",
+                "fleet_no": "f3.1"
+            },
+            "members_num": 3
+        },
+        {
+            "from": 7,
+            "to": 8,
+            "attrs": {
+                "order_mode": "singleton",
+                "order_type": "breakthrough",
+                "target": "hq_mark8",
+                "fleet_no": "f3.2"
+            },
+            "members_num": 3
+        },
+        {
+            "from": 8,
+            "to": 9,
+            "attrs": {
+                "order_mode": "singleton",
+                "order_type": "breakthrough",
+                "target": "hq_mark2",
+                "fleet_no": "f3.3"
+            },
+            "members_num": 3
+        },
+        {
+            "from": 9,
+            "to": 10,
+            "attrs": {
+                "order_mode": "singleton",
+                "order_type": "breakthrough",
+                "target": "hq_mark4",
+                "fleet_no": "f3.4"
+            },
+            "members_num": 3
+        },
+        {
+            "from": 10,
+            "to": 14,
+            "attrs": {
+                "order_mode": "aggregate",
+                "order_type": "breakthrough",
+                "target": "hq_2",
+                "fleet_no": "f5.2"
+            },
+            "members_num": 3
+        },
+        {
+            "from": 11,
+            "to": 12,
+            "attrs": {
+                "order_mode": "singleton",
+                "order_type": "breakthrough",
+                "target": "hq_mark10",
+                "fleet_no": "f4.1"
+            },
+            "members_num": 3
+        },
+        {
+            "from": 12,
+            "to": 13,
+            "attrs": {
+                "order_mode": "singleton",
+                "order_type": "breakthrough",
+                "target": "hq_mark3",
+                "fleet_no": "f4.2"
+            },
+            "members_num": 3
+        },
+        {
+            "from": 13,
+            "to": 14,
+            "attrs": {
+                "order_mode": "aggregate",
+                "order_type": "breakthrough",
+                "target": "hq_2",
+                "fleet_no": "f5.3"
+            },
+            "members_num": 3
+        },
+        {
+            "from": 14,
+            "to": 15,
+            "attrs": {
+                "order_mode": "singleton",
+                "order_type": "breakthrough",
+                "target": "hq_mark4",
+                "fleet_no": "f6.1"
+            },
+            "members_num": 16
+        }
+    ]
+}
