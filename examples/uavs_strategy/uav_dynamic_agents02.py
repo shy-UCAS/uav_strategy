@@ -290,6 +290,84 @@ def build_complete_flight_plan_export(
     }
 
 
+def build_mission_meta(digraph_attrs, planned_routes, raw_trajs):
+    """Rebuild cluster-level mission semantics for the latest-side generator.
+
+    agents02 plans missions at swarm level: each digraph edge carries an
+    ``order_type`` (detour/breakthrough/...), a target facility and a fleet
+    number, while per-frame extras record the runtime formation
+    (``cur_siblings_ids``/``leader_id``).  ``plannedRoutes`` alone keeps only
+    the segment key, so this function re-attaches the design semantics:
+
+    - ``orderType/target/fleetNo`` come from the digraph edge attributes
+      (mission-design truth, never fabricated from trajectories);
+    - ``memberIds`` come from grouping ``plannedRoutes[].flightPlan`` by
+      ``segmentKey`` (export-time fact, more authoritative than the digraph
+      ``members_num`` which historically excluded the leader);
+    - ``leaderId`` comes from the runtime extras ``leader_id`` of any member
+      frame, falling back to the first sorted member.
+
+    Multi-segment missions produce one swarm entry per edge sharing the same
+    ``fleetNo``; consumers may group by ``fleetNo`` when needed.  Targets whose
+    segment keys are absent from the design graph are collected into a final
+    fallback entry with ``orderType=None`` instead of being silently dropped.
+    """
+    member_by_segment = {}
+    for name, route in (planned_routes or {}).items():
+        for segment in (route or {}).get("flightPlan") or []:
+            segment_key = segment.get("segmentKey")
+            if segment_key:
+                member_by_segment.setdefault(segment_key, []).append(name)
+
+    def _leader_of(members):
+        for name in sorted(members):
+            _, traj_extra = (raw_trajs or {}).get(name, ([], []))
+            for extra in traj_extra or []:
+                if not isinstance(extra, dict):
+                    continue
+                leader = extra.get("leader_id")
+                if isinstance(leader, str) and leader and leader != "initializing":
+                    return leader
+        return sorted(members)[0] if members else None
+
+    swarms = []
+    seen_members = set()
+    for index, edge in enumerate(digraph_attrs or []):
+        if not isinstance(edge, dict):
+            continue
+        attrs = edge.get("attrs") or {}
+        segment_key = "{}_{}".format(edge.get("from"), edge.get("to"))
+        members = sorted(set(member_by_segment.get(segment_key, [])))
+        swarms.append(
+            {
+                "swarmId": "swarm%d" % (index + 1),
+                "fleetNo": attrs.get("fleet_no"),
+                "orderType": attrs.get("order_type"),
+                "target": attrs.get("target"),
+                "segmentKey": segment_key,
+                "leaderId": _leader_of(members),
+                "memberIds": members,
+            }
+        )
+        seen_members.update(members)
+
+    unassigned = sorted(set((planned_routes or {}).keys()) - seen_members)
+    if unassigned:
+        swarms.append(
+            {
+                "swarmId": "swarm%d" % (len(swarms) + 1),
+                "fleetNo": None,
+                "orderType": None,
+                "target": None,
+                "segmentKey": None,
+                "leaderId": _leader_of(unassigned),
+                "memberIds": unassigned,
+                "note": "targets without a matching digraph edge",
+            }
+        )
+    return {"source": "digraph_attrs", "swarms": swarms}
+
+
 init_loc1 = [
     122.18105710089186,
     37.51299467977935,
@@ -998,6 +1076,10 @@ class MissionOrchestrator:
                     )
                 )
 
+        # 2.2 集群级任务语义：从任务设计图边属性和运行期编队事实重建，
+        # 供 latest 侧生成器做语义一致的合规数据分配（只导出，不改仿真逻辑）。
+        mission_meta = build_mission_meta(digraph_attrs, planned_routes, raw_trajs)
+
         segment_common_frames = build_segment_common_frames(raw_trajs)
         print(
             "segment_common_frames: "
@@ -1087,7 +1169,8 @@ class MissionOrchestrator:
             "uavs_coords_raw": uavs_coords_raw,
             "plannedRoutes": planned_routes,
             "facilities_str": facilities_str,
-            "defence_rings": defence_rings
+            "defence_rings": defence_rings,
+            "missionMeta": mission_meta
         }
         
         # 5. 保存到文件

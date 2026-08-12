@@ -15,6 +15,7 @@ from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import (
 )
 from examples.uavs_strategy.uav_dynamic_agents02 import (
     build_complete_flight_plan_export,
+    build_mission_meta,
     build_segment_common_frames,
     is_analysis_ready_trajectory_point,
     select_analysis_trajectory,
@@ -197,6 +198,77 @@ class CompleteFlightPlanExportTests(unittest.TestCase):
         self.assertFalse(exported["complete"])
         self.assertEqual(exported["routePointCount"], 2)
         self.assertEqual(exported["missingSegments"][0]["segmentKey"], "1_2")
+
+
+class MissionMetaExportTests(unittest.TestCase):
+    def _planned_routes(self):
+        return {
+            name: {"flightPlan": [{"order": 0, "segmentKey": key, "fromNode": key[0], "toNode": key[-1]}]}
+            for name, key in (
+                ("agent_1_0", "0_3"), ("agent_1_1", "0_3"), ("agent_1_2", "0_3"),
+                ("agent_2_0", "1_4"), ("agent_2_1", "1_4"),
+                ("agent_3_0", "2_5"),
+            )
+        }
+
+    def _digraph_attrs(self):
+        return [
+            {"from": 0, "to": 3, "members_num": 2,
+             "attrs": {"order_mode": "singleton", "order_type": "detour",
+                       "target": "shaoxing_1", "fleet_no": "sx1.1"}},
+            {"from": 1, "to": 4, "members_num": 1,
+             "attrs": {"order_mode": "singleton", "order_type": "detour",
+                       "target": "shaoxing_2", "fleet_no": "sx2.1"}},
+            {"from": 2, "to": 5, "members_num": 0,
+             "attrs": {"order_mode": "singleton", "order_type": "breakthrough",
+                       "target": "shaoxing_3", "fleet_no": "sx3.1"}},
+        ]
+
+    def test_swarms_group_members_by_segment_and_keep_design_attrs(self):
+        # 每集群首个成员的 extras 携带 leader_id，其他成员无 leader_id，
+        # 用于验证 leaderId 来自运行期 extras 而不是按名称猜测。
+        raw_trajs = {
+            name: ([[0.0, 0.0, 100.0]], [{"leader_id": "nobody"}])
+            for name in self._planned_routes()
+        }
+        raw_trajs["agent_1_0"][1][0]["leader_id"] = "agent_1_0"
+        raw_trajs["agent_2_0"][1][0]["leader_id"] = "agent_2_0"
+        raw_trajs["agent_3_0"][1][0]["leader_id"] = "agent_3_0"
+
+        meta = build_mission_meta(self._digraph_attrs(), self._planned_routes(), raw_trajs)
+        swarms = {item["segmentKey"]: item for item in meta["swarms"]}
+        self.assertEqual(meta["source"], "digraph_attrs")
+        self.assertEqual(sorted(swarms["0_3"]["memberIds"]), ["agent_1_0", "agent_1_1", "agent_1_2"])
+        self.assertEqual(swarms["0_3"]["orderType"], "detour")
+        self.assertEqual(swarms["0_3"]["target"], "shaoxing_1")
+        self.assertEqual(swarms["0_3"]["fleetNo"], "sx1.1")
+        self.assertEqual(swarms["0_3"]["leaderId"], "agent_1_0")
+        self.assertEqual(swarms["2_5"]["orderType"], "breakthrough")
+        self.assertEqual(swarms["2_5"]["memberIds"], ["agent_3_0"])
+
+    def test_leader_falls_back_to_first_member_when_extras_lack_leader_id(self):
+        raw_trajs = {name: ([], [{"flight_phase": "task_flight"}]) for name in self._planned_routes()}
+        meta = build_mission_meta(self._digraph_attrs(), self._planned_routes(), raw_trajs)
+        by_segment = {item["segmentKey"]: item for item in meta["swarms"]}
+        self.assertEqual(by_segment["0_3"]["leaderId"], "agent_1_0")
+        self.assertEqual(by_segment["2_5"]["leaderId"], "agent_3_0")
+
+    def test_targets_without_digraph_edge_go_to_fallback_swarm(self):
+        planned = self._planned_routes()
+        planned["agent_9_9"] = {"flightPlan": [{"order": 0, "segmentKey": "7_8", "fromNode": "7", "toNode": "8"}]}
+        raw_trajs = {name: ([], []) for name in planned}
+        meta = build_mission_meta(self._digraph_attrs(), planned, raw_trajs)
+        fallback = [item for item in meta["swarms"] if item["segmentKey"] is None]
+        self.assertEqual(len(fallback), 1)
+        self.assertEqual(fallback[0]["memberIds"], ["agent_9_9"])
+        self.assertIsNone(fallback[0]["orderType"])
+        self.assertIn("note", fallback[0])
+
+    def test_missing_digraph_attrs_are_tolerated(self):
+        raw_trajs = {name: ([], []) for name in self._planned_routes()}
+        meta = build_mission_meta([{"from": 0, "to": 3}], self._planned_routes(), raw_trajs)
+        self.assertEqual(meta["swarms"][0]["orderType"], None)
+        self.assertEqual(meta["swarms"][0]["segmentKey"], "0_3")
 
 
 class PhysicalStepTests(unittest.TestCase):
