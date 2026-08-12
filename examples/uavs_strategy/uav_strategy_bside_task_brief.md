@@ -85,7 +85,8 @@ elif switch_config == 5:
 
 - **digraph_attrs 必须是顶层 list**：本项目 `extract_uav_trajectories` 直接 `for item in json_data`。转换器输出已是顶层 list；不要套成 `{"...": [...]}` 字典（手工图 config 3 那种 `_digraph_with_attrs` 包装会让 `MissionOrchestrator.__init__` 崩）。
 - **members_num = 实际 spawn 的 agent 数**，不是资源上限。固定 3（每航段 4 架）。别调到几百几千，会让 XMPP/Redis 崩。
-- **`save_trajectories` 的同步过滤当前恒空**：`is_waiting` 字段写入的是 `True`/`"False"`/`"flying to start"` 等 truthy 值，导致 `segment_common_frames` 恒空、`uavs_coords_str` 退化。做可视化用 `uavs_coords_raw`。修复点是把 `is_waiting` 判断改成只认明确的等待值。
+- **`save_trajectories` 的同步过滤已修复**：`is_waiting` 统一为 JSON 布尔值，`waiting_reason/flight_phase` 承载详细阶段语义；`uavs_coords_str` 只输出任务飞行帧，`uavs_coords_raw` 保留完整原始记录。
+- **已启用有界物理步进**：DT=0.5s，默认水平速度上限 16m/s，爬升/下降率上限 5m/s，避免 80m/500ms 强同步瞬移。
 - **round 全局同步**：`GlobalRoundCoordinator` 要求所有 blue agent `round_done==current_round` 才推进 round；已完成 agent 仍会 mark round_done，不会死锁。改动等待逻辑时别破坏这点。
 - **运行前置**：Redis `127.0.0.1:6379`、XMPP server `127.0.0.1` 必须先起；入口 `python -m examples.uavs_strategy.uav_dynamic_agents02`。
 

@@ -100,6 +100,7 @@ NLTaskOrchestration 把自然语言作战指令编排成任务 DAG，经转换�
 
 - **`digraph_attrs` 必须顶层 list**：`extract_uav_trajectories` 直接 `for item in json_data`。转换器输出已是顶层 list（手工图 config 3 的 `_digraph_with_attrs` 字典包装会让 `MissionOrchestrator.__init__` 崩）。
 - **`members_num` = 实际 spawn 的 agent 数**（= SPADE agent 数 + 编队轨迹数），不是资源上限。当前固定 3（每航段 4 架），别调到几百几千会崩 XMPP/Redis。
-- **`save_trajectories` 同步视图恒空（已知 bug）**：`is_waiting` 写入的是 `True` / `"False"` / `"flying to start"` 等 truthy 值，导致 `segment_common_frames` 恒空、`uavs_coords_str` 退化为空。当前做可视化用 `uavs_coords_raw`；修复时把 `is_waiting` 判断改成只认明确的等待值。
+- **`save_trajectories` 同步视图（已修复）**：`is_waiting` 现为 JSON 布尔值，原因单独写入 `waiting_reason`；`uavs_coords_str` 按 `flight_phase=task_flight` 筛选，`uavs_coords_raw` 仍保留初始化、定位和等待帧。
+- **运动学步进（已修复）**：参考轨迹点之间不再强同步瞬移；DT=0.5s 时水平步长上限 8m，爬升/下降步长上限 2.5m。
 - **round 全局同步**：`GlobalRoundCoordinator` 要求所有 blue agent `round_done==current_round` 才推进；已完成 agent 仍 mark round_done，不死锁。改 L2 等待逻辑时勿破坏这点。
 - **观察项**：初始阵位随机聚集、航段拼接处间隙检测被注释（无条件 `extend`）可能有几何跳变、防御圈避障可能让某段绕远——均为现有行为，跑时留意。
