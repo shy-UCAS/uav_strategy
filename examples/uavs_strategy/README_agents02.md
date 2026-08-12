@@ -281,7 +281,37 @@ Redis 当前位置中的 `ts` 也使用 `simTimeMs`，而 `recordedAtMs` 保留�
 
 `lngs/lats/alts/ts/extras` 必须等长，`ts` 必须严格递增。SituationEngine 对单个目标默认至少要求 6 个轨迹点；航段过短或同步交集不足 6 点时，仍需在样本组装层合并连续任务帧或跳过该目标。
 
-### 7.5 与 latest 的字段对应
+### 7.5 完整 flight_plan 与计划航迹导出
+
+`cur_reference_traj` 和 Redis 的 `uav:{uid}:ref_traj` 都只保存当前航段，进入下一航段时会被覆盖。`save_trajectories()` 现在新增 `plannedRoutes`：按 `agent.flight_plan` 的航段顺序读取每个 `(fromNode,toNode,memberId)` 对应的 `nodes_pair_member_traj`，重建每架无人机的完整计划航迹。
+
+```json
+{
+  "plannedRoutes": {
+    "agent_1_0": {
+      "source": "nodes_pair_member_traj",
+      "altitudeReference": "AMSL",
+      "complete": true,
+      "flightPlan": [
+        {"order": 0, "segmentKey": "0_3", "fromNode": "0", "toNode": "3"}
+      ],
+      "segmentCount": 1,
+      "routePointCount": 80,
+      "flightRoute": [
+        {"lng": 116.36, "lat": 39.87, "alt": 200.0}
+      ],
+      "segments": [],
+      "missingSegments": []
+    }
+  }
+}
+```
+
+拼接只删除两个航段完全相同的公共端点；如果换队形等原因造成航段边界不连续，会保留两侧端点，不会静默丢掉下一航段起点。某段参考轨迹缺失时不影响原有轨迹文件保存，当前目标标记 `complete=false` 并在 `missingSegments` 中给出原因。
+
+该逻辑只在仿真结束导出时读取 Redis，不修改 `cur_reference_traj`、lookahead、同步状态或 Agent 飞行过程。`flightRoute` 是计划轨迹，`uavs_coords_str/uavs_coords_raw` 仍是实际执行轨迹，两者保持独立。
+
+### 7.6 与 latest 的字段对应
 
 | agent02 导出 | latest `uavs_coords_str.targetId` | 说明 |
 |---|---|---|
@@ -291,16 +321,35 @@ Redis 当前位置中的 `ts` 也使用 `simTimeMs`，而 `recordedAtMs` 保留�
 | `ts` | `ts` | epoch 毫秒，由统一仿真时钟生成 |
 | `extras` | latest 非必填扩展 | 用于溯源、阶段过滤和排错 |
 
-设施与圈层仍需由接入层把 `facilities_str/defence_rings` 映射到 latest 的 `baseData.facilities/rings`；身份、登记、载荷等 `targetAttributes` 也不是 agent02 轨迹本身能提供的数据，由适配层使用模拟值或协议默认值补齐。完整映射清单见 `situationawareness latest/agents02_to_situation_judgment_接入清单.md`。
+设施、圈层和目标属性由 latest 侧离线适配器补齐，agent02 主程序继续只负责仿真和导出，避免把 SituationEngine 耦合进 SPADE/Redis 运行循环。完整映射清单见 `situationawareness latest/agents02_to_situation_judgment_接入清单.md`。
 
-### 7.6 可视化兼容
+### 7.7 latest 离线适配器
+
+已实现 `situationawareness latest/tools/agents02_export_to_payload.py`，负责：
+
+- 读取 `uav_trajectories_persistent_*.json`，默认消费 `uavs_coords_str`；
+- 校验并兼容 `ts/simTimeMs/round_id`，过滤非 `task_flight`、等待和初始化样本；
+- 生成默认 12 点、步幅 6 的滑动窗口，确保单目标至少 6 点；
+- 用共同快照截止时间组装多目标请求，并排除超过 `simulationMeta.dtMs` 的陈旧位置；
+- 映射 `facilities_str/defence_rings`，补齐 `baseData` 六个数组和默认 `targetAttributes`；
+- 输出 `adapterMeta + payloads[]`，也可直接逐项调用 `SituationEngine.analyze()`。
+
+在 latest 根目录、`study` 环境运行：
+
+```powershell
+conda run -n study python tools/agents02_export_to_payload.py "../uav_strategy/examples/uavs_strategy/data/raw_data/uav_trajectories_persistent_20260812_001009.json" "../uav_strategy/examples/uavs_strategy/data/facilities_shaoxing.json" --output outputs/agents02_analyze_payloads.json --require-all-targets --call-engine
+```
+
+将占位符替换成一个明确的 `uav_trajectories_persistent_*.json` 文件名。若需要每个时刻尽量保留当前活跃目标，可去掉 `--require-all-targets`；若需要放宽跨 Agent 的时钟偏差，可显式设置 `--max-snapshot-skew-ms`，但不建议用过大值把陈旧位置拼成一个蜂群快照。
+
+### 7.8 可视化兼容
 
 - 实时可视化优先使用新布尔值 `is_waiting`，同时兼容历史字符串数据，避免 `"False"` 被显示为等待中。
 - 实时面板和离线回放面板增加 `waiting_reason` 和 `flight_phase`。
 - 实时活跃性使用 `recordedAtMs`，不使用可能跑在真实墙钟前后的 `simTimeMs`。
 - 离线回放可根据用途选择 `uavs_coords_raw` 或 `uavs_coords_str`：前者展示完整生命周期，后者展示 latest 实际消费的任务轨迹。
 
-### 7.7 回归测试与验证
+### 7.9 回归测试与验证
 
 新增 `tests/test_agents02_trajectory_contract.py`，覆盖：
 
@@ -310,6 +359,8 @@ Redis 当前位置中的 `ts` 也使用 `simTimeMs`，而 `recordedAtMs` 保留�
 4. 统一时钟每 round 精确增加 500ms。
 5. 水平位移、爬升和下降不超过配置上限，短距离不超调。
 6. 最后一个参考点未真正到达时不提前完成任务。
+7. 多航段完整 `flight_plan` 按顺序拼接，重复公共端点只保留一次。
+8. 航段边界不一致时保留两侧点，缺失航段标记为不完整但不丢失其他航段。
 
 在 `study` 环境运行：
 
@@ -317,18 +368,22 @@ Redis 当前位置中的 `ts` 也使用 `simTimeMs`，而 `recordedAtMs` 保留�
 conda run -n study python -m unittest discover -s tests -p "test*.py" -v
 ```
 
-当前新增的 8 项契约/物理测试全部通过，相关 Python 文件也已通过 `py_compile`。这些是不依赖 Redis/Openfire 的逻辑回归；每次改动 round/barrier 或 Redis 写入逻辑后，仍应补跑一次完整 SPADE + Redis + XMPP 仿真。
+当前新增的 11 项契约、物理和完整计划航迹测试全部通过，相关 Python 文件也已通过 `py_compile`。这些是不依赖 Redis/Openfire 的逻辑回归；每次改动 round/barrier 或 Redis 写入逻辑后，仍应补跑一次完整 SPADE + Redis + XMPP 仿真。
 
-### 7.8 本轮改造文件清单
+latest 侧另有 `tests/test_agents02_export_adapter.py`，覆盖设施/圈层映射、阶段过滤、历史时间兼容、滑窗、多目标快照、陈旧目标剔除和 SituationEngine 直连。当前 7 项测试全部通过；改造后的实际样本以 `--require-all-targets` 转换后，13 个目标直连引擎得到 `code=0`、`skippedTargets=[]`、3 个集群。
+
+### 7.10 本轮改造文件清单
 
 | 文件 | 改动 |
 |---|---|
-| `uav_dynamic_agents02.py` | 统一仿真时钟字段、初始阶段元数据、raw/分析轨迹分层、旧数据兼容过滤、公共帧交集、高度与毫秒 `ts`、`simulationMeta.kinematics` |
+| `uav_dynamic_agents02.py` | 统一仿真时钟字段、初始阶段元数据、raw/分析轨迹分层、旧数据兼容过滤、公共帧交集、高度与毫秒 `ts`、`simulationMeta.kinematics`、完整 `plannedRoutes` 重建导出 |
 | `behaviors_modules/uav_periodic_behaviours.py` | 有界水平/垂直物理步进、三维到达判定、终点完成防提前、布尔 `is_waiting`、`waiting_reason/flight_phase` |
 | `redis_modules/uav_redis_io.py` | 当前位置 `ts` 使用 `simTimeMs`，保留 `recordedAtMs` 诊断墙钟 |
 | `visualize/redis_data_visualize.py` | 新旧等待值兼容，显示等待原因和飞行阶段 |
 | `visualize/pyqt_visualize.py` | 离线面板显示等待原因和飞行阶段 |
-| `tests/test_agents02_trajectory_contract.py` | 新增 8 项轨迹契约、时钟与物理步进回归测试 |
+| `tests/test_agents02_trajectory_contract.py` | 新增 11 项轨迹契约、时钟、物理步进和完整计划航迹回归测试 |
+| `situationawareness latest/tools/agents02_export_to_payload.py` | agent02 导出到 `SituationEngine.analyze()` 请求的离线适配器和可选引擎回放 CLI |
+| `situationawareness latest/tests/test_agents02_export_adapter.py` | 新增 7 项适配器契约及引擎直连测试 |
 | `situationawareness latest/agents02_to_situation_judgment_接入清单.md` | 更新生产者当前能力、已完成项和风险边界 |
 
 ## 8. 已知问题与后续建议
@@ -340,4 +395,4 @@ conda run -n study python -m unittest discover -s tests -p "test*.py" -v
 - **高度口径**：agent02 导出绝对高度，latest 协议中 `alts` 定义为 AGL；当前可用于仿真样本，接入真实地形后需增加高程基准换算。
 - **latest 最小点数**：分析轨迹经阶段过滤和多 Agent 交集后可能不足 6 点，应在滑动窗口/样本组装层检查，不应回退到 raw 初始化帧凑点数。
 - **仿真倍速尚未实现**：当前 Agent 墙钟调度周期仍为 `DT=0.5s`。后续若需缩短实际运行时间，应新增独立 `SIM_SPEEDUP`，只把行为的墙钟周期改为 `DT/SIM_SPEEDUP`；不要改变仿真 `DT`、`sim_dt_ms`或每帧物理步长，否则会再次改变 latest 计算的速度和 ETA。
-- **完整联调**：当前契约与物理逻辑回归已通过；发布新样本前还应在 `study` 环境完整运行 Redis + Openfire + SPADE，并用导出 JSON 调用一次 SituationEngine。
+- **完整联调**：当前契约、物理逻辑、实际导出转换和 SituationEngine 本地直连已通过；HTTP 服务回放及 I-01~I-30 意图结果验收仍待后续联调。

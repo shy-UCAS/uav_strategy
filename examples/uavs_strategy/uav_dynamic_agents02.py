@@ -26,7 +26,7 @@ import random
 import math
 import networkx as nx
 
-from typing import Dict, List, Optional, Iterable, Tuple, Any
+from typing import Callable, Dict, List, Optional, Iterable, Tuple, Any
 from matplotlib.animation import FuncAnimation
 # from time import time
 from datetime import datetime
@@ -169,6 +169,127 @@ def select_analysis_trajectory(
     return selected_trajectory, selected_extras
 
 
+def _flight_plan_segment_nodes(segment: Any) -> Tuple[str, str]:
+    """Return one ``(from_node, to_node)`` pair from a flight-plan entry."""
+    raw_pair = segment.get("segment") if isinstance(segment, dict) else segment
+    if not isinstance(raw_pair, (list, tuple)) or len(raw_pair) < 2:
+        raise ValueError("flight_plan segment must contain from/to nodes")
+    return str(raw_pair[0]), str(raw_pair[1])
+
+
+def _route_points_from_utm(
+    trajectory: List[List[float]],
+    lnglat_converter: Any,
+    segment_key: str,
+) -> List[Dict[str, float]]:
+    """Convert a 3-D UTM reference trajectory into FlightPlanDto route points."""
+    try:
+        trajectory_np = np.asarray(trajectory, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("{} contains non-numeric reference points".format(segment_key)) from exc
+    if trajectory_np.ndim != 2 or trajectory_np.shape[0] == 0 or trajectory_np.shape[1] < 3:
+        raise ValueError("{} requires non-empty [x,y,z] reference points".format(segment_key))
+    if not np.isfinite(trajectory_np[:, :3]).all():
+        raise ValueError("{} contains non-finite reference points".format(segment_key))
+
+    lnglat = np.asarray(lnglat_converter.utm_to_lng_lat_array(trajectory_np), dtype=float)
+    if lnglat.ndim != 2 or lnglat.shape[0] != trajectory_np.shape[0] or lnglat.shape[1] < 2:
+        raise ValueError("{} UTM conversion returned an invalid shape".format(segment_key))
+    return [
+        {
+            "lng": float(lnglat[index, 0]),
+            "lat": float(lnglat[index, 1]),
+            "alt": float(trajectory_np[index, 2]),
+        }
+        for index in range(trajectory_np.shape[0])
+    ]
+
+
+def build_complete_flight_plan_export(
+    flight_plan: Iterable[Any],
+    member_id: str,
+    segment_trajectory_getter: Callable[[str, str, str], List[List[float]]],
+    lnglat_converter: Any,
+) -> Dict[str, Any]:
+    """Rebuild one member's complete planned route from per-segment Redis data.
+
+    ``cur_reference_traj`` and ``uav:{uid}:ref_traj`` are overwritten whenever
+    the Agent enters a new segment.  The per-node-pair member trajectories use
+    distinct Redis keys, so walking ``flight_plan`` in order is the reliable
+    way to preserve the complete pre-planned route without changing execution.
+    """
+    ordered_plan = []
+    exported_segments = []
+    missing_segments = []
+    complete_utm: List[List[float]] = []
+
+    for order, raw_segment in enumerate(flight_plan or []):
+        from_node, to_node = _flight_plan_segment_nodes(raw_segment)
+        segment_key = "{}_{}".format(from_node, to_node)
+        ordered_plan.append(
+            {
+                "order": order,
+                "segmentKey": segment_key,
+                "fromNode": from_node,
+                "toNode": to_node,
+            }
+        )
+        try:
+            raw_trajectory = segment_trajectory_getter(from_node, to_node, member_id)
+            if not raw_trajectory:
+                missing_segments.append(
+                    {"segmentKey": segment_key, "reason": "member reference trajectory is missing"}
+                )
+                continue
+            trajectory_np = np.asarray(raw_trajectory, dtype=float)
+            route_points = _route_points_from_utm(raw_trajectory, lnglat_converter, segment_key)
+        except (TypeError, ValueError) as exc:
+            missing_segments.append({"segmentKey": segment_key, "reason": str(exc)})
+            continue
+
+        segment_utm = trajectory_np[:, :3].tolist()
+        exported_segments.append(
+            {
+                "order": order,
+                "segmentKey": segment_key,
+                "fromNode": from_node,
+                "toNode": to_node,
+                "routePointCount": len(route_points),
+                "flightRoute": route_points,
+            }
+        )
+
+        # Drop only a genuinely duplicated segment boundary.  If formation
+        # changes introduce a gap, keep both points so the declared plan does
+        # not silently lose the next segment's start position.
+        start_index = 0
+        if complete_utm and np.allclose(
+            np.asarray(complete_utm[-1], dtype=float),
+            np.asarray(segment_utm[0], dtype=float),
+            rtol=0.0,
+            atol=1e-6,
+        ):
+            start_index = 1
+        complete_utm.extend(segment_utm[start_index:])
+
+    complete_route = (
+        _route_points_from_utm(complete_utm, lnglat_converter, "complete_flight_plan")
+        if complete_utm
+        else []
+    )
+    return {
+        "source": "nodes_pair_member_traj",
+        "altitudeReference": "AMSL",
+        "complete": bool(ordered_plan) and not missing_segments,
+        "flightPlan": ordered_plan,
+        "segmentCount": len(ordered_plan),
+        "routePointCount": len(complete_route),
+        "flightRoute": complete_route,
+        "segments": exported_segments,
+        "missingSegments": missing_segments,
+    }
+
+
 init_loc1 = [
     122.18105710089186,
     37.51299467977935,
@@ -216,7 +337,8 @@ height_range_value_set = {
     'escape': [[0, 100], [250, 400]],
     'detour': [[0, 100], [200, 400]],
     'orbit': [[150, 300], [150, 300]],     # 侦察盘旋：中低空保持
-    'loiter': [[200, 350], [200, 350]]     # 待命悬停
+    'loiter': [[200, 350], [200, 350]],    # 待命悬停
+    'routine': [[200, 300], [200, 300]]    # 常规机动：平飞保持
 }
 direction_range_set = {
     'breakthrough': [-20, 20],
@@ -842,6 +964,40 @@ class MissionOrchestrator:
             traj_extra = agent.io.get_traj_extra(agent.self_uid)
             raw_trajs[name] = (traj_utm, traj_extra)
 
+        # 2.1 完整计划航迹：cur_reference_traj/ref_traj 只保存当前航段，
+        # 因此按每架无人机的 flight_plan 顺序读取分航段成员参考轨迹并拼接。
+        # 这里只增加导出数据，不修改 Agent 执行状态、lookahead 或 Redis 内容。
+        planned_routes = {}
+        for name, agent in self.active_agents.items():
+            try:
+                planned_routes[name] = build_complete_flight_plan_export(
+                    agent.flight_plan,
+                    agent.self_uid,
+                    agent.io.get_nodes_pair_member_traj,
+                    self._lnglat2utm_convertor,
+                )
+            except Exception as exc:
+                planned_routes[name] = {
+                    "source": "nodes_pair_member_traj",
+                    "altitudeReference": "AMSL",
+                    "complete": False,
+                    "flightPlan": [],
+                    "segmentCount": len(agent.flight_plan or []),
+                    "routePointCount": 0,
+                    "flightRoute": [],
+                    "segments": [],
+                    "missingSegments": [
+                        {"segmentKey": None, "reason": "export failed: {}".format(exc)}
+                    ],
+                }
+            if not planned_routes[name]["complete"]:
+                print(
+                    "[save_trajectories] Warning: incomplete planned route for {}: {}".format(
+                        name,
+                        planned_routes[name]["missingSegments"],
+                    )
+                )
+
         segment_common_frames = build_segment_common_frames(raw_trajs)
         print(
             "segment_common_frames: "
@@ -929,6 +1085,7 @@ class MissionOrchestrator:
             "simulationMeta": simulation_meta,
             "uavs_coords_str": uavs_coords,
             "uavs_coords_raw": uavs_coords_raw,
+            "plannedRoutes": planned_routes,
             "facilities_str": facilities_str,
             "defence_rings": defence_rings
         }

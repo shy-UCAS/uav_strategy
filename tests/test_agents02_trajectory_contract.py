@@ -14,12 +14,21 @@ from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import (
     SyncAPFStepEnhance,
 )
 from examples.uavs_strategy.uav_dynamic_agents02 import (
+    build_complete_flight_plan_export,
     build_segment_common_frames,
     is_analysis_ready_trajectory_point,
     select_analysis_trajectory,
     simulation_time_ms,
     trajectory_timestamps_ms,
 )
+
+
+class IdentityLngLatConverter:
+    """Treat test x/y values as lng/lat so route stitching can be tested alone."""
+
+    @staticmethod
+    def utm_to_lng_lat_array(trajectory):
+        return [[point[0], point[1]] for point in trajectory]
 
 
 class TrajectoryPhaseContractTests(unittest.TestCase):
@@ -127,6 +136,67 @@ class SimulationClockTests(unittest.TestCase):
             trajectory_timestamps_ms([{"simTimeMs": value} for value in timestamps]),
             timestamps,
         )
+
+
+class CompleteFlightPlanExportTests(unittest.TestCase):
+    def test_two_segments_are_stitched_and_duplicate_boundary_is_removed(self):
+        trajectories = {
+            ("0", "1", "agent_1_0"): [[1.0, 2.0, 100.0], [3.0, 4.0, 110.0]],
+            ("1", "2", "agent_1_0"): [[3.0, 4.0, 110.0], [5.0, 6.0, 120.0]],
+        }
+
+        exported = build_complete_flight_plan_export(
+            [("0", "1"), ("1", "2")],
+            "agent_1_0",
+            lambda start, end, member: trajectories.get((start, end, member), []),
+            IdentityLngLatConverter(),
+        )
+
+        self.assertTrue(exported["complete"])
+        self.assertEqual(exported["segmentCount"], 2)
+        self.assertEqual(exported["routePointCount"], 3)
+        self.assertEqual(
+            exported["flightRoute"],
+            [
+                {"lng": 1.0, "lat": 2.0, "alt": 100.0},
+                {"lng": 3.0, "lat": 4.0, "alt": 110.0},
+                {"lng": 5.0, "lat": 6.0, "alt": 120.0},
+            ],
+        )
+        self.assertEqual(
+            [item["segmentKey"] for item in exported["flightPlan"]],
+            ["0_1", "1_2"],
+        )
+
+    def test_non_matching_segment_boundary_is_preserved(self):
+        trajectories = {
+            ("0", "1", "agent"): [[1.0, 2.0, 100.0], [3.0, 4.0, 110.0]],
+            ("1", "2", "agent"): [[30.0, 40.0, 115.0], [5.0, 6.0, 120.0]],
+        }
+        exported = build_complete_flight_plan_export(
+            [("0", "1"), ("1", "2")],
+            "agent",
+            lambda start, end, member: trajectories.get((start, end, member), []),
+            IdentityLngLatConverter(),
+        )
+
+        self.assertEqual(exported["routePointCount"], 4)
+        self.assertEqual(exported["flightRoute"][2]["lng"], 30.0)
+
+    def test_missing_segment_marks_export_incomplete_without_losing_other_segments(self):
+        trajectories = {
+            ("0", "1", "agent"): [[1.0, 2.0, 100.0], [3.0, 4.0, 110.0]],
+        }
+        exported = build_complete_flight_plan_export(
+            [("0", "1"), ("1", "2")],
+            "agent",
+            lambda start, end, member: trajectories.get((start, end, member), []),
+            IdentityLngLatConverter(),
+        )
+
+        self.assertFalse(exported["complete"])
+        self.assertEqual(exported["routePointCount"], 2)
+        self.assertEqual(exported["missingSegments"][0]["segmentKey"], "1_2")
 
 
 class PhysicalStepTests(unittest.TestCase):
