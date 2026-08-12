@@ -1,5 +1,7 @@
 import sys
 import json
+from datetime import datetime
+
 import numpy as np
 import matplotlib.pyplot as plt
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
@@ -10,6 +12,15 @@ from matplotlib.figure import Figure
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,
                              QPushButton, QCheckBox, QSlider, QLabel, QFileDialog, QWidget, QTextEdit, QSplitter)
 from PyQt5.QtCore import Qt, QTimer
+
+
+def _format_epoch_ms(ms):
+    """epoch 毫秒 → 可读本地时间（如 2026-08-12 13:12:24.043）；失败时回显原值。"""
+    try:
+        return datetime.fromtimestamp(int(ms) / 1000.0).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    except (TypeError, ValueError, OSError, OverflowError):
+        return str(ms)
+
 
 class UAVVisualizer(QMainWindow):
     def __init__(self):
@@ -27,6 +38,11 @@ class UAVVisualizer(QMainWindow):
         self.is_playing = False
         self.is_utm = False
         self.facilities = None  # 用于存储地图设施数据
+        # 导出附加信息（2026-08-13 起展示在右侧信息面板）
+        self.simulation_meta = {}   # 顶层 simulationMeta
+        self.mission_meta = {}      # 顶层 missionMeta（集群任务语义）
+        self.planned_routes = {}    # 顶层 plannedRoutes（计划航迹）
+        self.swarm_by_member = {}   # targetId → 所属集群条目
 
         # 定时器用于动画播放
         self.timer = QTimer()
@@ -145,7 +161,7 @@ class UAVVisualizer(QMainWindow):
 
         # --- 右侧：状态信息显示区域 ---
         self.info_panel = QVBoxLayout()
-        self.info_label = QLabel("无人机实时状态信息")
+        self.info_label = QLabel("无人机状态与任务语义信息")
         self.info_display = QTextEdit()
         self.info_display.setReadOnly(True)
         self.info_display.setPlaceholderText("等待数据加载...")
@@ -188,6 +204,16 @@ class UAVVisualizer(QMainWindow):
 
         self.data = json_data["uavs_coords_raw"]
         self.uav_ids = list(self.data.keys())
+        # 导出附加信息（旧导出缺失时按空处理，面板显示 N/A/未包含）
+        self.simulation_meta = json_data.get("simulationMeta") or {}
+        self.mission_meta = json_data.get("missionMeta") or {}
+        self.planned_routes = json_data.get("plannedRoutes") or {}
+        self.swarm_by_member = {}
+        for swarm in (self.mission_meta.get("swarms") or []):
+            if not isinstance(swarm, dict):
+                continue
+            for member in (swarm.get("memberIds") or []):
+                self.swarm_by_member[str(member)] = swarm
         
         # 计算最大步数
         self.max_steps = 0
@@ -375,27 +401,104 @@ class UAVVisualizer(QMainWindow):
     def update_info_display(self):
         """
         每更新一个 step 就同步更新所有无人机信息。
-        这里预留了逻辑，后续可以根据 extras 里的字段进行更复杂的展示。
+        除 extras 基础字段外，还展示导出新增的附加信息：
+        simulationMeta（统一时钟/运动学）、missionMeta（集群任务语义）、
+        高度 alts、仿真时间 simTimeMs/round_id、plannedRoutes 计划航迹。
         """
         if not self.data: return
-        
+
         info_text = f"--- Step {self.current_step} 实时状态 ---\n\n"
-        
+
+        # ---- 仿真元信息（simulationMeta，导出统一时钟与运动学上限） ----
+        if self.simulation_meta:
+            info_text += "== 仿真元信息 (simulationMeta) ==\n"
+            start_ms = self.simulation_meta.get("startTimeMs")
+            info_text += f"仿真起点: {_format_epoch_ms(start_ms) if start_ms is not None else 'N/A'}\n"
+            info_text += f"时间基准: {self.simulation_meta.get('timeBasis', 'N/A')}  dt={self.simulation_meta.get('dtMs', 'N/A')}ms\n"
+            kinematics = self.simulation_meta.get("kinematics") or {}
+            if kinematics:
+                info_text += (
+                    f"运动学上限: 水平{kinematics.get('maxHorizontalSpeedMps', 'N/A')}m/s "
+                    f"爬升{kinematics.get('maxClimbRateMps', 'N/A')}m/s "
+                    f"下降{kinematics.get('maxDescentRateMps', 'N/A')}m/s\n"
+                )
+
+        # ---- 集群任务语义（missionMeta，2026-08-13 新增导出） ----
+        swarms = self.mission_meta.get("swarms") or []
+        if swarms:
+            info_text += "\n== 集群任务语义 (missionMeta) ==\n"
+            for swarm in swarms:
+                if not isinstance(swarm, dict):
+                    continue
+                members = swarm.get("memberIds") or []
+                info_text += (
+                    f"[{swarm.get('swarmId', '?')}] 任务类型={swarm.get('orderType', 'N/A')} "
+                    f"目标={swarm.get('target', 'N/A')} 航段={swarm.get('segmentKey', 'N/A')} "
+                    f"舰队={swarm.get('fleetNo', 'N/A')} 领队={swarm.get('leaderId', 'N/A')}\n"
+                )
+                info_text += f"  成员({len(members)}): {', '.join(str(m) for m in members)}\n"
+        else:
+            info_text += "== 集群任务语义 (missionMeta) ==\n导出未包含 missionMeta\n"
+
+        info_text += "\n" + "-"*40 + "\n\n"
+
         for uid in self.uav_ids:
             uav_info = self.data[uid]
             if self.current_step < len(uav_info["extras"]):
                 extra = uav_info["extras"][self.current_step]
-                
+
                 info_text += f"【无人机: {uid}】\n"
+
+                # 所属集群（missionMeta 语义归属）
+                swarm = self.swarm_by_member.get(uid)
+                if swarm:
+                    info_text += (
+                        f"所属集群: {swarm.get('swarmId', '?')} "
+                        f"(任务={swarm.get('orderType', 'N/A')}, 目标={swarm.get('target', 'N/A')})\n"
+                    )
+
                 if self.is_utm:
                     cur_x, cur_y = self._lnglat2utm_convertor.lon_lat_to_utm(uav_info['lngs'][self.current_step], uav_info['lats'][self.current_step])
                     info_text += f"位置 (UTM): ({cur_x:.2f}, {cur_y:.2f})\n"
                 else:
                     info_text += f"位置: ({uav_info['lngs'][self.current_step]:.6f}, {uav_info['lats'][self.current_step]:.6f})\n"
+
+                # 高度（alts 与轨迹等长）
+                if "alts" in uav_info and self.current_step < len(uav_info["alts"]):
+                    alt = uav_info["alts"][self.current_step]
+                    if alt is not None:
+                        info_text += f"高度: {alt:.2f} m\n"
+
+                # 仿真时间与写入延迟（统一时钟字段）
+                sim_time_ms = extra.get("simTimeMs")
+                if sim_time_ms is not None:
+                    info_text += f"仿真时间: {_format_epoch_ms(sim_time_ms)} (round={extra.get('round_id', 'N/A')})\n"
+                    recorded_at = extra.get("recordedAtMs")
+                    if recorded_at is not None:
+                        try:
+                            info_text += f"写入延迟: {int(recorded_at) - int(sim_time_ms)} ms\n"
+                        except (TypeError, ValueError):
+                            pass
+
+                # 计划航迹（plannedRoutes：完整飞行计划与完整性）
+                plan = self.planned_routes.get(uid) or {}
+                if plan:
+                    segments = [seg.get("segmentKey") for seg in plan.get("flightPlan") or []]
+                    info_text += (
+                        f"计划航迹: {plan.get('segmentCount', '?')}段 {plan.get('routePointCount', '?')}点 "
+                        f"complete={plan.get('complete', '?')} segments={segments or 'N/A'}\n"
+                    )
+                    missing = plan.get("missingSegments") or []
+                    if missing:
+                        info_text += f"缺失航段: {[m.get('segmentKey') for m in missing]}\n"
+
                 info_text += f"编队类型: {extra.get('formation_type', 'N/A')}\n"
                 info_text += f"航段Key: {extra.get('segment_key', 'N/A')}\n"
                 info_text += f"等待状态: {extra.get('is_waiting', 'N/A')}\n"
-                info_text += f"领队ID\同伴IDs: {extra.get('leader_id', 'N/A')} | {', '.join(extra.get('cur_siblings_ids', []))}\n"
+                siblings = extra.get("cur_siblings_ids")
+                if not isinstance(siblings, list):
+                    siblings = []  # 初始化阶段为字符串（如 "initializing"），不逐字符拼接
+                info_text += f"领队ID\同伴IDs: {extra.get('leader_id', 'N/A')} | {', '.join(str(s) for s in siblings)}\n"
                 info_text += f"等待原因: {extra.get('waiting_reason', extra.get('wait_message', 'N/A'))}\n"
                 info_text += f"step_id/my_ack: {extra.get('frame_id', 'N/A')}/{extra.get('my_ack', 'N/A')}\n"
                 info_text += f"同伴ACK状态: {extra.get('peers_ack_states', 'N/A')}\n"
@@ -403,7 +506,7 @@ class UAVVisualizer(QMainWindow):
                 info_text += f"预瞄点: {extra.get('lookahead', 'N/A')}\n"
                 info_text += f"当前阶段: {extra.get('phase_state', 'N/A')}\n"
                 info_text += f"飞行阶段: {extra.get('flight_phase', 'N/A')}\n"
-                
+
                 lookahead_coord = extra.get('lookahead_coord')
                 if lookahead_coord:
                     if self.is_utm:
@@ -411,7 +514,7 @@ class UAVVisualizer(QMainWindow):
                     else:
                         lookahead_lng, lookahead_lat = self._lnglat2utm_convertor.utm_to_lng_lat(lookahead_coord[0], lookahead_coord[1])
                         info_text += f"lookahead坐标: ({lookahead_lng:.6f}, {lookahead_lat:.6f})\n"
-                    
+
                 info_text += f"global_id: {extra.get('global_id', 'N/A')}\n"
                 info_text += "-"*25 + "\n"
         
