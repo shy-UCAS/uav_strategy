@@ -39,8 +39,135 @@ from examples.uavs_strategy.redis_modules.uav_redis_io import UavRedisIO
 from examples.uavs_strategy.planning_modules.uav_planning_actions import PlanningLib
 from examples.uavs_strategy.planning_modules import basic_functions as bfunc
 from examples.uavs_strategy.planning_modules.formation_generator import FormationGenerator3D, Formation_Elements
-from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import FetchWorldState, SyncAPFStep, SyncAPFStepEnhance, GlobalRoundCoordinator, DT
+from examples.uavs_strategy.behaviors_modules.uav_periodic_behaviours import (
+    DT,
+    MAX_CLIMB_RATE_MPS,
+    MAX_DESCENT_RATE_MPS,
+    MAX_HORIZONTAL_SPEED_MPS,
+    FetchWorldState,
+    GlobalRoundCoordinator,
+    SyncAPFStep,
+    SyncAPFStepEnhance,
+)
 from examples.uavs_strategy.key_path_analyzer import KeyPathAnalyzer
+
+SIM_CLOCK_START_KEY = "sim_start_time_ms"
+SIM_CLOCK_DT_KEY = "sim_dt_ms"
+
+
+def simulation_time_ms(start_time_ms: int, round_id: int, dt_ms: int) -> int:
+    """Return the shared simulation timestamp for one global round."""
+    return int(start_time_ms) + int(round_id) * int(dt_ms)
+
+
+def trajectory_timestamps_ms(extras: List[Dict[str, Any]]) -> List[int]:
+    """Extract latest-compatible Unix millisecond timestamps from trajectory metadata.
+
+    New traces carry ``simTimeMs``.  The timestamp fallback keeps older trace
+    metadata readable while treating the historical ``timestamp`` value as
+    Unix seconds when necessary.
+    """
+    timestamps = []
+    for extra in extras or []:
+        value = extra.get("simTimeMs")
+        if value is None:
+            value = extra.get("timestamp")
+            if value is None:
+                raise ValueError("trajectory metadata is missing simTimeMs/timestamp")
+            value = float(value)
+            if abs(value) < 10_000_000_000:
+                value *= 1000.0
+        timestamps.append(int(round(float(value))))
+    return timestamps
+
+
+def _coerce_legacy_waiting(value: Any) -> bool:
+    """Interpret historical trajectory metadata without Python truthiness bugs."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return value.strip().lower() not in {"", "false", "0", "no", "none", "null"}
+    return bool(value)
+
+
+def is_analysis_ready_trajectory_point(extra: Dict[str, Any]) -> bool:
+    """Return whether one metadata record belongs in the latest-facing track.
+
+    New records use ``flight_phase`` and a real JSON boolean.  The legacy
+    fallback keeps older exports readable while excluding initialization,
+    positioning, barrier waits, and malformed/string frame identifiers.
+    """
+    if not isinstance(extra, dict):
+        return False
+
+    segment_key = extra.get("segment_key")
+    frame_id = extra.get("frame_id")
+    if segment_key in (None, "", "initializing"):
+        return False
+    if isinstance(frame_id, bool) or not isinstance(frame_id, int) or frame_id <= 0:
+        return False
+
+    flight_phase = extra.get("flight_phase")
+    if flight_phase is not None:
+        return flight_phase == "task_flight" and extra.get("is_waiting") is False
+
+    if _coerce_legacy_waiting(extra.get("is_waiting")):
+        return False
+    lookahead = extra.get("lookahead", frame_id)
+    return not isinstance(lookahead, bool) and isinstance(lookahead, int) and lookahead > 0
+
+
+def build_segment_common_frames(
+    raw_trajs: Dict[str, Tuple[List[List[float]], List[Dict[str, Any]]]]
+) -> Dict[str, set]:
+    """Build the common task-flight waypoint IDs for each participating group."""
+    segment_agents = collections.defaultdict(set)
+    segment_frames = collections.defaultdict(lambda: collections.defaultdict(set))
+    for name, (_, extras) in raw_trajs.items():
+        for extra in extras or []:
+            if not is_analysis_ready_trajectory_point(extra):
+                continue
+            segment_key = extra["segment_key"]
+            segment_agents[segment_key].add(name)
+            segment_frames[segment_key][name].add(extra["frame_id"])
+
+    common_frames = {}
+    for segment_key, agent_names in segment_agents.items():
+        frame_sets = [segment_frames[segment_key][name] for name in agent_names]
+        common_frames[segment_key] = set.intersection(*frame_sets) if frame_sets else set()
+    return common_frames
+
+
+def select_analysis_trajectory(
+    trajectory: List[List[float]],
+    extras: List[Dict[str, Any]],
+    segment_common_frames: Dict[str, set],
+) -> Tuple[List[List[float]], List[Dict[str, Any]]]:
+    """Select one final physical sample for every common task-flight waypoint."""
+    aligned_count = min(len(trajectory or []), len(extras or []))
+    last_index = {}
+    for index in range(aligned_count):
+        extra = extras[index]
+        if is_analysis_ready_trajectory_point(extra):
+            last_index[(extra["segment_key"], extra["frame_id"])] = index
+
+    selected_trajectory = []
+    selected_extras = []
+    for index in range(aligned_count):
+        extra = extras[index]
+        if not is_analysis_ready_trajectory_point(extra):
+            continue
+        key = (extra["segment_key"], extra["frame_id"])
+        if last_index.get(key) != index:
+            continue
+        if extra["frame_id"] not in segment_common_frames.get(extra["segment_key"], set()):
+            continue
+        selected_trajectory.append(trajectory[index])
+        selected_extras.append(extra)
+    return selected_trajectory, selected_extras
+
 
 init_loc1 = [
     122.18105710089186,
@@ -51,6 +178,20 @@ init_loc1 = [
 init_loc2 = [
     122.16096051695042,
     37.497235513573486,
+    200.0
+]
+
+# 绍兴空域 (switch_config == 6) 专用起始区：位于三个设施西偏南约 2~4km
+# 设施中心约 (116.3830°E, 39.9013°N)，两点为直径的圆即随机起飞区（跨度约 2km）
+init_loc3 = [
+    116.3480,
+    39.8720,
+    200.0
+]
+
+init_loc4 = [
+    116.3680,
+    39.8840,
     200.0
 ]
 init_locs = [
@@ -83,7 +224,7 @@ direction_range_set = {
     'detour': [0, 360]
 }
 
-switch_config = 5
+switch_config = 6
 
 current_dir = os.path.dirname(__file__)
 
@@ -126,6 +267,14 @@ elif switch_config == 5:
     facilities_file = os.path.join(_export_dir, "facilities.json")
     key_paths = json.load(open(os.path.join(_export_dir, "key_paths.json"), "r", encoding="utf-8"))
 
+elif switch_config == 6:
+    # 绍兴空域 (id=2086742451469029376)：三个设施分别执行 侦查-侦查-突破
+    # 航段图由 uav_manual_path_designer.py switch_case 3 生成（顶层 list 格式）
+    # 设施与防御圈由 data/gen_facilities_shaoxing.py 生成（三级半径共用 facilityList[0] 圆心）
+    digraph_attrs_reference_path = os.path.join(current_dir, "data", "manual_plan_graph", "manual_plan_graph01_digraph_attrs.json")
+    facilities_file = os.path.join(current_dir, "data", "facilities_shaoxing.json")
+    key_paths = [[0, 3], [1, 4], [2, 5]]
+
 key_path_instructions_path = os.path.join(current_dir,"data" ,"key-path-analyzer02.json")
 asl_file = os.path.join(current_dir, "uav_key_path.asl")
 digraph_attrs = json.load(open(digraph_attrs_reference_path, "r"))
@@ -147,9 +296,35 @@ class BlueUAVAgent(BDIAgent):
             self.step_logs = []
         self.step_logs.append(msg)
 
+    def simulation_time_fields(self, round_id: Optional[int] = None) -> Dict[str, Any]:
+        """Build shared simulation-clock fields plus a diagnostic wall clock.
+
+        ``timestamp`` remains Unix seconds for compatibility with existing
+        trajectory viewers.  ``simTimeMs`` is the canonical timestamp consumed
+        by exported ``ts`` arrays, while ``recordedAtMs`` records when this
+        agent actually wrote the Redis entry.
+        """
+        if round_id is None:
+            raw_round = self.io.get_world_state("sim_round")
+            if raw_round is None:
+                raise RuntimeError("sim_round is not initialized")
+            round_id = int(raw_round)
+
+        raw_start = self.io.get_world_state(SIM_CLOCK_START_KEY)
+        raw_dt = self.io.get_world_state(SIM_CLOCK_DT_KEY)
+        if raw_start is None or raw_dt is None:
+            raise RuntimeError("simulation clock is not initialized")
+
+        sim_time_ms = simulation_time_ms(int(raw_start), int(round_id), int(raw_dt))
+        return {
+            "timestamp": sim_time_ms / 1000.0,
+            "simTimeMs": sim_time_ms,
+            "recordedAtMs": int(time.time() * 1000),
+            "round_id": int(round_id),
+        }
+
     def __init__(self, jid, password, asl_file, flight_plan, siblings_ref ,orchestrator, init_pos=None, facilities=facilities_file, **kwargs):
         super().__init__(jid, password, asl_file)
-        from time import time
         self.flight_plan = flight_plan  # 航段列表: [{'segment': (u, v), 'coords': []}, ...]
         self.siblings_ref = siblings_ref
         self.orchestrator = orchestrator
@@ -178,7 +353,8 @@ class BlueUAVAgent(BDIAgent):
              # 但目前 extract_uav_trajectories 设置的 'coords' 是空的 (占位符)
              # 所以我们使用传入的 init_pos 或默认的随机逻辑
 
-             _rdm_init_pos = bfunc.generate_circle_positions_from_diameter(1, init_loc1, init_loc2)
+             _start_pair = (init_loc3, init_loc4) if switch_config == 6 else (init_loc1, init_loc2)
+             _rdm_init_pos = bfunc.generate_circle_positions_from_diameter(1, _start_pair[0], _start_pair[1])
              self.position = _rdm_init_pos[0]
              self.log(f"{self.jid} no initial position provided, generated random position: {self.position}")
 
@@ -192,7 +368,15 @@ class BlueUAVAgent(BDIAgent):
         self.io = UavRedisIO(**kwargs.get("redis_cfg", {}))
         self.self_uid = jid.split("@")[0] 
         self.io.add_uav_id(self.self_uid, blue=True)
-        self.io.set_pos(self.self_uid, self.traj[0][0], self.traj[0][1], self.position[2])
+        initial_time_fields = self.simulation_time_fields(round_id=0)
+        self.io.set_pos(
+            self.self_uid,
+            self.traj[0][0],
+            self.traj[0][1],
+            self.position[2],
+            ts_ms=initial_time_fields["simTimeMs"],
+            recorded_at_ms=initial_time_fields["recordedAtMs"],
+        )
         self.io.set_traj(self.self_uid, [[self.traj[0][0], self.traj[0][1], self.position[2]]])
         self.io.set_lookahead(self.self_uid, 0)
 
@@ -238,13 +422,15 @@ class BlueUAVAgent(BDIAgent):
             'lookahead': f"0",
             "global_id": f"{self.global_step_id} initializing",
             "segment_key": 'initializing',
-            "is_waiting": 'initializing',
+            "is_waiting": True,
+            "waiting_reason": "initializing",
+            "flight_phase": "initializing",
             'dist_to_target': 'initializing',
             'lookahead_coord': None,
             'phase_state': 'initializing',
             'leader_id': 'initializing',
-            "timestamp": time(),
-            "logs": getattr(self, "step_logs", []).copy()
+            "logs": getattr(self, "step_logs", []).copy(),
+            **initial_time_fields,
         }
         if hasattr(self, "step_logs"):
             self.step_logs.clear()
@@ -650,80 +836,51 @@ class MissionOrchestrator:
         uavs_coords = {}
 
         raw_trajs = {}
-        segment_agents = collections.defaultdict(set)
-        segment_frames = collections.defaultdict(lambda: collections.defaultdict(set))
 
         for name, agent in self.active_agents.items():
             traj_utm = agent.io.get_traj(agent.self_uid)
             traj_extra = agent.io.get_traj_extra(agent.self_uid)
             raw_trajs[name] = (traj_utm, traj_extra)
 
-            for extra in traj_extra or []:
-                if extra.get("is_waiting"):
-                    continue
-                seg_key = extra.get("segment_key")
-                frame_id = extra.get("frame_id")
-                if seg_key is None or frame_id is None:
-                    continue
-                segment_agents[seg_key].add(name)
-                segment_frames[seg_key][name].add(frame_id)
-        print(f"segment_frames: {json.dumps({k: {ak: list(av) for ak, av in v.items()} for k, v in segment_frames.items()}, indent=2)}")
-        segment_common_frames = {}
-        for seg_key, agents in segment_agents.items():
-            frame_sets = [segment_frames[seg_key].get(a, set()) for a in agents]
-            segment_common_frames[seg_key] = set.intersection(*frame_sets) if frame_sets else set()
+        segment_common_frames = build_segment_common_frames(raw_trajs)
+        print(
+            "segment_common_frames: "
+            + json.dumps(
+                {key: sorted(value) for key, value in segment_common_frames.items()},
+                indent=2,
+            )
+        )
 
         for name, agent in self.active_agents.items():
             traj_utm, traj_extra = raw_trajs.get(name, ([], []))
             if traj_utm:
-                if segment_common_frames:
-                    synced_traj = []
-                    synced_extra = []
-                    last_idx = {}
-                    for idx, extra in enumerate(traj_extra or []):
-                        if extra.get("is_waiting"):
-                            continue
-                        seg_key = extra.get("segment_key")
-                        frame_id = extra.get("frame_id")
-                        if seg_key is None or frame_id is None:
-                            continue
-                        last_idx[(seg_key, frame_id)] = idx
-
-                    for idx, extra in enumerate(traj_extra or []):
-                        if extra.get("is_waiting"):
-                            continue
-                        seg_key = extra.get("segment_key")
-                        frame_id = extra.get("frame_id")
-                        if seg_key is None or frame_id is None:
-                            continue
-                        if last_idx.get((seg_key, frame_id)) != idx:
-                            continue
-                        if frame_id in segment_common_frames.get(seg_key, set()):
-                            synced_traj.append(traj_utm[idx])
-                            synced_extra.append(extra)
-
-                    traj_utm = synced_traj
-                    traj_extra = synced_extra
-                    if not traj_utm:
-                        print(f"[save_trajectories] Warning: no synced frames for {name}")
-                        continue
+                traj_utm, traj_extra = select_analysis_trajectory(
+                    traj_utm,
+                    traj_extra or [],
+                    segment_common_frames,
+                )
+                if not traj_utm:
+                    print(f"[save_trajectories] Warning: no analysis-ready synced frames for {name}")
+                    continue
 
                 traj_np = np.array(traj_utm)
                 if traj_np.shape[0] > 0:
-                    # Convert to Lat/Lon
+                    # Convert to Lat/Lon (utm_to_lng_lat_array 只转换前两列，高度需单独取)
                     ll = self._lnglat2utm_convertor.utm_to_lng_lat_array(traj_np)
                     lats = ll[:, 1].tolist()
                     lngs = ll[:, 0].tolist()
+                    alts = traj_np[:, 2].tolist()  # 高度列（米）
 
                     # 额外信息 (现在通过 frame_id/segment_key 同步)
                     aligned_extras = traj_extra
 
-                    # 3. 生成时间步
-                    ts = [i for i in range(len(lats))]
+                    # 3. 使用全局 round 生成的统一仿真时钟（Unix 毫秒）
+                    ts = trajectory_timestamps_ms(aligned_extras)
 
                     uavs_coords[name] = {
                         "lats": lats,
                         "lngs": lngs,
+                        "alts": alts,
                         "ts": ts,
                         "extras": aligned_extras
                     }
@@ -738,16 +895,38 @@ class MissionOrchestrator:
                     ll = self._lnglat2utm_convertor.utm_to_lng_lat_array(traj_np)
                     lats = ll[:, 1].tolist()
                     lngs = ll[:, 0].tolist()
-                    ts = [i for i in range(len(lats))]
+                    alts = traj_np[:, 2].tolist()  # 高度列（米）
+                    ts = trajectory_timestamps_ms(traj_extra)
                     uavs_coords_raw[name] = {
                         "lats": lats,
                         "lngs": lngs,
+                        "alts": alts,
                         "ts": ts,
                         "extras": traj_extra
                     }
 
         # 4. 构建最终数据结构
+        simulation_meta = {
+            "startTimeMs": None,
+            "dtMs": int(round(DT * 1000)),
+            "timeBasis": "SIMULATION_ROUND",
+            "kinematics": {
+                "maxHorizontalSpeedMps": MAX_HORIZONTAL_SPEED_MPS,
+                "maxClimbRateMps": MAX_CLIMB_RATE_MPS,
+                "maxDescentRateMps": MAX_DESCENT_RATE_MPS,
+            },
+        }
+        if self.active_agents:
+            sample_io = next(iter(self.active_agents.values())).io
+            raw_start = sample_io.get_world_state(SIM_CLOCK_START_KEY)
+            raw_dt = sample_io.get_world_state(SIM_CLOCK_DT_KEY)
+            if raw_start is not None:
+                simulation_meta["startTimeMs"] = int(raw_start)
+            if raw_dt is not None:
+                simulation_meta["dtMs"] = int(raw_dt)
+
         final_data = {
+            "simulationMeta": simulation_meta,
             "uavs_coords_str": uavs_coords,
             "uavs_coords_raw": uavs_coords_raw,
             "facilities_str": facilities_str,
@@ -772,9 +951,18 @@ async def start_agent(server, password):
     except Exception as e:
         print(f"[System] Warning: Failed to flush Redis: {e}")
 
-    # 初始化全局 round
+    # 初始化全局 round 和统一仿真时钟。所有 Agent 都只读取这组世界状态，
+    # 不再以各自写 Redis 的墙钟作为轨迹时间。
     io = UavRedisIO()
     io.set_world_state("sim_round", 0)
+    simulation_start_time_ms = int(time.time() * 1000)
+    simulation_dt_ms = int(round(DT * 1000))
+    io.set_world_state(SIM_CLOCK_START_KEY, simulation_start_time_ms)
+    io.set_world_state(SIM_CLOCK_DT_KEY, simulation_dt_ms)
+    print(
+        "[System] Simulation clock initialized: "
+        f"startTimeMs={simulation_start_time_ms}, dtMs={simulation_dt_ms}"
+    )
 
     # 启动 round coordinator
     coordinator = RoundCoordinatorAgent(f"round_coordinator@{server}", password)

@@ -260,15 +260,15 @@ class BlueUAVAgent(BDIAgent):
             or target in self.facilities.defend_rings.keys():
 
             if target in self.facilities.antiairs:
-                _detour_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.antiairs[target],
+                _detour_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.facilities_info[target],
                                                                                    bfunc.GlobalBasicConfigs.AVOID_ANTIAIR_DISTANCE,
                                                                                    ll2utm=utm)
             elif target in self.facilities.headquartors:
-                _detour_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.headquartors[target],
+                _detour_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.facilities_info[target],
                                                                                    bfunc.GlobalBasicConfigs.AVOID_HQ_DISTANCE,
                                                                                    ll2utm=utm)
             elif target in self.facilities.probers:
-                _detour_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.probers[target],
+                _detour_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.facilities_info[target],
                                                                                    bfunc.GlobalBasicConfigs.AVOID_RADAR_DISTANCE,
                                                                                    ll2utm=utm)
 
@@ -296,15 +296,15 @@ class BlueUAVAgent(BDIAgent):
             or target in self.facilities.defend_rings.keys():
 
             if target in self.facilities.antiairs:
-                _escape_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.antiairs[target],
+                _escape_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.facilities_info[target],
                                                                                    bfunc.GlobalBasicConfigs.AVOID_ANTIAIR_DISTANCE,
                                                                                    ll2utm=utm)
             elif target in self.facilities.headquartors:
-                _escape_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.headquartors[target],
+                _escape_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.facilities_info[target],
                                                                                    bfunc.GlobalBasicConfigs.AVOID_HQ_DISTANCE,
                                                                                    ll2utm=utm)
             elif target in self.facilities.probers:
-                _escape_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.probers[target],
+                _escape_polygon_xys = self.facilities.get_spec_facility_polyborder(self.facilities.facilities_info[target],
                                                                                    bfunc.GlobalBasicConfigs.AVOID_RADAR_DISTANCE,
                                                                                    ll2utm=utm)
             elif target in self.facilities.defend_rings.keys():

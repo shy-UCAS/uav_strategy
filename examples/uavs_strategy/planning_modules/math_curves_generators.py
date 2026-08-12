@@ -68,6 +68,36 @@ def interpolate_z_coordinates(trajectory):
     return completed
 
 
+def linear_densify_3d(traj, step=80.0):
+    """
+    对三维折线按固定水平步长做线性采样（替代 cubic_interpolation_3d 的样条重采样）。
+    三次样条在"长直线进入段 + 短圆弧"这类非均匀间距几何上会过冲形成蛇形；
+    线性采样严格贴合原始折线，适用于 detour 这类本来就是圆弧/折线的轨迹。
+    参数：
+        traj: 三维点列表 [[x,y,z], ...]
+        step: 采样步长（米），默认 80（与绕行圆顶点间距一致）
+    返回：
+        线性采样后的三维点列表，包含首尾点
+    """
+    if len(traj) < 2:
+        return [list(p) for p in traj]
+
+    pts = [np.asarray(p, dtype=float) for p in traj]
+    out = [pts[0].tolist()]
+
+    for i in range(len(pts) - 1):
+        p0, p1 = pts[i], pts[i + 1]
+        seg_len = float(np.linalg.norm(p1 - p0))
+        n = max(1, int(np.ceil(seg_len / step)))
+        for k in range(1, n + 1):
+            r = k / n
+            # r == 1.0 是下一段起点，只在最后一段保留，避免重复点
+            if r < 1.0 or i == len(pts) - 2:
+                out.append((p0 * (1 - r) + p1 * r).tolist())
+
+    return out
+
+
 def generate_breakthrough_flight(traj, direction_range=None, num_points=15):
     """
     参数：

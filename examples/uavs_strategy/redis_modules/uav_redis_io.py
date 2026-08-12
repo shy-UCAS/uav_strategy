@@ -51,9 +51,25 @@ class UavRedisIO:
         return ids
 
     # ---------- 单机：位置读写 ----------
-    def set_pos(self, uid: str, x: float, y: float, z: float, ts_ms: Optional[int] = None, blue: bool = True) -> None:
+    def set_pos(
+        self,
+        uid: str,
+        x: float,
+        y: float,
+        z: float,
+        ts_ms: Optional[int] = None,
+        blue: bool = True,
+        recorded_at_ms: Optional[int] = None,
+    ) -> None:
         key = f"{'uav' if blue else 'red'}:{uid}:pos"
-        js = json.dumps({"x": x, "y": y, "z": z, "ts": _now_ms() if ts_ms is None else int(ts_ms)})
+        wall_time_ms = _now_ms() if recorded_at_ms is None else int(recorded_at_ms)
+        js = json.dumps({
+            "x": x,
+            "y": y,
+            "z": z,
+            "ts": wall_time_ms if ts_ms is None else int(ts_ms),
+            "recordedAtMs": wall_time_ms,
+        })
         self.r.set(key, js)
 
     def get_pos(self, uid: str, blue: bool = True) -> Optional[Dict[str, Any]]:
@@ -314,8 +330,17 @@ class UavRedisIO:
         key_traj = f"{'uav' if blue else 'red'}:{uid}:traj"
         key_extra = f"{'uav' if blue else 'red'}:{uid}:traj_extra"
 
-        # 1. 准备位置数据
-        js_pos = json.dumps({"x": pos[0], "y": pos[1], "z": pos[2], "ts": _now_ms()})
+        # 1. 准备位置数据。新版轨迹元数据提供统一仿真时钟时，位置
+        # 状态也使用 simTimeMs；墙钟只用于写入延迟和过期诊断。
+        wall_time_ms = int(extra_info.get("recordedAtMs", _now_ms()))
+        position_time_ms = int(extra_info.get("simTimeMs", wall_time_ms))
+        js_pos = json.dumps({
+            "x": pos[0],
+            "y": pos[1],
+            "z": pos[2],
+            "ts": position_time_ms,
+            "recordedAtMs": wall_time_ms,
+        })
 
         # 2. 获取旧数据 (Read)
         # 注意：在高并发下最好用 Watch 或 Lua，但此处单Agent写单Key，Pipeline 主要是提高效率和减少中间失败概率
@@ -369,7 +394,8 @@ class UavRedisIO:
         for uid, p in pos_map.items():
             if not p:
                 continue
-            ts = int(p.get("ts", 0))
+            # 新版 ts 是仿真时间；过期判断继续使用真实写入墙钟。
+            ts = int(p.get("recordedAtMs", p.get("ts", 0)))
             if abs(now_ms - ts) <= stale_ms:
                 out[uid] = p
         return out

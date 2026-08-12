@@ -26,6 +26,17 @@ from examples.uavs_strategy.planning_modules import basic_functions as bfunc
 from examples.uavs_strategy.uav_dynamic_agents02 import facilities_file
 
 
+def _is_waiting_value(value):
+    """Handle both the current JSON boolean and historical string values."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return value.strip().lower() not in {"", "false", "0", "no", "none", "null"}
+    return bool(value)
+
+
 class MapVisualizer:
     """
     地图可视化核心类，负责从Redis中读取无人机数据并绘制地图。
@@ -72,6 +83,13 @@ class MapVisualizer:
             self.facility_points.append((utm_xy[0], utm_xy[1], f"{name} [指挥部]"))
         for name, utm_xy in self.facilities.probers.items():
             self.facility_points.append((utm_xy[0], utm_xy[1], f"{name} [探测]"))
+        # 未分类设施（如 switch_config 6 的 shaoxing_*）
+        for name in self.facilities.facilities_info:
+            if name in self.facilities.antiairs or name in self.facilities.headquartors \
+                    or name in self.facilities.probers:
+                continue
+            _utm_xy = self.facilities.get_target_location(name, utm=True)
+            self.facility_points.append((_utm_xy[0], _utm_xy[1], f"{name} [设施]"))
 
     def get_drone_states(self, blue=True):
         ids = self.r.smembers("uav:ids" if blue else "red:ids")
@@ -116,6 +134,13 @@ class MapVisualizer:
                 ax.plot(_utm_xy[0], _utm_xy[1], 'bo', label=f'{_fac} Headquarters')
             for _fac, _utm_xy in self.facilities.probers.items():
                 ax.plot(_utm_xy[0], _utm_xy[1], 'go', label=f'{_fac} Prober')
+            # 未分类设施（如 switch_config 6 的 shaoxing_*）：只存在于 facilities_info，需单独绘制
+            for _fac in self.facilities.facilities_info:
+                if _fac in self.facilities.antiairs or _fac in self.facilities.headquartors \
+                        or _fac in self.facilities.probers:
+                    continue
+                _utm_xy = self.facilities.get_target_location(_fac, utm=True)
+                ax.plot(_utm_xy[0], _utm_xy[1], 'ko', markersize=6, label=f'{_fac} Facility')
             for _fac, _utm_xy in self.facilities.defend_rings.items():
                 ax.fill(_utm_xy[: ,0], _utm_xy[: ,1], alpha=0.2, label=f'{_fac} Defence Ring')
 
@@ -142,7 +167,9 @@ class MapVisualizer:
 
         for uid, pos in positions.items():
             is_active = False
-            if 'ts' in pos and abs(now_ms - pos['ts']) < 2000:
+            # pos['ts'] 现为仿真时间(simTimeMs)，活跃判断须用墙钟 recordedAtMs（旧数据回退 ts）
+            recorded_ms = pos.get('recordedAtMs', pos.get('ts', 0))
+            if abs(now_ms - recorded_ms) < 2000:
                 is_active = True
 
             alpha_val = 1.0 if is_active else 0.4
@@ -157,7 +184,7 @@ class MapVisualizer:
                 seg = extra.get('segment_key', '')
                 fmt = extra.get('formation_type', '')
                 fid = extra.get('frame_id', '')
-                waiting = extra.get('is_waiting', False)
+                waiting = _is_waiting_value(extra.get('is_waiting', False))
                 status_tag = '[W]' if waiting else ''
                 map_label = f"{uid} {status_tag}\nSeg:{seg} F:{fmt}\nFrame:{fid}"
             ax.text(pos['x'], pos['y'], map_label, fontsize=7, color=text_color,
@@ -200,6 +227,14 @@ class MapVisualizer:
             for _name, utm_xy in d.items():
                 xs.append(utm_xy[0])
                 ys.append(utm_xy[1])
+        # 未分类设施（如 switch_config 6 的 shaoxing_*）
+        for _name in self.facilities.facilities_info:
+            if _name in self.facilities.antiairs or _name in self.facilities.headquartors \
+                    or _name in self.facilities.probers:
+                continue
+            _utm_xy = self.facilities.get_target_location(_name, utm=True)
+            xs.append(_utm_xy[0])
+            ys.append(_utm_xy[1])
         for _name, poly in self.facilities.defend_rings.items():
             xs.extend(poly[:, 0])
             ys.extend(poly[:, 1])
@@ -373,7 +408,9 @@ class RealTimeRedisVisualizerApp(QMainWindow):
         for uid in sorted_uids:
             pos = positions[uid]
             is_active = False
-            if 'ts' in pos and abs(now_ms - pos['ts']) < 2000:
+            # pos['ts'] 现为仿真时间(simTimeMs)，活跃判断须用墙钟 recordedAtMs（旧数据回退 ts）
+            recorded_ms = pos.get('recordedAtMs', pos.get('ts', 0))
+            if abs(now_ms - recorded_ms) < 2000:
                 is_active = True
 
             status_str = "活跃" if is_active else "离线/静止"
@@ -390,8 +427,9 @@ class RealTimeRedisVisualizerApp(QMainWindow):
                 lookahead = extra.get('lookahead', 'N/A')
                 global_id = extra.get('global_id', 'N/A')
                 my_ack = extra.get('my_ack', 'N/A')
-                is_waiting = extra.get('is_waiting', False)
-                wait_msg = extra.get('wait_message', '')
+                is_waiting = _is_waiting_value(extra.get('is_waiting', False))
+                wait_msg = extra.get('waiting_reason', extra.get('wait_message', ''))
+                flight_phase = extra.get('flight_phase', 'N/A')
                 dist = extra.get('dist_to_target', None)
                 siblings = extra.get('cur_siblings_ids', [])
                 lh_coord = extra.get('lookahead_coord', None)
@@ -405,7 +443,9 @@ class RealTimeRedisVisualizerApp(QMainWindow):
                     info_text += f"  -> ({lh_coord[0]:.1f}, {lh_coord[1]:.1f})"
                 info_text += "\n"
                 info_text += f"  全局步数: {global_id}\n"
-                if dist is not None:
+                info_text += f"  飞行阶段: {flight_phase}\n"
+                # dist_to_target 在 agent 初始化时是字符串 'initializing'，等待态可能缺失，需类型判断
+                if isinstance(dist, (int, float)):
                     info_text += f"  距目标: {dist:.2f}m\n"
                 if is_waiting:
                     info_text += f"  ⏳ 等待中: {wait_msg}\n"

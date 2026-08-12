@@ -7,8 +7,8 @@ from examples.uavs_strategy.uav_dynamic_agents02 import facilities_file as _defa
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
-                             QPushButton, QSlider, QLabel, QFileDialog, QWidget, QTextEdit, QSplitter)
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,
+                             QPushButton, QCheckBox, QSlider, QLabel, QFileDialog, QWidget, QTextEdit, QSplitter)
 from PyQt5.QtCore import Qt, QTimer
 
 class UAVVisualizer(QMainWindow):
@@ -73,13 +73,13 @@ class UAVVisualizer(QMainWindow):
         # 加载地图json数据（默认已从 agent02 自动加载，可手动切换）
         self.btn_map = QPushButton("切换地图数据文件")
         self.btn_map.clicked.connect(self.open_map_file)
-        # 切换坐标系
-        self.btn_toggle_coord = QPushButton("切换为 UTM 坐标")
-        self.btn_toggle_coord.clicked.connect(self.toggle_coord_system)
+        # 坐标系切换开关：勾选 = UTM 坐标，取消 = 经纬度（点击立即刷新绘图与数字显示）
+        self.cb_utm = QCheckBox("UTM 坐标")
+        self.cb_utm.stateChanged.connect(lambda _: self.toggle_coord_system())
 
         top_bar.addWidget(self.btn_load)
         top_bar.addWidget(self.btn_map)
-        top_bar.addWidget(self.btn_toggle_coord)
+        top_bar.addWidget(self.cb_utm)
         top_bar.addStretch()
         upper_left_layout.addLayout(top_bar)
 
@@ -238,12 +238,8 @@ class UAVVisualizer(QMainWindow):
         self.step_label.setText(f"Step: {self.current_step}/{self.max_steps - 1}")
 
     def toggle_coord_system(self):
-        self.is_utm = not self.is_utm
-        if self.is_utm:
-            self.btn_toggle_coord.setText("切换为 经纬度 坐标")
-        else:
-            self.btn_toggle_coord.setText("切换为 UTM 坐标")
-        
+        """UTM <-> 经纬度 坐标系切换：勾选状态即目标坐标系，切换后立即重绘并自适应视野"""
+        self.is_utm = self.cb_utm.isChecked()
         self._force_autoscale = True
         self.init_draw_map()
         self.draw_plot()
@@ -271,27 +267,24 @@ class UAVVisualizer(QMainWindow):
             for _fac, _lnglat_xy in self.facilities.probers.items():
                 x, y = self._lnglat2utm_convertor.lon_lat_to_utm(_lnglat_xy[0], _lnglat_xy[1]) if self.is_utm else _lnglat_xy
                 self.ax.plot(x, y, 'bo', label=f'{_fac} Prober')
+            # 未分类设施（如 switch_config 6 的 shaoxing_*）：只存在于 facilities_info，需单独绘制
+            for _fac, _lnglat_xy in self.facilities.facilities_info.items():
+                if _fac in self.facilities.antiairs or _fac in self.facilities.headquartors or _fac in self.facilities.probers:
+                    continue
+                x, y = self._lnglat2utm_convertor.lon_lat_to_utm(_lnglat_xy[0], _lnglat_xy[1]) if self.is_utm else _lnglat_xy
+                self.ax.plot(x, y, 'ko', markersize=6, label=f'{_fac} Facility')
             for _fac, _lnglat_xy in self.facilities.defend_rings.items():
                 if self.is_utm:
                     _utm_xy = self._lnglat2utm_convertor.lng_lat_to_utm_array(_lnglat_xy)
                     self.ax.fill(_utm_xy[:, 0], _utm_xy[:, 1], alpha=0.2, label=f'{_fac} Defence Ring')
                 else:
                     self.ax.fill(_lnglat_xy[:, 0], _lnglat_xy[:, 1], alpha=0.2, label=f'{_fac} Defence Ring')        
-        # 记录先前的视图范围
-            old_xlim = self.ax.get_xlim()
-            old_ylim = self.ax.get_ylim()
-
-            # 判断是恢复之前的视口缩放还是重新自适应大小
-            if getattr(self, '_force_autoscale', False):
-                self.ax.autoscale(True)
-                self._force_autoscale = False
-            else:
-                self.ax.set_xlim(old_xlim)
-                self.ax.set_ylim(old_ylim)
-
-            self.ax.legend(loc='upper right', fontsize='small')
-            self.ax.grid(True, linestyle='--', alpha=0.5)
-            self.canvas.draw()    
+        # 地图单独加载时（无轨迹数据）自动适配视野；有轨迹数据时视野由 draw_plot 统一管理
+        if not self.data:
+            self.ax.autoscale(True)
+        self.ax.legend(loc='upper right', fontsize='small')
+        self.ax.grid(True, linestyle='--', alpha=0.5)
+        self.canvas.draw()
     
     def draw_plot(self):
         if not self.data: return
@@ -353,6 +346,12 @@ class UAVVisualizer(QMainWindow):
             for _fac, _lnglat_xy in self.facilities.probers.items():
                 x, y = self._lnglat2utm_convertor.lon_lat_to_utm(_lnglat_xy[0], _lnglat_xy[1]) if self.is_utm else _lnglat_xy
                 self.ax.plot(x, y, 'bo', label=f'{_fac} Prober')
+            # 未分类设施（如 switch_config 6 的 shaoxing_*）：只存在于 facilities_info，需单独绘制
+            for _fac, _lnglat_xy in self.facilities.facilities_info.items():
+                if _fac in self.facilities.antiairs or _fac in self.facilities.headquartors or _fac in self.facilities.probers:
+                    continue
+                x, y = self._lnglat2utm_convertor.lon_lat_to_utm(_lnglat_xy[0], _lnglat_xy[1]) if self.is_utm else _lnglat_xy
+                self.ax.plot(x, y, 'ko', markersize=6, label=f'{_fac} Facility')
             for _fac, _lnglat_xy in self.facilities.defend_rings.items():
                 if self.is_utm:
                     _utm_xy = self._lnglat2utm_convertor.lng_lat_to_utm_array(_lnglat_xy)
@@ -397,12 +396,13 @@ class UAVVisualizer(QMainWindow):
                 info_text += f"航段Key: {extra.get('segment_key', 'N/A')}\n"
                 info_text += f"等待状态: {extra.get('is_waiting', 'N/A')}\n"
                 info_text += f"领队ID\同伴IDs: {extra.get('leader_id', 'N/A')} | {', '.join(extra.get('cur_siblings_ids', []))}\n"
-                info_text += f"等待消息: {extra.get('wait_message', 'N/A')}\n"
+                info_text += f"等待原因: {extra.get('waiting_reason', extra.get('wait_message', 'N/A'))}\n"
                 info_text += f"step_id/my_ack: {extra.get('frame_id', 'N/A')}/{extra.get('my_ack', 'N/A')}\n"
                 info_text += f"同伴ACK状态: {extra.get('peers_ack_states', 'N/A')}\n"
                 info_text += f"距离目标: {extra.get('dist_to_target', 'N/A')}\n"
                 info_text += f"预瞄点: {extra.get('lookahead', 'N/A')}\n"
                 info_text += f"当前阶段: {extra.get('phase_state', 'N/A')}\n"
+                info_text += f"飞行阶段: {extra.get('flight_phase', 'N/A')}\n"
                 
                 lookahead_coord = extra.get('lookahead_coord')
                 if lookahead_coord:

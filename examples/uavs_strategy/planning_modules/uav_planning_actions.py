@@ -98,8 +98,13 @@ class PlanningLib:
         # 此时只有首尾是三维，中间点需要补 z
         traj_3d = curve_gen.interpolate_z_coordinates(traj)
 
-        if order_type in ("detour", "orbit", "loiter"):
-            # detour/orbit/loiter：点较多或盘旋/悬停，用三次样条平滑
+        if order_type == "detour":
+            # detour：折线本身就是圆弧几何（长直线进入段 + 圆上顶点），
+            # 三次样条的均匀参数化会在非均匀间距上过冲（蛇形轨迹），
+            # 改为按距离的线性采样，严格贴合圆弧
+            return curve_gen.linear_densify_3d(traj_3d)
+        elif order_type in ("orbit", "loiter"):
+            # orbit/loiter：点较多或盘旋/悬停，用三次样条平滑
             return curve_gen.cubic_interpolation_3d(traj_3d)
         else:
             # breakthrough/escape：只有两个关键点，套突破专用插值
@@ -138,36 +143,46 @@ class PlanningLib:
 
     # ---------- 迂回规划 ---------- #
     def plan_detour(self, start_location, target: str,
-                    detour_steps: int = 5, utm: bool = True) -> List[List[float]]:
+                    detour_steps: int = 10, utm: bool = True) -> List[List[float]]:
         """
         复制自 BlueUAVAgent._plan_detour：
         - 根据目标设施/防御圈选出一个多边形边界
         - 用 SimpleBorders 沿边界绕行 detour_steps 个点
         - 返回二维轨迹点列表
+        - detour_steps：圆上绕行顶点数（默认 10，约 1/4 圈；每步≈80m）
         """
         fac = self.agent.facilities
 
         if target in fac.facilities_info.keys() or target in fac.defend_rings.keys():
             if target in fac.antiairs:
                 detour_polygon_xys = fac.get_spec_facility_polyborder(
-                    fac.antiairs[target],
+                    fac.facilities_info[target],
                     bfunc.GlobalBasicConfigs.AVOID_ANTIAIR_DISTANCE,
                     ll2utm=utm,
                 )
             elif target in fac.headquartors:
                 detour_polygon_xys = fac.get_spec_facility_polyborder(
-                    fac.headquartors[target],
+                    fac.facilities_info[target],
                     bfunc.GlobalBasicConfigs.AVOID_HQ_DISTANCE,
                     ll2utm=utm,
                 )
             elif target in fac.probers:
                 detour_polygon_xys = fac.get_spec_facility_polyborder(
-                    fac.probers[target],
+                    fac.facilities_info[target],
                     bfunc.GlobalBasicConfigs.AVOID_RADAR_DISTANCE,
                     ll2utm=utm,
                 )
             elif target in fac.defend_rings.keys():
                 detour_polygon_xys = fac.get_defence_rings_polyborder()
+            else:
+                # 未分类设施（如 switch_config 6 的 shaoxing_*）：
+                # 名字不带 ua_/hq_/radar_ 前缀，未落入 antiairs/headquartors/probers，
+                # 直接绕设施中心以默认半径绕行（facilities_info 存的是原始经纬度）
+                detour_polygon_xys = fac.get_spec_facility_polyborder(
+                    fac.facilities_info[target],
+                    bfunc.GlobalBasicConfigs.AVOID_AVERAGE_DISTANCE,
+                    ll2utm=utm,
+                )
         elif target == "defence_rings":
             detour_polygon_xys = fac.get_defence_rings_polyborder()
         elif target == "probe_facilities":
@@ -203,24 +218,32 @@ class PlanningLib:
         if target in fac.facilities_info.keys() or target in fac.defend_rings.keys():
             if target in fac.antiairs:
                 escape_polygon_xys = fac.get_spec_facility_polyborder(
-                    fac.antiairs[target],
+                    fac.facilities_info[target],
                     bfunc.GlobalBasicConfigs.AVOID_ANTIAIR_DISTANCE,
                     ll2utm=utm,
                 )
             elif target in fac.headquartors:
                 escape_polygon_xys = fac.get_spec_facility_polyborder(
-                    fac.headquartors[target],
+                    fac.facilities_info[target],
                     bfunc.GlobalBasicConfigs.AVOID_HQ_DISTANCE,
                     ll2utm=utm,
                 )
             elif target in fac.probers:
                 escape_polygon_xys = fac.get_spec_facility_polyborder(
-                    fac.probers[target],
+                    fac.facilities_info[target],
                     bfunc.GlobalBasicConfigs.AVOID_RADAR_DISTANCE,
                     ll2utm=utm,
                 )
             elif target in fac.defend_rings.keys():
                 escape_polygon_xys = fac.get_defence_rings_polyborder()
+            else:
+                # 未分类设施（如 switch_config 6 的 shaoxing_*）：
+                # 与 plan_detour 相同，绕设施中心以默认半径生成逃逸边界
+                escape_polygon_xys = fac.get_spec_facility_polyborder(
+                    fac.facilities_info[target],
+                    bfunc.GlobalBasicConfigs.AVOID_AVERAGE_DISTANCE,
+                    ll2utm=utm,
+                )
         elif target == "defence_rings":
             escape_polygon_xys = fac.get_defence_rings_polyborder()
         elif target == "probe_facilities":

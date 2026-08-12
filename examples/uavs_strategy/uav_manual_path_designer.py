@@ -117,7 +117,7 @@ def compute_edge_members(paths, min_split_num=2):
 if __name__ == '__main__':
     # python -m examples.uavs_strategy.uav_manual_path_designer
     _plan_graph = nx.DiGraph()
-    switch_case = 1
+    switch_case = 3  # 1: 四集群汇聚大图 / 2: 四节点小图 / 3: 绍兴三设施(侦查-侦查-突破)
     _digraph_with_attrs = []
     _natural_language_description = ""
     descriptions_with_digraphplan = {}
@@ -181,7 +181,7 @@ if __name__ == '__main__':
                         [3, 4, 5, 2, 14, 15],
                         [6, 7, 8, 9, 10, 14, 15],
                         [11, 12, 13, 14, 15]]
-    elif switch_case == 2:    
+    elif switch_case == 2:
         _key_paths = [
             [0,1,2,3],
             [0,2,3]
@@ -190,6 +190,27 @@ if __name__ == '__main__':
         _plan_graph.add_edge(1, 2, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark7", "fleet_no": "f1.2"})
         _plan_graph.add_edge(2, 3, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark1", "fleet_no": "f1.3"})
         _plan_graph.add_edge(0, 2, **{"order_mode": "singleton", "order_type": "breakthrough", "target": "hq_mark7", "fleet_no": "f2.1"})
+    elif switch_case == 3:
+        # 新地图：空域 "20260810" (id=2086742451469029376) 的三个设施点
+        # 命名与 data/gen_facilities_shaoxing.py 一致（facilityList 顺序 -> shaoxing_N）：
+        #   shaoxing_1 = 绍兴 test02 (lng 116.376658, lat 39.899957) —— 任务1：侦查（facilityList[0]）
+        #   shaoxing_2 = 绍兴 test01 (lng 116.386614, lat 39.909373) —— 任务2：侦查
+        #   shaoxing_3 = 绍兴 test03 (lng 116.385745, lat 39.894678) —— 任务3：突破
+        # 三个任务相互独立，各为单航段：集群起飞后直达目标设施。
+        # 注意：设施坐标与防御圈由 data/gen_facilities_shaoxing.py 生成到
+        # data/facilities_shaoxing.json（facilities_str 需含以下三个名字，否则 get_target_location 崩溃）。
+        _natural_language_description = """蓝方兵力分为三个独立集群，
+        1号集群对绍兴 test02 设施执行侦查（盘旋侦察）。
+        2号集群对绍兴 test01 设施执行侦查（盘旋侦察）。
+        3号集群对绍兴 test03 设施执行突破。
+        """
+        _plan_graph.add_edge(0, 3, **{"order_mode": "singleton", "order_type": "detour",
+                                      "target": "shaoxing_1", "fleet_no": "sx1.1"})
+        _plan_graph.add_edge(1, 4, **{"order_mode": "singleton", "order_type": "detour",
+                                      "target": "shaoxing_2", "fleet_no": "sx2.1"})
+        _plan_graph.add_edge(2, 5, **{"order_mode": "singleton", "order_type": "breakthrough",
+                                      "target": "shaoxing_3", "fleet_no": "sx3.1"})
+        _key_paths = [[0, 3], [1, 4], [2, 5]]
 
 
     # 对 key_paths（含分离情况）计算
@@ -215,6 +236,19 @@ if __name__ == '__main__':
     ]
     descriptions_with_digraphplan['_digraph_with_attrs'] = _digraph_with_attrs
     current_dir = osp.dirname(os.path.abspath(__file__))
-    with open(osp.join(current_dir, "data", 'manual_plan_graph', "manual_plan_graph01.json"), "w") as _f:
+    with open(osp.join(current_dir, "data", 'manual_plan_graph', "manual_plan_graph_shaoxing.json"), "w") as _f:
         json.dump(descriptions_with_digraphplan, _f, indent=4, ensure_ascii=False)
+
+    # --- 新增（不影响原有输出）：额外输出 uav_dynamic_agents02.py 可直接消费的顶层 list 格式 ---
+    # 原有 manual_plan_graph01.json 是 {_natural_language_description, _digraph_with_attrs} 包装，
+    # 而 uav_dynamic_agents02.extract_uav_trajectories 只解包 key 名为 "digraph_attrs" 的 dict，
+    # 直接加载该文件会崩溃。这里把 _digraph_with_attrs 单独以顶层 list 写出：
+    #   [{from, to, attrs, members_num}, ...]
+    # ensure_ascii=True：输出为纯 ASCII，任何系统默认编码下 json.load 都能正确读取
+    # （uav_dynamic_agents02 用 json.load(open(...)) 走系统默认编码）。
+    _digraph_list_json = osp.join(current_dir, "data", 'manual_plan_graph', "manual_plan_graph_shaoxing_digraph_attrs.json")
+    with open(_digraph_list_json, "w", encoding="utf-8") as _f:
+        json.dump(_digraph_with_attrs, _f, indent=4, ensure_ascii=True)
+    print(f"[designer] 已额外输出 uav_dynamic_agents02 可直接加载的航段图: {_digraph_list_json}")
+    print(f"[designer] 在 uav_dynamic_agents02.py 对应分支将 digraph_attrs_reference_path 指向该文件即可")
 

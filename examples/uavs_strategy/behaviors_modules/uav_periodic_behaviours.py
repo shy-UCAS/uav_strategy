@@ -7,7 +7,7 @@ from time import time, sleep
 from typing import TYPE_CHECKING
 from pyparsing import C
 from ray import state
-from regex import F
+# from regex import F
 from spade.behaviour import PeriodicBehaviour
 from sympy import true
 from examples.uavs_strategy.planning_modules import avoidance_agents as a_agents
@@ -18,7 +18,10 @@ if TYPE_CHECKING:
 
 # ==== 势场与步进参数 ====
 DT = 0.5       # 周期（秒）
-STEP = 8.0     # 每步“最大位移”/速度上限（米/步）
+STEP = 8.0     # 每步最大水平位移（米/步）
+MAX_HORIZONTAL_SPEED_MPS = STEP / DT
+MAX_CLIMB_RATE_MPS = 5.0
+MAX_DESCENT_RATE_MPS = 5.0
 K_ATT = 0.85   # 引力系数 (独立飞行时)
 K_ATT_FORM = 1.5 # 引力系数 (编队飞行时，需要更强的跟随力)
 K_REP = 2.5    # 斥力系数
@@ -41,6 +44,46 @@ def v_sub_2d(a, b):
 def v_norm_2d(a):
     n = (a[0] ** 2 + a[1] ** 2) ** 0.5
     return n if n > 1e-9 else 1e-9
+
+
+def bounded_motion_step(
+    current,
+    target,
+    dt=DT,
+    max_horizontal_speed_mps=MAX_HORIZONTAL_SPEED_MPS,
+    max_climb_rate_mps=MAX_CLIMB_RATE_MPS,
+    max_descent_rate_mps=MAX_DESCENT_RATE_MPS,
+):
+    """Move toward ``target`` without exceeding per-round kinematic limits.
+
+    Horizontal motion and vertical motion are limited independently.  The
+    function never overshoots the target on either axis, so it is deterministic
+    and safe to use with the global simulation-round clock.
+    """
+    if dt <= 0:
+        raise ValueError("dt must be positive")
+    if min(max_horizontal_speed_mps, max_climb_rate_mps, max_descent_rate_mps) < 0:
+        raise ValueError("speed and climb/descent limits must be non-negative")
+
+    dx = float(target[0]) - float(current[0])
+    dy = float(target[1]) - float(current[1])
+    horizontal_distance = (dx * dx + dy * dy) ** 0.5
+    max_horizontal_step = float(max_horizontal_speed_mps) * float(dt)
+    if horizontal_distance <= max_horizontal_step or horizontal_distance <= 1e-9:
+        next_x = float(target[0])
+        next_y = float(target[1])
+    else:
+        scale = max_horizontal_step / horizontal_distance
+        next_x = float(current[0]) + dx * scale
+        next_y = float(current[1]) + dy * scale
+
+    dz = float(target[2]) - float(current[2])
+    max_up_step = float(max_climb_rate_mps) * float(dt)
+    max_down_step = float(max_descent_rate_mps) * float(dt)
+    bounded_dz = max(-max_down_step, min(max_up_step, dz))
+    next_z = float(current[2]) + bounded_dz
+
+    return [next_x, next_y, next_z]
 
 
 class FormationAPFStep(PeriodicBehaviour):
@@ -339,7 +382,7 @@ class SyncAPFStep(PeriodicBehaviour):
         # 物理计算
         nxt = self._calculate_physics(agent, io, target, self_pos)
         # 计算移动后的真实误差 (决定是否到达/同步)
-        dist_after_move = v_norm_2d(v_sub_2d(target, nxt))
+        dist_after_move = v_norm(v_sub(target, nxt))
 
         # 状态更新写入 Redis, 包括Lookahead推进 logic
         self._update_status_and_redis(agent, io, nxt, lookahead, max_idx, dist_after_move, target)
@@ -376,7 +419,6 @@ class SyncAPFStep(PeriodicBehaviour):
         # global_step_id 自增
         agent.global_step_id += 1
 
-        from time import time
         current_logs = getattr(agent, "step_logs", []).copy()
         if hasattr(agent, "step_logs"):
             agent.step_logs.clear()
@@ -389,10 +431,12 @@ class SyncAPFStep(PeriodicBehaviour):
             "global_id": agent.global_step_id,
             "segment_key": segment_key,
             "is_waiting": True,
+            "waiting_reason": "segment_start_barrier",
+            "flight_phase": "sync_wait",
             "leader_id": leader_id,
-            "timestamp": time(),
             'lookahead_coord': target if target else None,
             "logs": current_logs,
+            **agent.simulation_time_fields(),
         }
 
         # 使用组合原子更新
@@ -533,14 +577,14 @@ class SyncAPFStep(PeriodicBehaviour):
         
         target = traj[lookahead]
         self_pos = [me["x"], me["y"], me["z"]]
-        dist_to_target = v_norm_2d(v_sub_2d(target, self_pos)) # 暂时只计算2D距离
+        dist_to_target = v_norm(v_sub(target, self_pos))
         self.log(f"[{agent.self_uid}] lookahead: {lookahead}, target: {target}, dist_to_target: {dist_to_target}")
         
         return me, traj, lookahead, max_idx, target, self_pos, dist_to_target
 
     def _check_task_completion(self, agent: "BlueUAVAgent", io: "UavRedisIO", lookahead, max_idx, dist_to_target):
         """4. 检查任务结束"""
-        if lookahead >= max_idx:
+        if lookahead >= max_idx and dist_to_target <= CLOSE_TH_SYNC:
             # 清理状态与重置
             # io.set_uav_state(agent.self_uid, "current_segment_sync", "finished")
             # 是否所有任务彻底结束
@@ -594,18 +638,21 @@ class SyncAPFStep(PeriodicBehaviour):
 
 
     def _calculate_physics(self, agent: "BlueUAVAgent", io: "UavRedisIO", target, self_pos):
-        """5. 物理计算: 引力 + 斥力"""
-        # 优化：缓存 IDs，不要每帧 scan，因为 ID 列表变化不频繁
-        if not hasattr(agent, "cached_blue_ids") or not agent.cached_blue_ids:
-            agent.cached_blue_ids = io.get_ids(blue=True)
-        all_blue_pos = io.mget_pos(agent.cached_blue_ids, blue=True)
-
-        F_att = v_scale(v_sub(target, self_pos), K_ATT)
-
-        F_total = F_att # 回到简单的物理模型，不计算斥力了，因为可能会造成死锁
-        nxt = target # 直接设定为目标点（类似瞬移/强同步），确保位置严格跟随 Lookahead，消除物理滞后
-        # nxt = v_add(self_pos, F_total) 
-        return nxt
+        """5. 物理计算：按水平速度和升降率做有界步进。"""
+        return bounded_motion_step(
+            self_pos,
+            target,
+            dt=DT,
+            max_horizontal_speed_mps=getattr(
+                agent, "max_horizontal_speed_mps", MAX_HORIZONTAL_SPEED_MPS
+            ),
+            max_climb_rate_mps=getattr(
+                agent, "max_climb_rate_mps", MAX_CLIMB_RATE_MPS
+            ),
+            max_descent_rate_mps=getattr(
+                agent, "max_descent_rate_mps", MAX_DESCENT_RATE_MPS
+            ),
+        )
 
     def _update_status_and_redis(self, agent: "BlueUAVAgent", io: "UavRedisIO", nxt, lookahead, max_idx, dist_to_target,target=None):
         """6. 状态更新与 Redis 写入: 推进 lookahead 及记录轨迹"""
@@ -617,17 +664,23 @@ class SyncAPFStep(PeriodicBehaviour):
         if lookahead == 0:
              if not getattr(agent, "has_synced_segment", False):
                  is_gathering = True
-        waiting_message = "False"
+        is_waiting = False
+        waiting_reason = None
+        flight_phase = "task_flight"
         if is_gathering:
              f_type = "unknown"
-
-             waiting_message = "flying to start"
+             waiting_reason = "flying_to_segment_start"
+             flight_phase = "positioning"
              
         # global_step_id 自增
         agent.global_step_id += 1
-        self.log(f"[{agent.self_uid}] Step {agent.global_step_id}: lookahead={lookahead}, dist_to_target={dist_to_target:.2f}, waiting_message={waiting_message}")
+        self.log(
+            f"[{agent.self_uid}] Step {agent.global_step_id}: lookahead={lookahead}, "
+            f"dist_to_target={dist_to_target:.2f}, is_waiting={is_waiting}, "
+            f"flight_phase={flight_phase}"
+        )
 
-        if dist_to_target <= CLOSE_TH_SYNC and lookahead <= max_idx:
+        if dist_to_target <= CLOSE_TH_SYNC and lookahead < max_idx:
             if getattr(agent, "has_synced_segment", False):
                 self.log(f"[{agent.self_uid}] move forward {dist_to_target} meters [DEBUG_ADVANCE] Increasing lookahead {lookahead} -> {lookahead + 1}")
                 # 只有在已经同步了当前段的情况下才推进lookahead,否则说明agent还在飞往起点，不能推进lookahead
@@ -635,7 +688,6 @@ class SyncAPFStep(PeriodicBehaviour):
 
         self._check_task_completion(agent, io, lookahead, max_idx, dist_to_target)
 
-        from time import time
         current_logs = getattr(agent, "step_logs", []).copy()
         if hasattr(agent, "step_logs"):
             agent.step_logs.clear()
@@ -647,13 +699,15 @@ class SyncAPFStep(PeriodicBehaviour):
             "lookahead": lookahead,
             "global_id": agent.global_step_id,
             "segment_key": getattr(agent, "current_segment_key", None),
-            "is_waiting": waiting_message,
+            "is_waiting": is_waiting,
+            "waiting_reason": waiting_reason,
+            "flight_phase": flight_phase,
             "dist_to_target": dist_to_target,
             "leader_id": self._get_leader_id(agent),
             'lookahead_coord': target if target else None,
-            "timestamp": time(),
             'phase_state': agent.has_synced_segment,
             "logs": current_logs,
+            **agent.simulation_time_fields(),
         }
         
         # [DEBUG PRINT]
@@ -772,7 +826,7 @@ class SyncAPFStepEnhance(PeriodicBehaviour):
         nxt = self._calculate_physics(agent, io, target, self_pos)
 
         # 7) 计算移动后的真实误差
-        dist_after_move = v_norm_2d(v_sub_2d(target, nxt))
+        dist_after_move = v_norm(v_sub(target, nxt))
 
         # 8) 写回状态
         self._update_status_and_redis(
@@ -904,7 +958,6 @@ class SyncAPFStepEnhance(PeriodicBehaviour):
 
         agent.global_step_id += 1
 
-        from time import time
         current_logs = getattr(agent, "step_logs", []).copy()
         if hasattr(agent, "step_logs"):
             agent.step_logs.clear()
@@ -917,11 +970,12 @@ class SyncAPFStepEnhance(PeriodicBehaviour):
             "global_id": agent.global_step_id,
             "segment_key": segment_key,
             "is_waiting": True,
+            "waiting_reason": "segment_start_barrier",
+            "flight_phase": "sync_wait",
             "leader_id": leader_id,
-            "timestamp": time(),
             "lookahead_coord": target if target else None,
-            "round_id": current_round,
             "logs": current_logs,
+            **agent.simulation_time_fields(round_id=current_round),
         }
 
         io.append_pos_traj_with_extra(agent.self_uid, pos, extra_info, blue=True)
@@ -1093,7 +1147,7 @@ class SyncAPFStepEnhance(PeriodicBehaviour):
 
         target = traj[lookahead]
         self_pos = [me["x"], me["y"], me["z"]]
-        dist_to_target = v_norm_2d(v_sub_2d(target, self_pos))
+        dist_to_target = v_norm(v_sub(target, self_pos))
         self.log(
             f"[{agent.self_uid}] lookahead: {lookahead}, target: {target}, dist_to_target: {dist_to_target}"
         )
@@ -1104,7 +1158,7 @@ class SyncAPFStepEnhance(PeriodicBehaviour):
     # 任务完成检查
     # =========================
     def _check_task_completion(self, agent: "BlueUAVAgent", io: "UavRedisIO", lookahead, max_idx, dist_to_target):
-        if lookahead >= max_idx:
+        if lookahead >= max_idx and dist_to_target <= CLOSE_TH_SYNC:
             # 阶段2.1：本航段完成 → 置 seg_done 供依赖闸消费（幂等，同段多机均写 "1"）
             _seg_id = getattr(agent, "current_segment_id", None)
             if _seg_id:
@@ -1125,18 +1179,20 @@ class SyncAPFStepEnhance(PeriodicBehaviour):
     # 物理计算
     # =========================
     def _calculate_physics(self, agent: "BlueUAVAgent", io: "UavRedisIO", target, self_pos):
-        if not hasattr(agent, "cached_blue_ids") or not agent.cached_blue_ids:
-            agent.cached_blue_ids = io.get_ids(blue=True)
-
-        all_blue_pos = io.mget_pos(agent.cached_blue_ids, blue=True)
-
-        F_att = v_scale(v_sub(target, self_pos), K_ATT)
-        F_total = F_att
-
-        # 这里仍保留你的强同步写法
-        nxt = target
-        # nxt = v_add(self_pos, F_total)
-        return nxt
+        return bounded_motion_step(
+            self_pos,
+            target,
+            dt=DT,
+            max_horizontal_speed_mps=getattr(
+                agent, "max_horizontal_speed_mps", MAX_HORIZONTAL_SPEED_MPS
+            ),
+            max_climb_rate_mps=getattr(
+                agent, "max_climb_rate_mps", MAX_CLIMB_RATE_MPS
+            ),
+            max_descent_rate_mps=getattr(
+                agent, "max_descent_rate_mps", MAX_DESCENT_RATE_MPS
+            ),
+        )
 
     # =========================
     # 状态更新与 Redis 写入
@@ -1165,16 +1221,20 @@ class SyncAPFStepEnhance(PeriodicBehaviour):
         if lookahead == 0 and not getattr(agent, "has_synced_segment", False):
             is_gathering = True
 
-        waiting_message = "False"
+        is_waiting = False
+        waiting_reason = None
+        flight_phase = "task_flight"
         if is_gathering:
             f_type = "unknown"
-            waiting_message = "flying to start"
+            waiting_reason = "flying_to_segment_start"
+            flight_phase = "positioning"
 
         agent.global_step_id += 1
         self.log(
             f"[{agent.self_uid}] Step {agent.global_step_id}: "
             f"lookahead={lookahead}, dist_to_target={dist_to_target:.2f}, "
-            f"waiting_message={waiting_message}, round={current_round}"
+            f"is_waiting={is_waiting}, flight_phase={flight_phase}, "
+            f"round={current_round}"
         )
 
         if dist_to_target <= CLOSE_TH_SYNC and lookahead <= max_idx:
@@ -1187,7 +1247,7 @@ class SyncAPFStepEnhance(PeriodicBehaviour):
                         f"[{agent.self_uid}] Reached gathering start point at segment={target_sync_key}. "
                         f"Arrival marked only, waiting for release."
                     )
-            else:
+            elif lookahead < max_idx:
                 # 正常飞行阶段：才允许推进 lookahead
                 if getattr(agent, "has_synced_segment", False):
                     self.log(
@@ -1198,7 +1258,6 @@ class SyncAPFStepEnhance(PeriodicBehaviour):
 
         self._check_task_completion(agent, io, lookahead, max_idx, dist_to_target)
 
-        from time import time
         current_logs = getattr(agent, "step_logs", []).copy()
         if hasattr(agent, "step_logs"):
             agent.step_logs.clear()
@@ -1212,18 +1271,19 @@ class SyncAPFStepEnhance(PeriodicBehaviour):
             "lookahead": lookahead,
             "global_id": agent.global_step_id,
             "segment_key": getattr(agent, "current_segment_key", None),
-            "is_waiting": waiting_message,
+            "is_waiting": is_waiting,
+            "waiting_reason": waiting_reason,
+            "flight_phase": flight_phase,
             "dist_to_target": dist_to_target,
             "leader_id": self._get_leader_id(agent),
             "lookahead_coord": target if target else None,
-            "timestamp": time(),
-            "round_id": current_round,
             "phase_state": {
                 "has_synced_segment": getattr(agent, "has_synced_segment", False),
                 "release_key": release_key,
                 "release_round": release_round,
             },
             "logs": current_logs,
+            **agent.simulation_time_fields(round_id=current_round),
         }
 
         io.append_pos_traj_with_extra(agent.self_uid, nxt, extra_info, blue=True)

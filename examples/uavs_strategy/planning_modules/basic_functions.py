@@ -354,7 +354,9 @@ class Facilities:
         else:
             _polygon = self._make_polygon_from_circle(np.array(center_location), radius)
 
-        return _polygon.exterior.coords.xy
+        # 返回 [coords.xy]（单元素列表），与 get_defence_facilities_polyborder 等姊妹函数契约一致；
+        # 调用方统一用 [0] 解包出 (xs, ys) 二元组（此前裸元组与 [0] 解包不匹配会崩溃）
+        return [_polygon.exterior.coords.xy]
 
     def get_defence_facilities_polyborder(self, radius=GlobalBasicConfigs.AVOID_ANTIAIR_DISTANCE, union_polygons=False):
         _facs_polygons = []
@@ -668,21 +670,22 @@ class Facilities:
                 _border_radius = GlobalBasicConfigs.AVOID_RADAR_DISTANCE
 
             if show_borders:  # 绘制主要设施周围的躲避区域（圆形）
-                _border_xys = self.get_spec_facility_polyborder([_utm_x, _utm_y], _border_radius, ll2utm=False)
+                # 返回 [coords.xy]，[0] 解包出 (xs, ys)
+                _border_xs, _border_ys = self.get_spec_facility_polyborder([_utm_x, _utm_y], _border_radius, ll2utm=False)[0]
 
             if show_mode == '3D':
                 ax.scatter(xs=[_utm_x], ys=[_utm_y], zs=[0], s=30, color=_color, marker=_marker, edgecolors='black',
                            linewidth=1, label=_fac)
                 ax.text(_utm_x + 25, _utm_y + 25, 0, _fac, color='black', fontsize=9,
                         bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'))
-                ax.plot_trisurf(_border_xys[0], _border_xys[1], np.zeros_like(_border_xys[:, 0]), color='green',
+                ax.plot_trisurf(_border_xs, _border_ys, np.zeros_like(_border_xs), color='green',
                                 alpha=0.1)
             else:
                 ax.scatter(x=[_utm_x], y=[_utm_y], s=30, color=_color, marker=_marker, edgecolors='black', linewidth=1,
                            label=_fac)
                 ax.text(_utm_x + 25, _utm_y + 25, _fac, color='black', fontsize=9,
                         bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'))
-                ax.fill(_border_xys[0], _border_xys[1], color='green', alpha=0.1)
+                ax.fill(_border_xs, _border_ys, color='green', alpha=0.1)
 
         for _plan in twisted_paths:
             if show_mode == '3D':
