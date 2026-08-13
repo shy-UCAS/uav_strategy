@@ -218,6 +218,16 @@ Redis 当前位置中的 `ts` 也使用 `simTimeMs`，而 `recordedAtMs` 保留�
 
 水平位移和垂直位移独立限幅，短于最大步长时直接落到目标而不超调。到达误差改为三维距离；即使 `lookahead` 已指向最后一个参考点，也只有真正进入 `CLOSE_TH_SYNC` 阈值后才完成航段，避免物理步进引入“索引到终点但飞机仍在远处”的提前完成。
 
+### 7.2.1 仿真墙钟加速（SIM_SPEEDUP）
+
+`uav_dynamic_agents02.py` 顶部新增 `SIM_SPEEDUP`（默认 `1.0`），只把
+`APFStep` 与 `GlobalRoundCoordinator` 的真实调度周期从 `DT` 缩短为
+`DT / SIM_SPEEDUP`，用于减少生成相同仿真数据所需的真实墙钟时间。它**不改变**
+仿真 `DT`、`sim_dt_ms`，也**不改变**每 round 的物理位移上限，因此轨迹点、
+`simTimeMs`、速度上限和 ETA 语义均保持不变。需要加速时把 `SIM_SPEEDUP` 改为
+`10.0`、`20.0` 等再重新运行导出。实际加速上限受 Redis 往返、每轮物理计算与
+agent 数量影响，不是严格线性倍率。
+
 ### 7.3 等待状态与飞行阶段契约
 
 `is_waiting` 原先混用 `True`、`"False"`、`"flying to start"` 和 `"initializing"`。Python 会把非空字符串 `"False"` 判为真，导致同步轨迹过滤把正常飞行帧也全部丢弃。新契约将它拆分为：
@@ -449,5 +459,5 @@ latest 侧另有 `tests/test_agents02_export_adapter.py`，覆盖设施/圈层�
 - **config 6 注释**：`switch_config == 6` 注释写"绍兴空域"，实际坐标在 116.38°E（北京附近），建议修正注释。
 - **高度口径**：agent02 导出绝对高度，latest 协议中 `alts` 定义为 AGL；当前可用于仿真样本，接入真实地形后需增加高程基准换算。
 - **latest 最小点数**：分析轨迹经阶段过滤和多 Agent 交集后可能不足 6 点，应在滑动窗口/样本组装层检查，不应回退到 raw 初始化帧凑点数。
-- **仿真倍速尚未实现**：当前 Agent 墙钟调度周期仍为 `DT=0.5s`。后续若需缩短实际运行时间，应新增独立 `SIM_SPEEDUP`，只把行为的墙钟周期改为 `DT/SIM_SPEEDUP`；不要改变仿真 `DT`、`sim_dt_ms`或每帧物理步长，否则会再次改变 latest 计算的速度和 ETA。
+- **仿真倍速已实现（`SIM_SPEEDUP`）**：`uav_dynamic_agents02.py` 顶部新增 `SIM_SPEEDUP`（默认 `1.0`），只缩短 `APFStep`/`GlobalRoundCoordinator` 的真实墙钟周期，不改变仿真 `DT`、`sim_dt_ms` 或每帧物理步长；加速上限受 Redis/物理计算/agent 数量影响。详见 §7.2.1。
 - **完整联调**：当前契约、物理逻辑、实际导出转换和 SituationEngine 本地直连已通过；HTTP 服务回放及 I-01~I-30 意图结果验收仍待后续联调。

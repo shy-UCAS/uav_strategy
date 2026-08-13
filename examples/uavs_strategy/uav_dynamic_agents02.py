@@ -54,6 +54,13 @@ from examples.uavs_strategy.key_path_analyzer import KeyPathAnalyzer
 SIM_CLOCK_START_KEY = "sim_start_time_ms"
 SIM_CLOCK_DT_KEY = "sim_dt_ms"
 
+# 仿真墙钟加速倍率。只缩短 PeriodicBehaviour 的真实调度周期，不改变 DT 所
+# 代表的仿真时间步长，也不改变每个 round 的物理位移上限，因此最终轨迹与
+# 时间戳保持不变，只是生成相同仿真数据所需真实墙钟时间缩短约 SIM_SPEEDUP 倍。
+# 默认 1.0 表示 1:1 实时；设为 10.0 表示约 10 倍加速。实际加速上限受 Redis
+# 往返、每轮物理计算和 agent 数量影响，不等于严格的线性倍率。
+SIM_SPEEDUP = 20.0
+
 
 def simulation_time_ms(start_time_ms: int, round_id: int, dt_ms: int) -> int:
     """Return the shared simulation timestamp for one global round."""
@@ -471,7 +478,7 @@ elif switch_config == 6:
     # 绍兴空域 (id=2086742451469029376)：三个设施分别执行 侦查-侦查-突破
     # 航段图由 uav_manual_path_designer.py switch_case 3 生成（顶层 list 格式）
     # 设施与防御圈由 data/gen_facilities_shaoxing.py 生成（三级半径共用 facilityList[0] 圆心）
-    digraph_attrs_reference_path = os.path.join(current_dir, "data", "manual_plan_graph", "manual_plan_graph01_digraph_attrs.json")
+    digraph_attrs_reference_path = os.path.join(current_dir, "data", "manual_plan_graph", "manual_plan_graph_shaoxing_digraph_attrs.json")
     facilities_file = os.path.join(current_dir, "data", "facilities_shaoxing.json")
     key_paths = [[0, 3], [1, 4], [2, 5]]
 
@@ -667,7 +674,7 @@ class BlueUAVAgent(BDIAgent):
 
     async def setup(self):
         # 注册周期任务
-        self.add_behaviour(self.APFStep(period=DT))
+        self.add_behaviour(self.APFStep(period=DT / SIM_SPEEDUP))
         
     def add_custom_actions(self, actions):
         @actions.add(".act_digraph_path_planning", 2)
@@ -860,7 +867,7 @@ class RoundCoordinatorAgent(Agent):
 
     async def setup(self):
         self.io = UavRedisIO(**self.redis_cfg)
-        self.add_behaviour(GlobalRoundCoordinator(period=max(0.05, DT / 4.0)))
+        self.add_behaviour(GlobalRoundCoordinator(period=max(0.01, DT / 4.0 / SIM_SPEEDUP)))
 
 class MissionOrchestrator:
     """结合key_path_analyzer.log数据, 生成 Persistent Agents 并管理生命周期"""
@@ -1025,6 +1032,7 @@ class MissionOrchestrator:
         
         facilities_str = facilities_data.get('facilities_str', {})
         defence_rings = facilities_data.get('defence_rings', {})
+        airspaces = facilities_data.get('airspaces', [])
 
         for _ring_name, _ring_llgs in defence_rings.items():
             flat = []
@@ -1170,6 +1178,7 @@ class MissionOrchestrator:
             "plannedRoutes": planned_routes,
             "facilities_str": facilities_str,
             "defence_rings": defence_rings,
+            "airspaces": airspaces,
             "missionMeta": mission_meta
         }
         

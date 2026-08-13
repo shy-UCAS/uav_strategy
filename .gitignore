@@ -106,3 +106,6 @@ graphify-out/
 
 # IDE settings
 .vscode/settings.json
+
+# 超过 GitHub 100MB 单文件上限的仿真导出样本（保留本地，不入库）
+examples/uavs_strategy/data/raw_data/uav_trajectories_persistent_20260813_125628.json
