@@ -49,7 +49,7 @@ def _default_facilities(self, default_json_path=None):
     else:
         _facilities_info_json = default_json_path
 
-    with open(_facilities_info_json, 'r') as f:
+    with open(_facilities_info_json, 'r', encoding='utf-8') as f:
         _facilities_info = json.load(f)
 
     return bfunc.Facilities(_facilities_info['facilities_str'], _facilities_info['defence_rings'])
