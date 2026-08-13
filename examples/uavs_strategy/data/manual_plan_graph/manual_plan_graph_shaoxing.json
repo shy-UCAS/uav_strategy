@@ -1,8 +1,8 @@
 {
     "_natural_language_description": [
         "蓝方兵力分为三个独立集群，",
-        "1号集群对绍兴 test01 设施执行侦查（盘旋侦察）。",
-        "2号集群对绍兴 test02 设施执行侦查（盘旋侦察）。",
+        "1号集群对绍兴 test02 设施执行侦查（盘旋侦察）。",
+        "2号集群对绍兴 test01 设施执行侦查（盘旋侦察）。",
         "3号集群对绍兴 test03 设施执行突破。"
     ],
     "_digraph_with_attrs": [
@@ -15,7 +15,7 @@
                 "target": "shaoxing_1",
                 "fleet_no": "sx1.1"
             },
-            "members_num": 4
+            "members_num": 37
         },
         {
             "from": 1,
@@ -26,7 +26,7 @@
                 "target": "shaoxing_2",
                 "fleet_no": "sx2.1"
             },
-            "members_num": 4
+            "members_num": 38
         },
         {
             "from": 2,
@@ -37,7 +37,7 @@
                 "target": "shaoxing_3",
                 "fleet_no": "sx3.1"
             },
-            "members_num": 4
+            "members_num": 37
         }
     ]
 }

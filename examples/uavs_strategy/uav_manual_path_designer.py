@@ -30,7 +30,7 @@ def compute_edge_members(paths, min_split_num=2):
     # 2) 初始生成（这里生成的是“从机”数量，所以总数要+1）
     _path_init_members = []
     for _path in paths:
-        _init_members_num = random.randint(3, 4)
+        _init_members_num = random.randint(35, 45)
         _path_init_members.append(_init_members_num)
     print(f"各路径初始从机数量: {_path_init_members} (总机数对应+1)")
 
