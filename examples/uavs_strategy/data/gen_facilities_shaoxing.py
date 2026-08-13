@@ -3,7 +3,10 @@
 生成 facilities_shaoxing.json：
 从 apitest/samples/airspace_list_sample.json 提取指定空域的设施点与三级防御半径，
 把圆形防御圈离散化为正十二边形顶点（经纬度），对齐 facilities.json 的
-defence_rings 存储形式 {环名: {"lngs": [...], "lats": [...]}}。
+defence_rings 存储形式 {环名: {"lngs": [...], "lats": [...]}}；
+同时从 apitest/samples/nofly_list_sample.json 读取禁飞区，把圆形禁飞区
+（zoneType=1，geom=null，只有圆心+半径）离散为正多边形，映射为 v3.2 的
+airspaces[]（airspaceType=no_fly）。
 
 防御圈规则：三级半径（countermeasure/alert/warning）共用同一圆心——
 facilityList 中第一个设施的坐标，只生成一套三级环（3 个环）。
@@ -18,6 +21,7 @@ import os
 
 # 空域样本文件（相对本脚本所在目录向上找仓库根目录）
 _SAMPLE_REL = ["..", "..", "..", "..", "apitest", "samples", "airspace_list_sample.json"]
+_NOFLY_SAMPLE_REL = ["..", "..", "..", "..", "apitest", "samples", "nofly_list_sample.json"]
 _OUT_NAME = "facilities_shaoxing.json"
 _AIRSPACE_ID = "2086742451469029376"
 
@@ -51,6 +55,17 @@ def find_sample_file():
     return None
 
 
+def find_nofly_sample_file():
+    """从脚本目录逐级向上找 apitest/samples/nofly_list_sample.json"""
+    cur = os.path.dirname(os.path.abspath(__file__))
+    for _ in range(6):
+        cand = os.path.join(cur, *_NOFLY_SAMPLE_REL)
+        if os.path.exists(cand):
+            return cand
+        cur = os.path.dirname(cur)
+    return None
+
+
 def load_airspace():
     """读取样本文件，返回 (facilities, radii)；文件缺失时用兜底数据"""
     sample_path = find_sample_file()
@@ -71,6 +86,48 @@ def load_airspace():
     return _FALLBACK_FACILITIES, _FALLBACK_RADII
 
 
+def load_nofly():
+    """读取禁飞区样本，把圆形禁飞区离散为 v3.2 airspaces[] 多边形。
+
+    ``/nofly/list`` 的 ``zoneType=1`` 记录只有圆心+半径（``geom=null``），
+    而 v3.2 协议 §12 的 ``airspaces[]`` 只接受多边形 ``geometry``。这里复用
+    ``circle_to_ngon`` 把圆形离散成正多边形顶点，映射为协议需要的
+    ``airspaceType=no_fly`` 记录。
+    """
+    sample_path = find_nofly_sample_file()
+    if not sample_path:
+        print("[gen] 禁飞区样本文件不存在，跳过 airspaces 生成")
+        return []
+    with open(sample_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    items = data.get("data", {}).get("list") or []
+    airspaces = []
+    for item in items:
+        zone_type = item.get("zoneType")
+        geometry = None
+        if zone_type == 1:
+            lng = item.get("lng")
+            lat = item.get("lat")
+            radius = item.get("radius")
+            if lng is not None and lat is not None and radius is not None:
+                lngs, lats = circle_to_ngon(float(lng), float(lat), float(radius))
+                geometry = [[lng, lat] for lng, lat in zip(lngs, lats)]
+        elif isinstance(item.get("geom"), list):
+            # 多边形禁飞区：后端已提供 geom 时直接透传其顶点。
+            geometry = [[float(p[0]), float(p[1])] for p in item["geom"]]
+        if not geometry or len(geometry) < 3:
+            print(f"[gen] 跳过无法形成多边形的禁飞区: id={item.get('id')} name={item.get('name')}")
+            continue
+        airspaces.append({
+            "airspaceId": str(item.get("id")),
+            "airspaceType": "no_fly",
+            "name": str(item.get("name") or "禁飞区"),
+            "geometry": geometry,
+        })
+    print(f"[gen] 从样本读取 {len(airspaces)} 个禁飞区")
+    return airspaces
+
+
 def circle_to_ngon(lng0, lat0, radius_m, n=_N_GON):
     """
     将圆形防御圈（半径米，圆心经纬度）离散化为正 n 边形顶点（经纬度）。
@@ -88,6 +145,7 @@ def circle_to_ngon(lng0, lat0, radius_m, n=_N_GON):
 
 def main():
     facilities, radii = load_airspace()
+    airspaces = load_nofly()
     if not facilities:
         raise ValueError("空域没有设施点")
 
@@ -108,12 +166,14 @@ def main():
     out_data = {
         "facilities_str": facilities_str,
         "defence_rings": defence_rings,
+        "airspaces": airspaces,
     }
     out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), _OUT_NAME)
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(out_data, f, indent=4, ensure_ascii=False)
     print(f"[gen] 已生成: {out_path}")
     print(f"[gen] facilities_str {len(facilities_str)} 项, defence_rings {len(defence_rings)} 项")
+    print(f"[gen] airspaces {len(airspaces)} 项")
 
 
 if __name__ == "__main__":
