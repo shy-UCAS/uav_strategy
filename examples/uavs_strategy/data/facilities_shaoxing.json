@@ -15,6 +15,7 @@
     },
     "defence_rings": {
         "shaoxing_1_countermeasure": {
+            "airspaceId": "2086742451469029376",
             "lngs": [
                 116.388367,
                 116.386799,
@@ -45,6 +46,7 @@
             ]
         },
         "shaoxing_1_alert": {
+            "airspaceId": "2086742451469029376",
             "lngs": [
                 116.400077,
                 116.396939,
@@ -75,6 +77,7 @@
             ]
         },
         "shaoxing_1_warning": {
+            "airspaceId": "2086742451469029376",
             "lngs": [
                 116.411786,
                 116.40708,

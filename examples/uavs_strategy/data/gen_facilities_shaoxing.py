@@ -160,7 +160,11 @@ def main():
         radius_m = radii[radius_key]
         ring_name = f"{center['name']}_{level_name}"
         lngs, lats = circle_to_ngon(center["lng"], center["lat"], radius_m)
-        defence_rings[ring_name] = {"lngs": lngs, "lats": lats}
+        defence_rings[ring_name] = {
+            "airspaceId": _AIRSPACE_ID,
+            "lngs": lngs,
+            "lats": lats,
+        }
         print(f"[gen] {ring_name}: 圆心=({center['lng']}, {center['lat']}) r={radius_m}m, {len(lngs)} 个顶点")
 
     out_data = {
